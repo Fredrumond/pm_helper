@@ -16,6 +16,7 @@ class Conversation extends Model
         'user_id',
         'title',
         'status',
+        'prompt_version',
     ];
 
     protected $casts = [

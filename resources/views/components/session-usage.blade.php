@@ -43,6 +43,10 @@
                                 #{{ $index + 1 }} {{ $usage->model }}
                             </p>
                             <p class="text-[11px] text-gray-400 mt-0.5">
+                                @if ($usage->prompt_version)
+                                    prompt {{ $usage->prompt_version }}
+                                    ·
+                                @endif
                                 {{ $usage->provider ?? '—' }}
                                 · {{ number_format($usage->prompt_tokens) }} in
                                 · {{ number_format($usage->completion_tokens) }} out

@@ -31,6 +31,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | System prompts
+    |--------------------------------------------------------------------------
+    |
+    | Cada versão vive em resources/prompts/{name}/{version}.md.
+    | Para evoluir: copie o arquivo para v2.md, ajuste o texto e troque a
+    | versão abaixo. Conversas já iniciadas permanecem na versão original.
+    | Não edite um arquivo já publicado — isso mistura medições.
+    |
+    */
+    'prompts' => [
+        'discovery' => [
+            'version' => env('CHAT_PROMPT_VERSION', 'v1'),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Skills do composer (atalho /)
     |--------------------------------------------------------------------------
     |

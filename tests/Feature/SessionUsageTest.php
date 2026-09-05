@@ -38,6 +38,7 @@ class SessionUsageTest extends TestCase
             'conversation_id' => $conversation->id,
             'generation_id' => 'gen-1',
             'model' => 'minimax/minimax-m3:free',
+            'prompt_version' => 'v1',
             'provider' => 'GMICloud',
             'prompt_tokens' => 850,
             'completion_tokens' => 131,
@@ -67,7 +68,8 @@ class SessionUsageTest extends TestCase
             ->assertSee('minimax/minimax-m3:free')
             ->assertSee('GMICloud')
             ->assertSee('Grátis')
-            ->assertSee('$0.0015');
+            ->assertSee('$0.0015')
+            ->assertSee('prompt v1');
 
         $this->actingAs($user)
             ->get(route('cards.show', $card))

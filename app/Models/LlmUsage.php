@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Prompts\SystemPrompt;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -11,6 +12,8 @@ class LlmUsage extends Model
         'conversation_id',
         'generation_id',
         'model',
+        'prompt_version',
+        'prompt_hash',
         'provider',
         'prompt_tokens',
         'completion_tokens',
@@ -36,8 +39,12 @@ class LlmUsage extends Model
     /**
      * @param  array<string, mixed>  $data
      */
-    public static function recordFromResponse(Conversation $conversation, array $data, string $fallbackModel): self
-    {
+    public static function recordFromResponse(
+        Conversation $conversation,
+        array $data,
+        string $fallbackModel,
+        ?SystemPrompt $prompt = null,
+    ): self {
         $usage = is_array($data['usage'] ?? null) ? $data['usage'] : [];
         $details = is_array($usage['prompt_tokens_details'] ?? null)
             ? $usage['prompt_tokens_details']
@@ -47,6 +54,8 @@ class LlmUsage extends Model
             'conversation_id' => $conversation->id,
             'generation_id' => $data['id'] ?? null,
             'model' => $data['model'] ?? $fallbackModel,
+            'prompt_version' => $prompt?->version,
+            'prompt_hash' => $prompt?->hash,
             'provider' => $data['provider'] ?? null,
             'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
             'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
