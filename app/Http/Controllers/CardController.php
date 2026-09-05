@@ -23,7 +23,7 @@ class CardController extends Controller
     {
         abort_if($card->user_id !== Auth::id(), 403);
 
-        $card->load('conversation');
+        $card->load('conversation.llmUsages');
 
         return view('cards.show', compact('card'));
     }

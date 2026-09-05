@@ -4,7 +4,6 @@ namespace App\Livewire;
 
 use App\Models\Card;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Attributes\On;
 use Livewire\Component;
 
 class CardPreview extends Component
@@ -27,6 +26,8 @@ class CardPreview extends Component
 
     public function render()
     {
+        $this->card->loadMissing('conversation.llmUsages');
+
         return view('livewire.card-preview');
     }
 }

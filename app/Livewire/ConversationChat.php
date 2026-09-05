@@ -7,6 +7,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Services\CardParserService;
 use App\Services\OpenRouterService;
+use App\Support\ChatComposer;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -19,10 +20,27 @@ class ConversationChat extends Component
 
     public string $input = '';
 
+    public string $selectedModel = '';
+
     public function mount(Conversation $conversation): void
     {
         abort_if($conversation->user_id !== Auth::id(), 403);
         $this->conversation = $conversation;
+
+        $stored = session('chat.selected_model');
+        $this->selectedModel = is_string($stored) && ChatComposer::isAllowedModel($stored)
+            ? $stored
+            : ChatComposer::defaultModel();
+    }
+
+    public function selectModel(string $model): void
+    {
+        if (! ChatComposer::isAllowedModel($model)) {
+            return;
+        }
+
+        $this->selectedModel = $model;
+        session(['chat.selected_model' => $model]);
     }
 
     public function sendMessage(OpenRouterService $openRouter, CardParserService $parser): void
@@ -50,7 +68,7 @@ class ConversationChat extends Component
             $this->conversation->refresh();
             $this->conversation->load('messages');
 
-            $assistantResponse = $openRouter->chat($this->conversation);
+            $assistantResponse = $openRouter->chat($this->conversation, $this->selectedModel);
 
             Message::create([
                 'conversation_id' => $this->conversation->id,
@@ -106,9 +124,19 @@ class ConversationChat extends Component
 
     public function render()
     {
+        $selected = ChatComposer::findModel($this->selectedModel);
+
+        $this->conversation->load(['messages', 'card']);
+
         return view('livewire.conversation-chat', [
             'messages' => $this->conversation->messages,
             'card' => $this->conversation->card,
+            'models' => ChatComposer::models(),
+            'selectedModelMeta' => $selected ?? [
+                'id' => $this->selectedModel,
+                'name' => $this->selectedModel,
+                'tier' => '',
+            ],
         ]);
     }
 }

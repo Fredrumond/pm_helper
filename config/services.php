@@ -36,7 +36,7 @@ return [
     */
     'openrouter' => [
         'api_key' => env('OPENROUTER_API_KEY'),
-        'model'   => env('OPENROUTER_MODEL', 'anthropic/claude-3.5-sonnet'),
+        'model'   => env('OPENROUTER_MODEL', 'minimax/minimax-m3:free'),
     ],
 
 ];

@@ -37,9 +37,38 @@ class Conversation extends Model
         return $this->hasOne(Card::class);
     }
 
+    public function llmUsages(): HasMany
+    {
+        return $this->hasMany(LlmUsage::class)->orderBy('created_at');
+    }
+
     public function isCompleted(): bool
     {
         return $this->status === 'completed';
+    }
+
+    /**
+     * @return array{calls: int, prompt_tokens: int, completion_tokens: int, total_tokens: int, cached_tokens: int, cost: float}
+     */
+    public function usageSummary(): array
+    {
+        $usages = $this->relationLoaded('llmUsages')
+            ? $this->llmUsages
+            : $this->llmUsages()->get();
+
+        return [
+            'calls' => $usages->count(),
+            'prompt_tokens' => (int) $usages->sum('prompt_tokens'),
+            'completion_tokens' => (int) $usages->sum('completion_tokens'),
+            'total_tokens' => (int) $usages->sum('total_tokens'),
+            'cached_tokens' => (int) $usages->sum('cached_tokens'),
+            'cost' => (float) $usages->sum(fn (LlmUsage $usage) => (float) $usage->cost),
+        ];
+    }
+
+    public function formattedUsageCost(): string
+    {
+        return LlmUsage::formatCost($this->usageSummary()['cost']);
     }
 
     /**
@@ -48,7 +77,7 @@ class Conversation extends Model
     public function toLlmHistory(): array
     {
         return $this->messages->map(fn (Message $msg) => [
-            'role'    => $msg->role,
+            'role' => $msg->role,
             'content' => $msg->content,
         ])->toArray();
     }

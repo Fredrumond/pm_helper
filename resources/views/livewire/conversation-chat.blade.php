@@ -1,24 +1,27 @@
-<div class="flex-1 flex flex-col overflow-hidden h-full">
+<div class="flex-1 flex flex-col overflow-hidden h-full min-h-0">
 
     {{-- Mensagens --}}
-    <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4" id="messages-container">
+    <div class="flex-1 overflow-y-auto px-5 py-4" id="messages-container">
+        <div @class(['max-w-3xl mx-auto', 'h-full' => $messages->isEmpty(), 'space-y-4' => $messages->isNotEmpty()])>
 
         @if ($messages->isEmpty())
-            <div class="flex flex-col items-center justify-center h-full text-center py-12">
-                <div class="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center mb-4">
-                    <svg class="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                    </svg>
+            <div class="flex items-center justify-center h-full">
+                <div class="w-full text-center py-16 px-6 bg-white rounded-xl border border-gray-200">
+                    <div class="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-semibold text-gray-800 mb-1">Assistente de Discovery</h3>
+                    <p class="text-sm text-gray-500 max-w-sm mx-auto">
+                        Descreva uma necessidade ou ideia. O assistente conduz o discovery e gera um card.
+                    </p>
                 </div>
-                <h3 class="font-semibold text-gray-700 mb-1">Assistente de Discovery</h3>
-                <p class="text-sm text-gray-400 max-w-xs">
-                    Descreva uma necessidade ou ideia. O assistente vai conduzir um processo de discovery e gerar um card estruturado.
-                </p>
             </div>
         @else
             @foreach ($messages as $message)
-                <div class="flex {{ $message->isFromUser() ? 'justify-end' : 'justify-start' }}">
+                <div wire:key="message-{{ $message->id }}" class="flex {{ $message->isFromUser() ? 'justify-end' : 'justify-start' }}">
                     @if ($message->isFromAssistant())
                         <div class="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center shrink-0 mr-2 mt-1">
                             <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -71,9 +74,10 @@
                 </div>
             </div>
         </div>
+        </div>
     </div>
 
-    {{-- Input --}}
+    {{-- Composer --}}
     <div class="bg-white border-t border-gray-200 px-4 py-3 shrink-0">
         @if ($conversation->isCompleted())
             <div class="text-center text-sm text-gray-400 py-2">
@@ -81,41 +85,204 @@
             </div>
             <form id="new-conv-form" method="POST" action="{{ route('conversations.store') }}" class="hidden">@csrf</form>
         @else
-            <form wire:submit.prevent="sendMessage" class="flex gap-2">
-                <textarea
-                    wire:model="input"
-                    wire:keydown.enter.prevent="sendMessage"
-                    wire:loading.attr="disabled"
-                    wire:target="sendMessage"
-                    placeholder="Descreva sua necessidade ou ideia..."
-                    rows="1"
-                    class="flex-1 resize-none rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent
-                           placeholder-gray-400 transition-colors"
-                ></textarea>
-                <button
-                    type="submit"
-                    wire:loading.attr="disabled"
-                    wire:target="sendMessage"
-                    class="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors
-                           disabled:opacity-50 disabled:cursor-not-allowed shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
-                    </svg>
-                </button>
+            <form
+                wire:submit="sendMessage"
+                x-data="chatComposer(@js($models))"
+                @click.outside="showModels = false"
+                class="relative max-w-3xl mx-auto"
+            >
+                {{-- Modelos --}}
+                <div
+                    x-show="showModels"
+                    x-cloak
+                    x-transition.opacity
+                    class="absolute bottom-12 left-0 z-20 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+                    role="listbox"
+                    aria-label="Modelos"
+                >
+                    <div class="border-b border-gray-100 p-2">
+                        <input
+                            type="search"
+                            x-model="modelQuery"
+                            @keydown.enter.prevent
+                            placeholder="Buscar modelos"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                        >
+                    </div>
+                    <ul class="max-h-56 overflow-y-auto py-1">
+                        <template x-for="model in filteredModels" :key="model.id">
+                            <li>
+                                <button
+                                    type="button"
+                                    @click="chooseModel(model.id)"
+                                    class="w-full flex items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-indigo-50"
+                                >
+                                    <span>
+                                        <span class="block text-sm text-gray-800" x-text="model.name"></span>
+                                        <span class="block text-[11px] text-gray-400" x-text="model.tier"></span>
+                                    </span>
+                                    <svg x-show="model.id === $wire.selectedModel" class="w-4 h-4 shrink-0 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </button>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white shadow-sm transition-colors focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-200">
+                    <textarea
+                        wire:model="input"
+                        wire:keydown.enter.exact.prevent="sendMessage"
+                        wire:loading.attr="disabled"
+                        wire:target="sendMessage"
+                        x-ref="input"
+                        @input="onDraftInput($event)"
+                        @keydown.escape="showModels = false"
+                        placeholder="Descreva sua necessidade ou ideia..."
+                        rows="2"
+                        class="w-full resize-none bg-transparent px-4 pt-3 pb-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none disabled:opacity-60"
+                    ></textarea>
+
+                    <div class="flex items-center justify-between gap-2 px-2.5 pb-2.5">
+                        <div class="flex items-center min-w-0">
+                            <button
+                                type="button"
+                                @click="toggleModels()"
+                                class="inline-flex items-center gap-1 max-w-full rounded-lg px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-100"
+                                :aria-expanded="showModels.toString()"
+                            >
+                                <span class="truncate">{{ $selectedModelMeta['name'] }}</span>
+                                @if ($selectedModelMeta['tier'] !== '')
+                                    <span class="hidden text-gray-400 sm:inline">{{ $selectedModelMeta['tier'] }}</span>
+                                @endif
+                                <svg class="w-3 h-3 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-1">
+                            <div class="relative">
+                                <button
+                                    type="button"
+                                    @click="soon('skills')"
+                                    title="Skills (em breve)"
+                                    class="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                                >
+                                    <span class="block text-xs font-mono leading-none px-0.5">/</span>
+                                </button>
+                                <span
+                                    x-show="soonHint === 'skills'"
+                                    x-cloak
+                                    x-transition.opacity
+                                    class="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-md bg-gray-800 px-2 py-1 text-[11px] text-white"
+                                >
+                                    Em breve
+                                </span>
+                            </div>
+
+                            <div class="relative">
+                                <button
+                                    type="button"
+                                    @click="soon('attach')"
+                                    title="Anexar arquivo (em breve)"
+                                    class="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                              d="M21.44 11.05l-8.49 8.49a5.25 5.25 0 01-7.42-7.42l8.48-8.49a3.5 3.5 0 014.95 4.95l-8.48 8.49a1.75 1.75 0 11-2.47-2.47l7.78-7.78"/>
+                                    </svg>
+                                </button>
+                                <span
+                                    x-show="soonHint === 'attach'"
+                                    x-cloak
+                                    x-transition.opacity
+                                    class="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-md bg-gray-800 px-2 py-1 text-[11px] text-white"
+                                >
+                                    Em breve
+                                </span>
+                            </div>
+
+                            <button
+                                type="submit"
+                                wire:loading.attr="disabled"
+                                wire:target="sendMessage"
+                                title="Enviar (Enter)"
+                                class="rounded-lg bg-indigo-600 p-1.5 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </form>
         @endif
     </div>
 </div>
 
 <script>
-    // Scroll para a última mensagem automaticamente
-    document.addEventListener('livewire:updated', () => {
+    window.chatComposer = function (models) {
+        return {
+            models,
+            showModels: false,
+            modelQuery: '',
+            soonHint: '',
+            get filteredModels() {
+                const query = this.modelQuery.toLowerCase();
+                if (! query) {
+                    return this.models;
+                }
+
+                return this.models.filter((model) =>
+                    model.name.toLowerCase().includes(query)
+                    || model.id.toLowerCase().includes(query)
+                    || model.tier.toLowerCase().includes(query)
+                );
+            },
+            toggleModels() {
+                this.showModels = ! this.showModels;
+            },
+            chooseModel(id) {
+                this.$wire.selectModel(id);
+                this.showModels = false;
+                this.modelQuery = '';
+            },
+            soon(kind) {
+                this.soonHint = kind;
+                setTimeout(() => { this.soonHint = ''; }, 1800);
+            },
+            onDraftInput() {
+                this.resize();
+            },
+            resize() {
+                const el = this.$refs.input;
+                if (! el) {
+                    return;
+                }
+
+                el.style.height = 'auto';
+                el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+            },
+        };
+    };
+
+    const scrollMessages = () => {
         const container = document.getElementById('messages-container');
-        if (container) container.scrollTop = container.scrollHeight;
-    });
-    window.addEventListener('load', () => {
-        const container = document.getElementById('messages-container');
-        if (container) container.scrollTop = container.scrollHeight;
-    });
+        if (container) {
+            container.scrollTop = container.scrollHeight;
+        }
+    };
+
+    if (! window.__pmChatScrollBound) {
+        window.__pmChatScrollBound = true;
+        document.addEventListener('livewire:updated', scrollMessages);
+        window.addEventListener('load', scrollMessages);
+    }
 </script>
+
+<style>
+    [x-cloak] { display: none !important; }
+</style>

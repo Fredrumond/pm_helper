@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="title">{{ $conversation->title }} — PM Helper</x-slot>
 
-    <div class="h-full flex overflow-hidden">
+    <div class="h-full min-h-0 flex overflow-hidden">
 
         {{-- Painel principal: Chat --}}
         <div class="flex-1 overflow-hidden flex flex-col {{ $conversation->card ? 'w-1/2' : 'w-full' }}">

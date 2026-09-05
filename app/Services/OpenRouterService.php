@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Conversation;
+use App\Models\LlmUsage;
+use App\Support\ChatComposer;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -29,8 +31,10 @@ class OpenRouterService
     /**
      * Envia o histórico da conversa para a LLM e retorna a resposta do assistente.
      */
-    public function chat(Conversation $conversation): string
+    public function chat(Conversation $conversation, ?string $model = null): string
     {
+        $model = $this->resolveModel($model);
+
         $messages = array_merge(
             [['role' => 'system', 'content' => $this->buildSystemPrompt()]],
             $conversation->toLlmHistory()
@@ -45,7 +49,7 @@ class OpenRouterService
             ->connectTimeout(10)
             ->timeout(120)
             ->post("{$this->baseUrl}/chat/completions", [
-                'model' => $this->model,
+                'model' => $model,
                 'messages' => $messages,
                 'temperature' => 0.7,
                 'max_tokens' => 4096,
@@ -60,7 +64,7 @@ class OpenRouterService
             Log::error('OpenRouter API error', [
                 'status' => $response->status(),
                 'body' => $response->body(),
-                'model' => $this->model,
+                'model' => $model,
             ]);
 
             throw new \RuntimeException(
@@ -73,12 +77,11 @@ class OpenRouterService
         Log::info('OpenRouter API response', [
             'conversation_id' => $conversation->id,
             'status' => $response->status(),
-            'model' => is_array($data) ? ($data['model'] ?? $this->model) : $this->model,
+            'model' => is_array($data) ? ($data['model'] ?? $model) : $model,
             'id' => is_array($data) ? ($data['id'] ?? null) : null,
             'provider' => is_array($data) ? ($data['provider'] ?? null) : null,
             'usage' => is_array($data) ? ($data['usage'] ?? null) : null,
             'finish_reason' => is_array($data) ? ($data['choices'][0]['finish_reason'] ?? null) : null,
-            'payload' => $data ?? $response->body(),
         ]);
 
         $content = is_array($data) ? ($data['choices'][0]['message']['content'] ?? '') : '';
@@ -87,7 +90,20 @@ class OpenRouterService
             throw new \RuntimeException('A LLM retornou uma resposta vazia.');
         }
 
+        if (is_array($data)) {
+            LlmUsage::recordFromResponse($conversation, $data, $model);
+        }
+
         return $content;
+    }
+
+    private function resolveModel(?string $model): string
+    {
+        if (is_string($model) && $model !== '' && ChatComposer::isAllowedModel($model)) {
+            return $model;
+        }
+
+        return $this->model;
     }
 
     private function buildSystemPrompt(): string

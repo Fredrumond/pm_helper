@@ -15,7 +15,10 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100">
+        <div @class([
+            'min-h-screen bg-gray-100',
+            'h-screen flex flex-col overflow-hidden' => request()->routeIs('conversations.show'),
+        ])>
             @include('layouts.navigation')
 
             <!-- Page Heading -->
@@ -28,7 +31,7 @@
             @endisset
 
             <!-- Page Content -->
-            <main>
+            <main @class(['flex-1 overflow-hidden min-h-0' => request()->routeIs('conversations.show')])>
                 {{ $slot }}
             </main>
         </div>

@@ -107,6 +107,8 @@
         </div>
     @endif
 
+    <x-session-usage :conversation="$card->conversation" class="mb-5" />
+
     {{-- Ações --}}
     @if (! $card->isApproved())
         <button wire:click="approve"

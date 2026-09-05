@@ -117,6 +117,8 @@
                     </section>
                 @endif
 
+                <x-session-usage :conversation="$card->conversation" />
+
             </div>
 
             {{-- Footer --}}

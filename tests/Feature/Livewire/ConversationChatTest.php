@@ -5,7 +5,9 @@ namespace Tests\Feature\Livewire;
 use App\Livewire\ConversationChat;
 use App\Models\Conversation;
 use App\Models\User;
+use App\Support\ChatComposer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -109,8 +111,20 @@ TXT;
         Http::preventStrayRequests();
         Http::fake([
             'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'id' => 'gen-card-1',
+                'model' => 'test/model',
+                'provider' => 'TestProvider',
+                'usage' => [
+                    'prompt_tokens' => 80,
+                    'completion_tokens' => 20,
+                    'total_tokens' => 100,
+                    'cost' => 0,
+                ],
                 'choices' => [
-                    ['message' => ['content' => $reply]],
+                    [
+                        'finish_reason' => 'stop',
+                        'message' => ['content' => $reply],
+                    ],
                 ],
             ], 200),
         ]);
@@ -134,6 +148,11 @@ TXT;
             'status' => 'draft',
         ]);
         $this->assertSame('completed', $conversation->fresh()->status);
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'generation_id' => 'gen-card-1',
+            'total_tokens' => 100,
+        ]);
     }
 
     public function test_does_not_send_blank_or_completed_conversation_messages(): void
@@ -200,5 +219,74 @@ TXT;
             ->call('sendMessage')
             ->assertSee('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;', false)
             ->assertDontSee('<script>alert("xss")</script>', false);
+    }
+
+    public function test_renders_composer_with_models_and_deferred_actions(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->assertSee('Descreva sua necessidade ou ideia')
+            ->assertSee('Skills (em breve)', false)
+            ->assertSee('Anexar arquivo (em breve)', false)
+            ->assertDontSee('Gerar card')
+            ->assertSee('bg-white border-t border-gray-200', false)
+            ->assertSee('wire:submit="sendMessage"', false)
+            ->assertSee('wire:keydown.enter.exact.prevent="sendMessage"', false)
+            ->assertDontSee('$wire.set(', false)
+            ->assertSee(ChatComposer::findModel(ChatComposer::defaultModel())['name'] ?? ChatComposer::defaultModel());
+    }
+
+    public function test_sends_the_selected_model_to_openrouter(): void
+    {
+        config([
+            'chat.models' => [
+                ['id' => 'test/model', 'name' => 'Test', 'tier' => 'Free'],
+                ['id' => 'openai/gpt-4o', 'name' => 'GPT-4o', 'tier' => 'High'],
+            ],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Certo.']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('selectModel', 'openai/gpt-4o')
+            ->assertSet('selectedModel', 'openai/gpt-4o')
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage');
+
+        Http::assertSent(fn (Request $request) => $request['model'] === 'openai/gpt-4o');
+    }
+
+    public function test_ignores_unknown_model_selection(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('selectModel', 'unknown/model')
+            ->assertSet('selectedModel', ChatComposer::defaultModel());
     }
 }

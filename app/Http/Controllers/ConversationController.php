@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Conversation;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -24,7 +23,7 @@ class ConversationController extends Controller
     public function store(): RedirectResponse
     {
         $conversation = Auth::user()->conversations()->create([
-            'title'  => 'Nova conversa',
+            'title' => 'Nova conversa',
             'status' => 'in_progress',
         ]);
 
@@ -35,7 +34,7 @@ class ConversationController extends Controller
     {
         abort_if($conversation->user_id !== Auth::id(), 403);
 
-        $conversation->load(['messages', 'card']);
+        $conversation->load(['messages', 'card', 'llmUsages']);
 
         return view('conversations.show', compact('conversation'));
     }
