@@ -98,6 +98,92 @@ class ConversationChatTest extends TestCase
         ]);
     }
 
+    public function test_uses_fallback_model_silently_when_primary_is_rate_limited(): void
+    {
+        config([
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+            ],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push([
+                    'error' => [
+                        'message' => 'Provider returned error',
+                        'code' => 429,
+                        'metadata' => [
+                            'raw' => 'test/model is temporarily rate-limited upstream.',
+                            'provider_error_code' => 'rate_limit_exceeded',
+                        ],
+                    ],
+                ], 429)
+                ->push([
+                    'choices' => [
+                        ['message' => ['content' => 'Qual o impacto disso?']],
+                    ],
+                ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Qual o impacto disso?')
+            ->assertDontSee('Erro OpenRouter')
+            ->assertDontSee('rate-limited')
+            ->assertDontSee('429');
+
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Qual o impacto disso?',
+        ]);
+    }
+
+    public function test_does_not_expose_rate_limit_when_fallbacks_are_exhausted(): void
+    {
+        config([
+            'services.openrouter.fallback_models' => [],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'error' => [
+                    'message' => 'Provider returned error',
+                    'code' => 429,
+                    'metadata' => [
+                        'raw' => 'test/model is temporarily rate-limited upstream.',
+                        'provider_error_code' => 'rate_limit_exceeded',
+                    ],
+                ],
+            ], 429),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Não consegui continuar agora')
+            ->assertDontSee('Erro OpenRouter')
+            ->assertDontSee('rate-limited')
+            ->assertDontSee('HTTP 429');
+    }
+
     public function test_persists_card_and_redirects_when_assistant_returns_card_json(): void
     {
         $reply = <<<'TXT'

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Services;
 
+use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Conversation;
 use App\Models\LlmUsage;
 use App\Models\User;
@@ -409,5 +410,209 @@ class OpenRouterServiceTest extends TestCase
                 && str_contains((string) $request['messages'][1]['content'], 'Problema: checkout sem pagamento')
                 && count($request['messages']) === 2;
         });
+    }
+
+    public function test_retries_same_context_on_next_fallback_when_rate_limited(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+                'poolside/laguna-s-2.1:free',
+            ],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push($this->rateLimitPayload('test/model'), 429)
+                ->push([
+                    'id' => 'gen-fallback-1',
+                    'model' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
+                    'choices' => [
+                        ['message' => ['content' => 'Resposta do fallback']],
+                    ],
+                ], 200),
+        ]);
+
+        $conversation = $this->conversationWithUserMessage();
+
+        $content = (new OpenRouterService)->chat($conversation);
+
+        $this->assertSame('Resposta do fallback', $content);
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'generation_id' => 'gen-fallback-1',
+            'model' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        ]);
+
+        Http::assertSentCount(2);
+        Http::assertSent(function (Request $request) {
+            return $request['model'] === 'test/model'
+                && $request['messages'][1]['content'] === 'Quero um card';
+        });
+        Http::assertSent(function (Request $request) {
+            return $request['model'] === 'nvidia/nemotron-3-ultra-550b-a55b:free'
+                && $request['messages'][1]['content'] === 'Quero um card';
+        });
+    }
+
+    public function test_walks_fallback_chain_when_first_fallback_is_also_rate_limited(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+                'poolside/laguna-s-2.1:free',
+            ],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push($this->rateLimitPayload('test/model'), 429)
+                ->push($this->rateLimitPayload('nvidia/nemotron-3-ultra-550b-a55b:free'), 429)
+                ->push([
+                    'choices' => [
+                        ['message' => ['content' => 'Resposta da segunda fallback']],
+                    ],
+                ], 200),
+        ]);
+
+        $content = (new OpenRouterService)->chat($this->conversationWithUserMessage());
+
+        $this->assertSame('Resposta da segunda fallback', $content);
+        Http::assertSentCount(3);
+        Http::assertSent(fn (Request $request) => $request['model'] === 'poolside/laguna-s-2.1:free');
+    }
+
+    public function test_skips_fallback_equal_to_primary_model(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+                'poolside/laguna-s-2.1:free',
+            ],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push($this->rateLimitPayload('nvidia/nemotron-3-ultra-550b-a55b:free'), 429)
+                ->push([
+                    'choices' => [
+                        ['message' => ['content' => 'Ok da segunda']],
+                    ],
+                ], 200),
+        ]);
+
+        $content = (new OpenRouterService)->chat($this->conversationWithUserMessage());
+
+        $this->assertSame('Ok da segunda', $content);
+        Http::assertSentCount(2);
+        Http::assertSent(fn (Request $request) => $request['model'] === 'poolside/laguna-s-2.1:free');
+    }
+
+    public function test_does_not_expose_rate_limit_when_all_models_are_exhausted(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+            ],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push($this->rateLimitPayload('test/model'), 429)
+                ->push($this->rateLimitPayload('nvidia/nemotron-3-ultra-550b-a55b:free'), 429),
+        ]);
+
+        $this->expectException(LlmTemporarilyUnavailableException::class);
+        $this->expectExceptionMessage('Não consegui continuar agora');
+
+        try {
+            (new OpenRouterService)->chat($this->conversationWithUserMessage());
+        } finally {
+            $this->assertDatabaseCount('llm_usages', 0);
+        }
+    }
+
+    public function test_generate_card_retries_fallback_when_rate_limited(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+            ],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push($this->rateLimitPayload('test/model'), 429)
+                ->push([
+                    'choices' => [
+                        ['message' => ['content' => '<CARD_JSON>{"title":"Checkout"}</CARD_JSON>']],
+                    ],
+                ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'prompt_name' => 'interview',
+            'prompt_version' => 'v1',
+            'interview_summary' => 'Problema: checkout sem pagamento',
+        ]);
+
+        $content = (new OpenRouterService)->generateCard(
+            $conversation,
+            'Problema: checkout sem pagamento',
+        );
+
+        $this->assertStringContainsString('<CARD_JSON>', $content);
+        Http::assertSent(fn (Request $request) => $request['model'] === 'nvidia/nemotron-3-ultra-550b-a55b:free');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function rateLimitPayload(string $model): array
+    {
+        return [
+            'error' => [
+                'message' => 'Provider returned error',
+                'code' => 429,
+                'metadata' => [
+                    'raw' => "{$model} is temporarily rate-limited upstream.",
+                    'provider_error_code' => 'rate_limit_exceeded',
+                ],
+            ],
+        ];
+    }
+
+    private function conversationWithUserMessage(): Conversation
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Teste',
+        ]);
+        $conversation->messages()->create([
+            'role' => 'user',
+            'content' => 'Quero um card',
+        ]);
+        $conversation->load('messages');
+
+        return $conversation;
     }
 }

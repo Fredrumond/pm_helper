@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Card;
 use App\Models\Conversation;
 use App\Models\Message;
@@ -81,6 +82,8 @@ class ConversationChat extends Component
             if ($parser->hasCard($assistantResponse)) {
                 $this->persistCard($parser, $assistantResponse);
             }
+        } catch (LlmTemporarilyUnavailableException $e) {
+            $this->recordSoftLlmUnavailable($e);
         } catch (Throwable $e) {
             Log::error('Falha ao consultar a OpenRouter', [
                 'conversation_id' => $this->conversation->id,
@@ -141,6 +144,8 @@ class ConversationChat extends Component
             if ($parser->hasCard($assistantResponse)) {
                 $this->persistCard($parser, $assistantResponse);
             }
+        } catch (LlmTemporarilyUnavailableException $e) {
+            $this->recordSoftLlmUnavailable($e);
         } catch (Throwable $e) {
             Log::error('Falha ao gerar o card', [
                 'conversation_id' => $this->conversation->id,
@@ -201,6 +206,20 @@ class ConversationChat extends Component
         ]);
 
         $this->dispatch('interview-ready');
+    }
+
+    private function recordSoftLlmUnavailable(LlmTemporarilyUnavailableException $e): void
+    {
+        Log::warning('LLM temporariamente indisponível após fallbacks', [
+            'conversation_id' => $this->conversation->id,
+            'error' => $e->getMessage(),
+        ]);
+
+        Message::create([
+            'conversation_id' => $this->conversation->id,
+            'role' => 'assistant',
+            'content' => $e->getMessage(),
+        ]);
     }
 
     private function persistCard(CardParserService $parser, string $response): void

@@ -37,6 +37,10 @@ return [
     'openrouter' => [
         'api_key' => env('OPENROUTER_API_KEY'),
         'model'   => env('OPENROUTER_MODEL', 'minimax/minimax-m3:free'),
+        'fallback_models' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('OPENROUTER_FALLBACK_MODELS', 'nvidia/nemotron-3-ultra-550b-a55b:free'))
+        ))),
     ],
 
 ];

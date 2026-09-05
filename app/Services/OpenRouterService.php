@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Conversation;
 use App\Models\LlmUsage;
 use App\Prompts\SystemPrompt;
 use App\Prompts\SystemPromptCatalog;
 use App\Support\ChatComposer;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -73,7 +75,89 @@ class OpenRouterService
         SystemPrompt $prompt,
         string $step,
     ): string {
-        $response = Http::withToken($this->apiKey)
+        $candidates = $this->modelsToTry($model);
+
+        foreach ($candidates as $index => $candidate) {
+            $response = $this->requestChatCompletion($messages, $candidate);
+
+            if ($this->isRateLimited($response)) {
+                $fallback = $candidates[$index + 1] ?? null;
+
+                Log::warning('OpenRouter rate limited', [
+                    'conversation_id' => $conversation->id,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'model' => $candidate,
+                    'step' => $step,
+                    'fallback' => $fallback,
+                ]);
+
+                if ($fallback !== null) {
+                    continue;
+                }
+
+                throw new LlmTemporarilyUnavailableException(
+                    'Não consegui continuar agora. Envie a mensagem novamente em alguns instantes.'
+                );
+            }
+
+            if ($response->failed()) {
+                $payload = $response->json();
+                $detail = is_array($payload)
+                    ? ($payload['error']['message'] ?? $response->body())
+                    : $response->body();
+
+                Log::error('OpenRouter API error', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'model' => $candidate,
+                    'step' => $step,
+                ]);
+
+                throw new \RuntimeException(
+                    "OpenRouter retornou HTTP {$response->status()}: {$detail}"
+                );
+            }
+
+            $data = $response->json();
+
+            Log::info('OpenRouter API response', [
+                'conversation_id' => $conversation->id,
+                'status' => $response->status(),
+                'prompt' => $prompt->identifier(),
+                'prompt_hash' => $prompt->hash,
+                'step' => $step,
+                'model' => is_array($data) ? ($data['model'] ?? $candidate) : $candidate,
+                'id' => is_array($data) ? ($data['id'] ?? null) : null,
+                'provider' => is_array($data) ? ($data['provider'] ?? null) : null,
+                'usage' => is_array($data) ? ($data['usage'] ?? null) : null,
+                'finish_reason' => is_array($data) ? ($data['choices'][0]['finish_reason'] ?? null) : null,
+            ]);
+
+            $content = is_array($data) ? ($data['choices'][0]['message']['content'] ?? '') : '';
+
+            if (empty($content)) {
+                throw new \RuntimeException('A LLM retornou uma resposta vazia.');
+            }
+
+            if (is_array($data)) {
+                LlmUsage::recordFromResponse($conversation, $data, $candidate, $prompt, $step);
+            }
+
+            return $content;
+        }
+
+        throw new LlmTemporarilyUnavailableException(
+            'Não consegui continuar agora. Envie a mensagem novamente em alguns instantes.'
+        );
+    }
+
+    /**
+     * @param  list<array{role: string, content: string}>  $messages
+     */
+    private function requestChatCompletion(array $messages, string $model): Response
+    {
+        return Http::withToken($this->apiKey)
             ->withHeaders([
                 'HTTP-Referer' => config('app.url'),
                 'X-Title' => 'PM Card Assistant',
@@ -87,51 +171,78 @@ class OpenRouterService
                 'temperature' => 0.7,
                 'max_tokens' => 4096,
             ]);
+    }
 
-        if ($response->failed()) {
-            $payload = $response->json();
-            $detail = is_array($payload)
-                ? ($payload['error']['message'] ?? $response->body())
-                : $response->body();
-
-            Log::error('OpenRouter API error', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-                'model' => $model,
-                'step' => $step,
-            ]);
-
-            throw new \RuntimeException(
-                "OpenRouter retornou HTTP {$response->status()}: {$detail}"
-            );
+    private function isRateLimited(Response $response): bool
+    {
+        if ($response->status() === 429) {
+            return true;
         }
 
-        $data = $response->json();
+        $payload = $response->json();
+        $code = is_array($payload) ? ($payload['error']['code'] ?? null) : null;
 
-        Log::info('OpenRouter API response', [
-            'conversation_id' => $conversation->id,
-            'status' => $response->status(),
-            'prompt' => $prompt->identifier(),
-            'prompt_hash' => $prompt->hash,
-            'step' => $step,
-            'model' => is_array($data) ? ($data['model'] ?? $model) : $model,
-            'id' => is_array($data) ? ($data['id'] ?? null) : null,
-            'provider' => is_array($data) ? ($data['provider'] ?? null) : null,
-            'usage' => is_array($data) ? ($data['usage'] ?? null) : null,
-            'finish_reason' => is_array($data) ? ($data['choices'][0]['finish_reason'] ?? null) : null,
-        ]);
-
-        $content = is_array($data) ? ($data['choices'][0]['message']['content'] ?? '') : '';
-
-        if (empty($content)) {
-            throw new \RuntimeException('A LLM retornou uma resposta vazia.');
+        if ($code === 429 || $code === '429') {
+            return true;
         }
 
-        if (is_array($data)) {
-            LlmUsage::recordFromResponse($conversation, $data, $model, $prompt, $step);
+        $providerCode = is_array($payload)
+            ? ($payload['error']['metadata']['provider_error_code'] ?? null)
+            : null;
+
+        if (is_string($providerCode) && str_contains(strtolower($providerCode), 'rate_limit')) {
+            return true;
         }
 
-        return $content;
+        $haystack = strtolower($response->body());
+
+        return str_contains($haystack, 'rate-limited')
+            || str_contains($haystack, 'rate_limit')
+            || str_contains($haystack, 'rate limit');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function modelsToTry(string $primary): array
+    {
+        $models = [$primary];
+
+        foreach ($this->fallbackModels() as $fallback) {
+            if (! in_array($fallback, $models, true)) {
+                $models[] = $fallback;
+            }
+        }
+
+        return $models;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fallbackModels(): array
+    {
+        $configured = config('services.openrouter.fallback_models', []);
+
+        if (is_string($configured)) {
+            $configured = explode(',', $configured);
+        }
+
+        if (! is_array($configured)) {
+            return [];
+        }
+
+        $models = [];
+
+        foreach ($configured as $model) {
+            $model = trim((string) $model);
+
+            if ($model !== '' && ! in_array($model, $models, true)) {
+                $models[] = $model;
+            }
+        }
+
+        return $models;
     }
 
     private function resolveModel(?string $model): string
