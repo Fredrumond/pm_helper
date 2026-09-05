@@ -19,7 +19,14 @@
                     @if ($conversation->isCompleted())
                         <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 shrink-0">✓ Card gerado</span>
                     @else
-                        <span class="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-600 shrink-0">Discovery em andamento</span>
+                        <span
+                            x-data="{ complete: @js($conversation->isInterviewComplete()) }"
+                            x-on:interview-ready.window="complete = true"
+                            class="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-600 shrink-0"
+                            x-text="complete ? 'Pronto para gerar o card' : 'Interview em andamento'"
+                        >
+                            {{ $conversation->isInterviewComplete() ? 'Pronto para gerar o card' : 'Interview em andamento' }}
+                        </span>
                     @endif
                 </div>
                 <form method="POST" action="{{ route('conversations.destroy', $conversation) }}"

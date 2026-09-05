@@ -76,6 +76,8 @@ class ConversationChat extends Component
                 'content' => $assistantResponse,
             ]);
 
+            $this->captureInterviewSummary($parser, $assistantResponse);
+
             if ($parser->hasCard($assistantResponse)) {
                 $this->persistCard($parser, $assistantResponse);
             }
@@ -98,6 +100,107 @@ class ConversationChat extends Component
         if ($this->conversation->card !== null) {
             $this->redirect(route('conversations.show', $this->conversation));
         }
+    }
+
+    public function generateCard(OpenRouterService $openRouter, CardParserService $parser): void
+    {
+        $this->conversation->refresh();
+        $this->conversation->load('messages');
+        $this->ensureInterviewSummary($parser);
+
+        if ($this->conversation->isCompleted()) {
+            return;
+        }
+
+        if (! $this->conversation->isInterviewComplete()) {
+            Message::create([
+                'conversation_id' => $this->conversation->id,
+                'role' => 'assistant',
+                'content' => 'Ainda não fechei a entrevista. Complemente o contexto no chat e tente gerar o card de novo.',
+            ]);
+
+            $this->conversation->refresh();
+            $this->conversation->load(['messages', 'card']);
+
+            return;
+        }
+
+        try {
+            $assistantResponse = $openRouter->generateCard(
+                $this->conversation,
+                (string) $this->conversation->interview_summary,
+                $this->selectedModel,
+            );
+
+            Message::create([
+                'conversation_id' => $this->conversation->id,
+                'role' => 'assistant',
+                'content' => $assistantResponse,
+            ]);
+
+            if ($parser->hasCard($assistantResponse)) {
+                $this->persistCard($parser, $assistantResponse);
+            }
+        } catch (Throwable $e) {
+            Log::error('Falha ao gerar o card', [
+                'conversation_id' => $this->conversation->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            Message::create([
+                'conversation_id' => $this->conversation->id,
+                'role' => 'assistant',
+                'content' => '⚠️ Erro OpenRouter: '.$e->getMessage(),
+            ]);
+        }
+
+        $this->conversation->refresh();
+        $this->conversation->load(['messages', 'card']);
+
+        if ($this->conversation->card !== null) {
+            $this->redirect(route('conversations.show', $this->conversation));
+        }
+    }
+
+    private function captureInterviewSummary(CardParserService $parser, string $response): void
+    {
+        $summary = $parser->extractInterviewSummary($response);
+
+        if ($summary === null && $parser->looksInterviewReady($response)) {
+            $summary = $parser->extractTextOnly($response);
+        }
+
+        if ($summary === null || trim($summary) === '') {
+            return;
+        }
+
+        $this->markInterviewReady($summary);
+    }
+
+    private function ensureInterviewSummary(CardParserService $parser): void
+    {
+        if ($this->conversation->isInterviewComplete()) {
+            return;
+        }
+
+        $summary = $parser->summaryFromMessages($this->conversation->messages);
+
+        if ($summary === null) {
+            return;
+        }
+
+        $this->markInterviewReady($summary);
+        $this->conversation->refresh();
+    }
+
+    private function markInterviewReady(string $summary): void
+    {
+        $this->conversation->update([
+            'interview_summary' => $summary,
+            'current_step' => 'card_generation',
+        ]);
+
+        $this->dispatch('interview-ready');
     }
 
     private function persistCard(CardParserService $parser, string $response): void
@@ -132,6 +235,7 @@ class ConversationChat extends Component
             'messages' => $this->conversation->messages,
             'card' => $this->conversation->card,
             'models' => ChatComposer::models(),
+            'showGenerateCardButton' => $this->conversation->isInterviewComplete() && ! $this->conversation->isCompleted(),
             'selectedModelMeta' => $selected ?? [
                 'id' => $this->selectedModel,
                 'name' => $this->selectedModel,

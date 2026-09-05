@@ -69,6 +69,8 @@ class OpenRouterServiceTest extends TestCase
             'conversation_id' => $conversation->id,
             'generation_id' => 'gen-test-1',
             'model' => 'test/model',
+            'step' => 'interview',
+            'prompt_version' => 'v2',
             'provider' => 'TestProvider',
             'prompt_tokens' => 10,
             'completion_tokens' => 4,
@@ -77,12 +79,18 @@ class OpenRouterServiceTest extends TestCase
             'finish_reason' => 'stop',
         ]);
         $this->assertSame(0.0012, (float) LlmUsage::query()->first()->cost);
+        $this->assertSame(64, strlen((string) LlmUsage::query()->first()->prompt_hash));
+        $this->assertSame('v2', $conversation->fresh()->prompt_version);
+        $this->assertSame('interview', $conversation->fresh()->prompt_name);
+        $this->assertSame('interview', $conversation->fresh()->current_step);
 
         Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($conversation) {
             return $log->level === 'info'
                 && $log->message === 'OpenRouter API response'
                 && $log->context['conversation_id'] === $conversation->id
                 && $log->context['status'] === 200
+                && $log->context['prompt'] === 'interview@v2'
+                && $log->context['step'] === 'interview'
                 && $log->context['model'] === 'test/model'
                 && $log->context['id'] === 'gen-test-1'
                 && $log->context['provider'] === 'TestProvider'
@@ -95,8 +103,45 @@ class OpenRouterServiceTest extends TestCase
             return $request->url() === 'https://openrouter.ai/api/v1/chat/completions'
                 && $request->hasHeader('Authorization', 'Bearer test-key')
                 && $request['model'] === 'test/model'
+                && $request['messages'][0]['role'] === 'system'
+                && str_contains((string) $request['messages'][0]['content'], 'NUNCA gere um card, JSON de card')
                 && $request['messages'][1]['content'] === 'Quero um card';
         });
+    }
+
+    public function test_pins_prompt_version_for_the_rest_of_the_conversation(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'chat.prompts.interview.version' => 'v1',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Ok']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Teste',
+        ]);
+
+        (new OpenRouterService)->chat($conversation);
+        $this->assertSame('v1', $conversation->fresh()->prompt_version);
+
+        config(['chat.prompts.interview.version' => 'missing']);
+
+        (new OpenRouterService)->chat($conversation->fresh()->load('messages'));
+
+        Http::assertSentCount(2);
+        $this->assertSame('v1', $conversation->fresh()->prompt_version);
+        $this->assertSame(['v1', 'v1'], LlmUsage::query()->pluck('prompt_version')->all());
     }
 
     public function test_uses_allowed_override_model(): void
@@ -231,5 +276,138 @@ class OpenRouterServiceTest extends TestCase
             'total_tokens' => 0,
             'cached_tokens' => 0,
         ]);
+    }
+
+    public function test_uses_discovery_prompt_when_mode_is_discovery(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'chat.mode' => 'discovery',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Ok']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Teste',
+        ]);
+
+        (new OpenRouterService)->chat($conversation);
+
+        $this->assertSame('discovery', $conversation->fresh()->prompt_name);
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'step' => 'discovery',
+        ]);
+
+        Http::assertSent(fn (Request $request) => str_contains(
+            (string) $request['messages'][0]['content'],
+            'NUNCA gere o card imediatamente.'
+        ));
+    }
+
+    public function test_keeps_legacy_discovery_prompt_when_only_version_is_pinned(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'chat.mode' => 'interview',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Ok']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Legado',
+            'prompt_version' => 'v1',
+        ]);
+
+        (new OpenRouterService)->chat($conversation);
+
+        Http::assertSent(fn (Request $request) => str_contains(
+            (string) $request['messages'][0]['content'],
+            'NUNCA gere o card imediatamente.'
+        ));
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'step' => 'discovery',
+        ]);
+    }
+
+    public function test_generate_card_sends_interview_summary_without_chat_history(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'id' => 'gen-card-1',
+                'model' => 'test/model',
+                'provider' => 'TestProvider',
+                'usage' => [
+                    'prompt_tokens' => 40,
+                    'completion_tokens' => 20,
+                    'total_tokens' => 60,
+                    'cost' => 0.002,
+                ],
+                'choices' => [
+                    ['message' => ['content' => '<CARD_JSON>{"title":"Checkout"}</CARD_JSON>']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'prompt_name' => 'interview',
+            'prompt_version' => 'v1',
+            'interview_summary' => 'Problema: checkout sem pagamento',
+        ]);
+        $conversation->messages()->create([
+            'role' => 'user',
+            'content' => 'Quero um checkout',
+        ]);
+
+        $content = (new OpenRouterService)->generateCard(
+            $conversation,
+            'Problema: checkout sem pagamento',
+        );
+
+        $this->assertStringContainsString('<CARD_JSON>', $content);
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'generation_id' => 'gen-card-1',
+            'step' => 'card_generation',
+            'prompt_version' => 'v1',
+        ]);
+
+        Http::assertSent(function (Request $request) {
+            return $request['messages'][0]['role'] === 'system'
+                && str_contains((string) $request['messages'][0]['content'], 'Gere o card imediatamente.')
+                && $request['messages'][1]['role'] === 'user'
+                && str_contains((string) $request['messages'][1]['content'], 'Problema: checkout sem pagamento')
+                && count($request['messages']) === 2;
+        });
     }
 }

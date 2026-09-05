@@ -31,6 +31,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Modo do chat
+    |--------------------------------------------------------------------------
+    |
+    | interview — entrevista + geração de card em prompts separados.
+    | discovery — prompt único legado (resources/prompts/discovery).
+    | Conversas já iniciadas mantêm o prompt original gravado no banco.
+    |
+    */
+    'mode' => env('CHAT_MODE', 'interview'),
+
+    /*
+    |--------------------------------------------------------------------------
     | System prompts
     |--------------------------------------------------------------------------
     |
@@ -43,6 +55,12 @@ return [
     'prompts' => [
         'discovery' => [
             'version' => env('CHAT_PROMPT_VERSION', 'v1'),
+        ],
+        'interview' => [
+            'version' => env('CHAT_INTERVIEW_PROMPT_VERSION', 'v2'),
+        ],
+        'card_generation' => [
+            'version' => env('CHAT_CARD_PROMPT_VERSION', 'v1'),
         ],
     ],
 

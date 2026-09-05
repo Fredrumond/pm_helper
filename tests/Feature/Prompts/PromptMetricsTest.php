@@ -112,4 +112,57 @@ class PromptMetricsTest extends TestCase
         $this->assertFalse($metrics->has('v2'));
         $this->assertSame(1, $metrics['v1']['conversations']);
     }
+
+    public function test_compares_usage_by_step_and_prompt_version(): void
+    {
+        $user = User::factory()->create();
+
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'status' => 'completed',
+            'prompt_version' => 'v1',
+        ]);
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'model' => 'test/model',
+            'step' => 'interview',
+            'prompt_version' => 'v1',
+            'total_tokens' => 100,
+            'cost' => 0.20,
+        ]);
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'model' => 'test/model',
+            'step' => 'card_generation',
+            'prompt_version' => 'v1',
+            'total_tokens' => 40,
+            'cost' => 0.05,
+        ]);
+
+        $other = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Login',
+            'status' => 'in_progress',
+            'prompt_version' => 'v1',
+        ]);
+        LlmUsage::query()->create([
+            'conversation_id' => $other->id,
+            'model' => 'test/model',
+            'step' => 'interview',
+            'prompt_version' => 'v1',
+            'total_tokens' => 80,
+            'cost' => 0.10,
+        ]);
+
+        $metrics = (new PromptMetrics)->compareByStep($user)->keyBy('step');
+
+        $this->assertSame(2, $metrics['interview']['conversations']);
+        $this->assertSame(2, $metrics['interview']['calls']);
+        $this->assertSame(90.0, $metrics['interview']['avg_tokens']);
+        $this->assertSame(180, $metrics['interview']['total_tokens']);
+        $this->assertSame(1, $metrics['card_generation']['conversations']);
+        $this->assertSame(1, $metrics['card_generation']['calls']);
+        $this->assertSame(40.0, $metrics['card_generation']['avg_tokens']);
+    }
 }

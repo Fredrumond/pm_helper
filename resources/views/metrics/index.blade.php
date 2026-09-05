@@ -43,7 +43,7 @@
                 </div>
                 <div class="text-right shrink-0">
                     <p class="text-[10px] uppercase tracking-wide text-gray-400">Atual</p>
-                    <p class="text-sm font-semibold text-indigo-600">discovery@{{ $currentPromptVersion }}</p>
+                    <p class="text-sm font-semibold text-indigo-600">{{ $currentMode.'@'.$currentPromptVersion }}</p>
                     @if (count($promptVersions) > 0)
                         <p class="text-[11px] text-gray-400 mt-0.5">{{ implode(', ', $promptVersions) }}</p>
                     @endif
@@ -85,6 +85,52 @@
                                     <td class="px-5 py-3 text-right text-gray-700">{{ number_format($row['avg_tokens'], 1) }}</td>
                                     <td class="px-5 py-3 text-right text-gray-700">{{ \App\Models\LlmUsage::formatCost($row['avg_cost']) }}</td>
                                     <td class="px-5 py-3 text-right text-gray-700">{{ number_format($row['avg_messages'], 1) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
+
+        <section class="bg-white border border-gray-200 rounded-xl mb-8 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h2 class="text-sm font-semibold text-gray-900">Pipeline por step</h2>
+                <p class="text-xs text-gray-400 mt-1">
+                    Consumo de cada etapa (interview, card_generation, discovery) para achar gargalos.
+                </p>
+            </div>
+
+            @if ($promptSteps->isEmpty())
+                <p class="px-5 py-10 text-sm text-gray-400 text-center">
+                    Nenhuma chamada com step registrado ainda.
+                </p>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-400">
+                            <tr>
+                                <th class="text-left font-medium px-5 py-2.5">Step</th>
+                                <th class="text-left font-medium px-5 py-2.5">Versão</th>
+                                <th class="text-right font-medium px-5 py-2.5">Conversas</th>
+                                <th class="text-right font-medium px-5 py-2.5">Chamadas</th>
+                                <th class="text-right font-medium px-5 py-2.5">Tokens médios</th>
+                                <th class="text-right font-medium px-5 py-2.5">Tokens totais</th>
+                                <th class="text-right font-medium px-5 py-2.5">Custo médio</th>
+                                <th class="text-right font-medium px-5 py-2.5">Custo total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach ($promptSteps as $row)
+                                <tr>
+                                    <td class="px-5 py-3 font-medium text-gray-900">{{ $row['step'] }}</td>
+                                    <td class="px-5 py-3 text-gray-700">{{ $row['version'] !== '' ? $row['version'] : '—' }}</td>
+                                    <td class="px-5 py-3 text-right text-gray-700">{{ number_format($row['conversations']) }}</td>
+                                    <td class="px-5 py-3 text-right text-gray-700">{{ number_format($row['calls']) }}</td>
+                                    <td class="px-5 py-3 text-right text-gray-700">{{ number_format($row['avg_tokens'], 1) }}</td>
+                                    <td class="px-5 py-3 text-right text-gray-700">{{ number_format($row['total_tokens']) }}</td>
+                                    <td class="px-5 py-3 text-right text-gray-700">{{ \App\Models\LlmUsage::formatCost($row['avg_cost']) }}</td>
+                                    <td class="px-5 py-3 text-right text-gray-700">{{ \App\Models\LlmUsage::formatCost($row['total_cost']) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -144,6 +190,10 @@
                                         <a href="{{ route('conversations.show', $usage->conversation) }}" class="hover:text-indigo-600">
                                             {{ $usage->conversation->title }}
                                         </a>
+                                        ·
+                                    @endif
+                                    @if ($usage->step)
+                                        {{ $usage->step }}
                                         ·
                                     @endif
                                     @if ($usage->prompt_version)

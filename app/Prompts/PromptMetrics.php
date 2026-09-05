@@ -3,6 +3,7 @@
 namespace App\Prompts;
 
 use App\Models\Conversation;
+use App\Models\LlmUsage;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -49,5 +50,51 @@ class PromptMetrics
                 'avg_messages' => round((float) $group->avg('messages_count'), 1),
             ];
         })->values();
+    }
+
+    /**
+     * Compara consumo da pipeline por step e versão do prompt.
+     *
+     * @return Collection<int, array{
+     *     step: string,
+     *     version: string,
+     *     conversations: int,
+     *     calls: int,
+     *     avg_tokens: float,
+     *     avg_cost: float,
+     *     total_tokens: int,
+     *     total_cost: float
+     * }>
+     */
+    public function compareByStep(?User $user = null): Collection
+    {
+        $usages = LlmUsage::query()
+            ->whereNotNull('step')
+            ->when($user, function ($query) use ($user) {
+                $query->whereIn(
+                    'conversation_id',
+                    Conversation::query()->where('user_id', $user->id)->select('id')
+                );
+            })
+            ->get()
+            ->groupBy(fn (LlmUsage $usage) => $usage->step.'@'.($usage->prompt_version ?? ''));
+
+        return $usages->map(function (Collection $group, string $key): array {
+            [$step, $version] = explode('@', $key, 2);
+
+            return [
+                'step' => $step,
+                'version' => $version,
+                'conversations' => $group->pluck('conversation_id')->unique()->count(),
+                'calls' => $group->count(),
+                'avg_tokens' => round((float) $group->avg('total_tokens'), 1),
+                'avg_cost' => round((float) $group->avg(fn (LlmUsage $usage) => (float) $usage->cost), 8),
+                'total_tokens' => (int) $group->sum('total_tokens'),
+                'total_cost' => round((float) $group->sum(fn (LlmUsage $usage) => (float) $usage->cost), 8),
+            ];
+        })->sortBy([
+            ['step', 'asc'],
+            ['version', 'asc'],
+        ])->values();
     }
 }

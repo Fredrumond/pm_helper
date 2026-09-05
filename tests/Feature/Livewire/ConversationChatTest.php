@@ -289,4 +289,184 @@ TXT;
             ->call('selectModel', 'unknown/model')
             ->assertSet('selectedModel', ChatComposer::defaultModel());
     }
+
+    public function test_captures_interview_summary_and_shows_generate_card_button(): void
+    {
+        $reply = <<<'TXT'
+Entendi. Podemos gerar o card.
+
+<INTERVIEW_COMPLETE>
+<INTERVIEW_SUMMARY>
+Problema: checkout sem pagamento
+Persona: comprador
+</INTERVIEW_SUMMARY>
+</INTERVIEW_COMPLETE>
+TXT;
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => $reply]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Entendi. Podemos gerar o card.')
+            ->assertDontSee('<INTERVIEW_COMPLETE>', false)
+            ->assertSee('Gerar Card');
+
+        $conversation->refresh();
+        $this->assertSame('card_generation', $conversation->current_step);
+        $this->assertStringContainsString('checkout sem pagamento', (string) $conversation->interview_summary);
+        $this->assertTrue($conversation->isInterviewComplete());
+        $this->assertSame('in_progress', $conversation->status);
+    }
+
+    public function test_generate_card_uses_interview_summary_and_persists_card(): void
+    {
+        $reply = <<<'TXT'
+Card gerado.
+
+<CARD_JSON>
+{"title":"Checkout MVP","type":"feature","user_story":"Como comprador, quero pagar","acceptance_criteria":["Dado o carrinho"],"priority":"high"}
+</CARD_JSON>
+TXT;
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'id' => 'gen-card-step',
+                'model' => 'test/model',
+                'usage' => [
+                    'prompt_tokens' => 30,
+                    'completion_tokens' => 20,
+                    'total_tokens' => 50,
+                    'cost' => 0,
+                ],
+                'choices' => [
+                    ['message' => ['content' => $reply]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'prompt_name' => 'interview',
+            'prompt_version' => 'v1',
+            'current_step' => 'card_generation',
+            'interview_summary' => 'Problema: checkout sem pagamento',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('generateCard')
+            ->assertRedirect(route('conversations.show', $conversation));
+
+        $this->assertDatabaseHas('cards', [
+            'conversation_id' => $conversation->id,
+            'title' => 'Checkout MVP',
+            'status' => 'draft',
+        ]);
+        $this->assertSame('completed', $conversation->fresh()->status);
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'generation_id' => 'gen-card-step',
+            'step' => 'card_generation',
+        ]);
+
+        Http::assertSent(function (Request $request) {
+            return str_contains((string) $request['messages'][1]['content'], 'Problema: checkout sem pagamento')
+                && count($request['messages']) === 2;
+        });
+    }
+
+    public function test_generate_card_explains_when_interview_is_not_ready(): void
+    {
+        Http::preventStrayRequests();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('generateCard')
+            ->assertSee('Ainda não fechei a entrevista');
+
+        $this->assertDatabaseMissing('cards', [
+            'conversation_id' => $conversation->id,
+        ]);
+    }
+
+    public function test_shows_generate_card_button_when_assistant_closes_interview_without_tags(): void
+    {
+        $reply = 'Perfeito, tenho tudo que preciso. Vou fazer um resumo do entendimento. Se sim, a entrevista está fechada e você já pode gerar o card no produto.';
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => $reply]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'LP de ebooks',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero uma LP')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card');
+
+        $this->assertTrue($conversation->fresh()->isInterviewComplete());
+        $this->assertSame('card_generation', $conversation->fresh()->current_step);
+    }
+
+    public function test_shows_generate_card_button_when_assistant_says_entrevista_finalizada(): void
+    {
+        $reply = '### Resumo da entrevista\n\nLP com Stripe.\n\nEntrevista finalizada! O botão "Gerar Card" deve aparecer agora no produto.';
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => $reply]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'LP de ebooks',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero uma LP')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card');
+
+        $this->assertTrue($conversation->fresh()->isInterviewComplete());
+    }
 }

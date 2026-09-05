@@ -12,6 +12,7 @@ class LlmUsage extends Model
         'conversation_id',
         'generation_id',
         'model',
+        'step',
         'prompt_version',
         'prompt_hash',
         'provider',
@@ -44,6 +45,7 @@ class LlmUsage extends Model
         array $data,
         string $fallbackModel,
         ?SystemPrompt $prompt = null,
+        ?string $step = null,
     ): self {
         $usage = is_array($data['usage'] ?? null) ? $data['usage'] : [];
         $details = is_array($usage['prompt_tokens_details'] ?? null)
@@ -54,6 +56,7 @@ class LlmUsage extends Model
             'conversation_id' => $conversation->id,
             'generation_id' => $data['id'] ?? null,
             'model' => $data['model'] ?? $fallbackModel,
+            'step' => $step ?? $prompt?->name,
             'prompt_version' => $prompt?->version,
             'prompt_hash' => $prompt?->hash,
             'provider' => $data['provider'] ?? null,

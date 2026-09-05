@@ -13,9 +13,9 @@
                                   d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
                         </svg>
                     </div>
-                    <h3 class="font-semibold text-gray-800 mb-1">Assistente de Discovery</h3>
+                    <h3 class="font-semibold text-gray-800 mb-1">Assistente de Interview</h3>
                     <p class="text-sm text-gray-500 max-w-sm mx-auto">
-                        Descreva uma necessidade ou ideia. O assistente conduz o discovery e gera um card.
+                        Descreva uma necessidade ou ideia. O assistente conduz a entrevista e, quando estiver pronto, você gera o card.
                     </p>
                 </div>
             </div>
@@ -36,10 +36,7 @@
                             ? 'bg-indigo-600 text-white rounded-br-sm'
                             : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm shadow-sm' }}">
                         @php
-                            $content = $message->content;
-                            // Remove bloco CARD_JSON da exibição
-                            $content = preg_replace('/<CARD_JSON>.*?<\/CARD_JSON>/s', '', $content);
-                            $content = trim($content);
+                            $content = app(\App\Services\CardParserService::class)->extractTextOnly($message->content);
                         @endphp
                         {!! nl2br(e($content)) !!}
 
@@ -59,7 +56,7 @@
         @endif
 
         {{-- Indicador de digitação enquanto a OpenRouter responde --}}
-        <div wire:loading.flex wire:target="sendMessage" class="justify-start">
+        <div wire:loading.flex wire:target="sendMessage,generateCard" class="justify-start">
             <div class="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center shrink-0 mr-2 mt-1">
                 <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -85,6 +82,31 @@
             </div>
             <form id="new-conv-form" method="POST" action="{{ route('conversations.store') }}" class="hidden">@csrf</form>
         @else
+            @if ($showGenerateCardButton)
+                <div class="max-w-3xl mx-auto mb-3" wire:key="generate-card-cta" x-data>
+                    <button
+                        type="button"
+                        wire:click="generateCard"
+                        wire:loading.attr="disabled"
+                        wire:target="generateCard,sendMessage"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <svg wire:loading.remove wire:target="generateCard" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
+                        </svg>
+                        <svg wire:loading wire:target="generateCard" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                        </svg>
+                        <span wire:loading.remove wire:target="generateCard">Gerar Card</span>
+                        <span wire:loading wire:target="generateCard">Gerando card...</span>
+                    </button>
+                    <p class="mt-1.5 text-center text-[11px] text-gray-400">
+                        A entrevista está pronta. Você ainda pode complementar o contexto antes de gerar.
+                    </p>
+                </div>
+            @endif
+
             <form
                 wire:submit="sendMessage"
                 x-data="chatComposer(@js($models))"

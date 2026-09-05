@@ -28,7 +28,8 @@ class MetricsPageTest extends TestCase
             ->assertSee('Métricas')
             ->assertSee('Conversas')
             ->assertSee('Cards')
-            ->assertSee('discovery@v1')
+            ->assertSee('interview@v2')
+            ->assertSee('Pipeline por step')
             ->assertSee('Nenhuma conversa com versão de prompt registrada ainda.')
             ->assertSee('Nenhuma chamada registrada ainda.');
     }

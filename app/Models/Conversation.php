@@ -16,7 +16,10 @@ class Conversation extends Model
         'user_id',
         'title',
         'status',
+        'prompt_name',
         'prompt_version',
+        'current_step',
+        'interview_summary',
     ];
 
     protected $casts = [
@@ -46,6 +49,11 @@ class Conversation extends Model
     public function isCompleted(): bool
     {
         return $this->status === 'completed';
+    }
+
+    public function isInterviewComplete(): bool
+    {
+        return is_string($this->interview_summary) && trim($this->interview_summary) !== '';
     }
 
     /**

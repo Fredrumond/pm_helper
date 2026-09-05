@@ -17,13 +17,17 @@ class MetricsController extends Controller
     ): View {
         $user = Auth::user();
 
+        $mode = (string) config('chat.mode', 'interview');
+
         return view('metrics.index', [
             'summary' => $consumptionMetrics->summary($user),
             'byModel' => $consumptionMetrics->byModel($user),
             'recent' => $consumptionMetrics->recent($user),
             'promptComparison' => $promptMetrics->compare($user),
-            'promptVersions' => $catalog->versions('discovery'),
-            'currentPromptVersion' => (string) config('chat.prompts.discovery.version', 'v1'),
+            'promptSteps' => $promptMetrics->compareByStep($user),
+            'promptVersions' => $catalog->versions($mode),
+            'currentPromptVersion' => (string) config("chat.prompts.{$mode}.version", 'v1'),
+            'currentMode' => $mode,
         ]);
     }
 }

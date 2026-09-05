@@ -22,7 +22,33 @@ class SystemPromptCatalogTest extends TestCase
 
     public function test_lists_available_versions(): void
     {
-        $this->assertContains('v1', (new SystemPromptCatalog)->versions('discovery'));
+        $catalog = new SystemPromptCatalog;
+
+        $this->assertContains('v1', $catalog->versions('discovery'));
+        $this->assertContains('v1', $catalog->versions('interview'));
+        $this->assertContains('v2', $catalog->versions('interview'));
+        $this->assertContains('v1', $catalog->versions('card_generation'));
+    }
+
+    public function test_loads_the_configured_interview_prompt(): void
+    {
+        $prompt = (new SystemPromptCatalog)->current('interview');
+
+        $this->assertSame('interview', $prompt->name);
+        $this->assertSame('v2', $prompt->version);
+        $this->assertSame('interview@v2', $prompt->identifier());
+        $this->assertStringContainsString('<INTERVIEW_COMPLETE>', $prompt->content);
+        $this->assertStringContainsString('Na mesma mensagem do resumo', $prompt->content);
+        $this->assertStringNotContainsString('<CARD_JSON>', $prompt->content);
+    }
+
+    public function test_loads_the_configured_card_generation_prompt(): void
+    {
+        $prompt = (new SystemPromptCatalog)->current('card_generation');
+
+        $this->assertSame('card_generation', $prompt->name);
+        $this->assertSame('card_generation@v1', $prompt->identifier());
+        $this->assertStringContainsString('<CARD_JSON>', $prompt->content);
     }
 
     public function test_throws_when_version_is_missing(): void
