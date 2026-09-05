@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\ConversationController;
+use App\Http\Controllers\MetricsController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +27,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Cards
     Route::get('/cards', [CardController::class, 'index'])->name('cards.index');
     Route::get('/cards/{card}', [CardController::class, 'show'])->name('cards.show');
+
+    // Métricas
+    Route::get('/metrics', [MetricsController::class, 'index'])->name('metrics.index');
 
 });
 
