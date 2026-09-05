@@ -54,4 +54,13 @@ TXT;
         $this->assertTrue($parser->hasInterviewComplete($content));
     }
 
+    public function test_detects_generate_card_request(): void
+    {
+        $parser = new CardParserService;
+
+        $this->assertTrue($parser->isGenerateCardRequest('gere o card'));
+        $this->assertTrue($parser->isGenerateCardRequest('Gerar card'));
+        $this->assertFalse($parser->isGenerateCardRequest('Pode gerar o card depois'));
+        $this->assertFalse($parser->isGenerateCardRequest('Qual o problema?'));
+    }
 }

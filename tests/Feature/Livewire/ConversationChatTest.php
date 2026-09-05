@@ -551,8 +551,62 @@ TXT;
             ->test(ConversationChat::class, ['conversation' => $conversation])
             ->set('input', 'Quero uma LP')
             ->call('sendMessage')
-            ->assertSee('Gerar Card');
+            ->assertSee('Gerar Card')
+            ->assertSee('$wire.generateCard()', false);
 
         $this->assertTrue($conversation->fresh()->isInterviewComplete());
+    }
+
+    public function test_user_asking_to_generate_card_uses_history_summary_instead_of_interview(): void
+    {
+        $reply = <<<'TXT'
+Card gerado.
+
+<CARD_JSON>
+{"title":"LP de ebooks","type":"feature","user_story":"Como PM, quero uma LP","acceptance_criteria":["Dado o visitante"],"priority":"high"}
+</CARD_JSON>
+TXT;
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => $reply]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'LP de ebooks',
+            'prompt_name' => 'interview',
+            'prompt_version' => 'v1',
+        ]);
+        $conversation->messages()->create([
+            'role' => 'user',
+            'content' => 'Quero uma LP para vender ebooks',
+        ]);
+        $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => 'Perfeito, tenho tudo que preciso. Resumo do entendimento: LP para ebooks de carreira.',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'gere o card')
+            ->call('sendMessage')
+            ->assertRedirect(route('conversations.show', $conversation));
+
+        $this->assertDatabaseHas('cards', [
+            'conversation_id' => $conversation->id,
+            'title' => 'LP de ebooks',
+        ]);
+
+        Http::assertSent(function (Request $request) {
+            return str_contains((string) $request['messages'][0]['content'], 'Gere o card imediatamente.')
+                && str_contains((string) $request['messages'][1]['content'], 'LP para vender ebooks')
+                && count($request['messages']) === 2;
+        });
     }
 }

@@ -86,7 +86,7 @@
                 <div class="max-w-3xl mx-auto mb-3" wire:key="generate-card-cta" x-data>
                     <button
                         type="button"
-                        wire:click="generateCard"
+                        @click.prevent="$wire.generateCard()"
                         wire:loading.attr="disabled"
                         wire:target="generateCard,sendMessage"
                         class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -244,67 +244,3 @@
         @endif
     </div>
 </div>
-
-<script>
-    window.chatComposer = function (models) {
-        return {
-            models,
-            showModels: false,
-            modelQuery: '',
-            soonHint: '',
-            get filteredModels() {
-                const query = this.modelQuery.toLowerCase();
-                if (! query) {
-                    return this.models;
-                }
-
-                return this.models.filter((model) =>
-                    model.name.toLowerCase().includes(query)
-                    || model.id.toLowerCase().includes(query)
-                    || model.tier.toLowerCase().includes(query)
-                );
-            },
-            toggleModels() {
-                this.showModels = ! this.showModels;
-            },
-            chooseModel(id) {
-                this.$wire.selectModel(id);
-                this.showModels = false;
-                this.modelQuery = '';
-            },
-            soon(kind) {
-                this.soonHint = kind;
-                setTimeout(() => { this.soonHint = ''; }, 1800);
-            },
-            onDraftInput() {
-                this.resize();
-            },
-            resize() {
-                const el = this.$refs.input;
-                if (! el) {
-                    return;
-                }
-
-                el.style.height = 'auto';
-                el.style.height = Math.min(el.scrollHeight, 200) + 'px';
-            },
-        };
-    };
-
-    const scrollMessages = () => {
-        const container = document.getElementById('messages-container');
-        if (container) {
-            container.scrollTop = container.scrollHeight;
-        }
-    };
-
-    if (! window.__pmChatScrollBound) {
-        window.__pmChatScrollBound = true;
-        document.addEventListener('livewire:updated', scrollMessages);
-        window.addEventListener('load', scrollMessages);
-    }
-</script>
-
-<style>
-    [x-cloak] { display: none !important; }
-</style>

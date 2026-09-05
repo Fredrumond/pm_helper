@@ -38,6 +38,19 @@ class CardParserService
     }
 
     /**
+     * Detecta pedido explícito do PM para gerar o card.
+     */
+    public function isGenerateCardRequest(string $content): bool
+    {
+        $normalized = mb_strtolower(trim($content));
+
+        return (bool) preg_match(
+            '/^(gere|gerar|cria|criar)(\s+o)?\s+card\b/u',
+            $normalized
+        );
+    }
+
+    /**
      * Extrai o resumo estruturado da entrevista.
      */
     public function extractInterviewSummary(string $content): ?string

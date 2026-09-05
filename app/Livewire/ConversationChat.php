@@ -23,6 +23,8 @@ class ConversationChat extends Component
 
     public string $selectedModel = '';
 
+    public bool $generatingCard = false;
+
     public function mount(Conversation $conversation): void
     {
         abort_if($conversation->user_id !== Auth::id(), 403);
@@ -63,6 +65,15 @@ class ConversationChat extends Component
             $this->conversation->update([
                 'title' => Str::limit($text, 60),
             ]);
+        }
+
+        if ($parser->isGenerateCardRequest($text)) {
+            $this->conversation->refresh();
+            $this->conversation->load('messages');
+            $this->ensureInterviewSummary($parser);
+            $this->generateCard($openRouter, $parser);
+
+            return;
         }
 
         try {
@@ -107,11 +118,23 @@ class ConversationChat extends Component
 
     public function generateCard(OpenRouterService $openRouter, CardParserService $parser): void
     {
+        if ($this->generatingCard) {
+            return;
+        }
+
+        $this->generatingCard = true;
+
+        Log::info('Geração de card solicitada', [
+            'conversation_id' => $this->conversation->id,
+        ]);
+
         $this->conversation->refresh();
         $this->conversation->load('messages');
         $this->ensureInterviewSummary($parser);
 
         if ($this->conversation->isCompleted()) {
+            $this->generatingCard = false;
+
             return;
         }
 
@@ -124,6 +147,7 @@ class ConversationChat extends Component
 
             $this->conversation->refresh();
             $this->conversation->load(['messages', 'card']);
+            $this->generatingCard = false;
 
             return;
         }
@@ -161,6 +185,7 @@ class ConversationChat extends Component
 
         $this->conversation->refresh();
         $this->conversation->load(['messages', 'card']);
+        $this->generatingCard = false;
 
         if ($this->conversation->card !== null) {
             $this->redirect(route('conversations.show', $this->conversation));
