@@ -190,7 +190,7 @@ class ConversationChatTest extends TestCase
 Card gerado.
 
 <CARD_JSON>
-{"title":"Checkout MVP","type":"feature","user_story":"Como comprador, quero pagar","acceptance_criteria":["Dado o carrinho"],"priority":"high"}
+{"title":"Checkout MVP","objetivo":"Permitir pagamento no checkout.","regras":["Exibir meios de pagamento."],"onde":["Checkout"],"aceite":["Comprador com carrinho: ao pagar, confirma."],"priority":"high"}
 </CARD_JSON>
 TXT;
 
@@ -425,7 +425,7 @@ TXT;
 Card gerado.
 
 <CARD_JSON>
-{"title":"Checkout MVP","type":"feature","user_story":"Como comprador, quero pagar","acceptance_criteria":["Dado o carrinho"],"priority":"high"}
+{"title":"Checkout MVP","objetivo":"Permitir pagamento no checkout.","regras":["Exibir meios de pagamento."],"onde":["Checkout"],"aceite":["Comprador com carrinho: ao pagar, confirma."],"priority":"high"}
 </CARD_JSON>
 TXT;
 
@@ -552,7 +552,7 @@ TXT;
             ->set('input', 'Quero uma LP')
             ->call('sendMessage')
             ->assertSee('Gerar Card')
-            ->assertSee('$wire.generateCard()', false);
+            ->assertSee('wire:click="generateCard"', false);
 
         $this->assertTrue($conversation->fresh()->isInterviewComplete());
     }
@@ -563,7 +563,7 @@ TXT;
 Card gerado.
 
 <CARD_JSON>
-{"title":"LP de ebooks","type":"feature","user_story":"Como PM, quero uma LP","acceptance_criteria":["Dado o visitante"],"priority":"high"}
+{"title":"LP de ebooks","objetivo":"Vender ebooks pela LP.","regras":["Exibir oferta do ebook."],"onde":["LP"],"aceite":["Visitante: ao comprar, recebe o ebook."],"priority":"high"}
 </CARD_JSON>
 TXT;
 

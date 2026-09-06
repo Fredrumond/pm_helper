@@ -11,16 +11,6 @@
         <div>
             <div class="flex items-center gap-2 mb-1">
                 <span class="text-xs font-medium px-2 py-0.5 rounded-full
-                    {{ match($card->type) {
-                        'feature'   => 'bg-blue-100 text-blue-700',
-                        'bug'       => 'bg-red-100 text-red-700',
-                        'tech_debt' => 'bg-orange-100 text-orange-700',
-                        'spike'     => 'bg-purple-100 text-purple-700',
-                        default     => 'bg-gray-100 text-gray-600',
-                    } }}">
-                    {{ $card->typeLabel() }}
-                </span>
-                <span class="text-xs font-medium px-2 py-0.5 rounded-full
                     {{ match($card->priority) {
                         'low'      => 'bg-gray-100 text-gray-500',
                         'medium'   => 'bg-yellow-100 text-yellow-700',
@@ -30,11 +20,6 @@
                     } }}">
                     ↑ {{ $card->priorityLabel() }}
                 </span>
-                @if ($card->estimated_complexity)
-                    <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">
-                        {{ $card->estimated_complexity }}
-                    </span>
-                @endif
             </div>
             <h2 class="text-base font-bold text-gray-900 leading-tight">{{ $card->title }}</h2>
         </div>
@@ -44,41 +29,66 @@
         </span>
     </div>
 
-    {{-- User Story --}}
-    <div class="mb-4 bg-white rounded-xl border border-gray-200 p-4">
-        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">História do Usuário</h3>
-        <p class="text-sm text-gray-800 italic">"{{ $card->user_story }}"</p>
-    </div>
-
-    {{-- Contexto --}}
-    @if ($card->context)
+    @if ($card->objetivo)
         <div class="mb-4 bg-white rounded-xl border border-gray-200 p-4">
-            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Contexto</h3>
-            <p class="text-sm text-gray-700 leading-relaxed">{{ $card->context }}</p>
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Objetivo</h3>
+            <p class="text-sm text-gray-700 leading-relaxed">{{ $card->objetivo }}</p>
         </div>
     @endif
 
-    {{-- Critérios de Aceite --}}
-    @if ($card->acceptance_criteria)
+    @if ($card->como_funciona_hoje)
         <div class="mb-4 bg-white rounded-xl border border-gray-200 p-4">
-            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Critérios de Aceite</h3>
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Como funciona hoje</h3>
+            <p class="text-sm text-gray-700 leading-relaxed">{{ $card->como_funciona_hoje }}</p>
+        </div>
+    @endif
+
+    @if ($card->regras && count($card->regras) > 0)
+        <div class="mb-4 bg-white rounded-xl border border-gray-200 p-4">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Regras</h3>
             <ul class="space-y-2">
-                @foreach ($card->acceptance_criteria as $criterion)
+                @foreach ($card->regras as $regra)
                     <li class="flex gap-2 text-sm text-gray-700">
-                        <span class="text-green-500 shrink-0 mt-0.5">✓</span>
-                        <span>{{ $criterion }}</span>
+                        <span class="text-indigo-500 shrink-0 mt-0.5">•</span>
+                        <span>{{ $regra }}</span>
                     </li>
                 @endforeach
             </ul>
         </div>
     @endif
 
-    {{-- Fora do Escopo --}}
-    @if ($card->out_of_scope && count($card->out_of_scope) > 0)
+    @if ($card->onde && count($card->onde) > 0)
         <div class="mb-4 bg-white rounded-xl border border-gray-200 p-4">
-            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Fora do Escopo</h3>
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Onde</h3>
+            <div class="flex flex-wrap gap-1.5">
+                @foreach ($card->onde as $canal)
+                    <span class="px-2.5 py-0.5 text-xs bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">
+                        {{ $canal }}
+                    </span>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    @if ($card->aceite && count($card->aceite) > 0)
+        <div class="mb-4 bg-white rounded-xl border border-gray-200 p-4">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Aceite</h3>
             <ul class="space-y-2">
-                @foreach ($card->out_of_scope as $item)
+                @foreach ($card->aceite as $criterio)
+                    <li class="flex gap-2 text-sm text-gray-700">
+                        <span class="text-green-500 shrink-0 mt-0.5">✓</span>
+                        <span>{{ $criterio }}</span>
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    @if ($card->o_que_nao_fazer && count($card->o_que_nao_fazer) > 0)
+        <div class="mb-4 bg-white rounded-xl border border-gray-200 p-4">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">O que não fazer</h3>
+            <ul class="space-y-2">
+                @foreach ($card->o_que_nao_fazer as $item)
                     <li class="flex gap-2 text-sm text-gray-500">
                         <span class="text-red-400 shrink-0 mt-0.5">✕</span>
                         <span>{{ $item }}</span>
@@ -88,22 +98,23 @@
         </div>
     @endif
 
-    {{-- Notas Técnicas --}}
-    @if ($card->technical_notes)
+    @if ($card->stakeholders && count($card->stakeholders) > 0)
         <div class="mb-4 bg-white rounded-xl border border-gray-200 p-4">
-            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Notas Técnicas</h3>
-            <p class="text-sm text-gray-700 leading-relaxed font-mono">{{ $card->technical_notes }}</p>
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Stakeholders</h3>
+            <div class="flex flex-wrap gap-1.5">
+                @foreach ($card->stakeholders as $pessoa)
+                    <span class="px-2.5 py-0.5 text-xs bg-gray-100 text-gray-700 rounded-full border border-gray-200">
+                        {{ $pessoa }}
+                    </span>
+                @endforeach
+            </div>
         </div>
     @endif
 
-    {{-- Labels --}}
-    @if ($card->labels && count($card->labels) > 0)
-        <div class="mb-5 flex flex-wrap gap-1.5">
-            @foreach ($card->labels as $label)
-                <span class="px-2.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full border border-gray-200">
-                    {{ $label }}
-                </span>
-            @endforeach
+    @if ($card->como_validar)
+        <div class="mb-4 bg-white rounded-xl border border-gray-200 p-4">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Como validar</h3>
+            <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ $card->como_validar }}</p>
         </div>
     @endif
 

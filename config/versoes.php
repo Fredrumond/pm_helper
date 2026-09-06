@@ -27,6 +27,39 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.5.0',
+            'data' => '2026-09-06',
+            'estado' => 'development',
+            'titulo' => 'Framework de cards do time',
+            'resumo' => 'Entrevista e geração de card passam a usar o framework do time (objetivo, regras, onde, aceite, stakeholders e como validar), no lugar de user story e critérios de aceite clássicos.',
+            'nota' => 'Prompts interview@v3 e card_generation@v2. Cards existentes perdem os campos antigos na migration.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Prompts',
+                    'itens' => [
+                        ['titulo' => 'Prompt de entrevista (v3)', 'estado' => 'development', 'nota' => 'Conduz pelo framework e fecha com INTERVIEW_SUMMARY estruturado'],
+                        ['titulo' => 'Prompt de geração de card (v2)', 'estado' => 'development', 'nota' => 'JSON com objetivo, regras, onde, aceite, stakeholders e como validar'],
+                    ],
+                ],
+                [
+                    'nome' => 'Cards',
+                    'itens' => [
+                        ['titulo' => 'Campos do framework no modelo e na migration', 'estado' => 'development'],
+                        ['titulo' => 'Parser normaliza listas e textos do novo JSON', 'estado' => 'development'],
+                        ['titulo' => 'Lista, detalhe e preview com as novas seções', 'estado' => 'development'],
+                    ],
+                ],
+                [
+                    'nome' => 'Plataforma',
+                    'itens' => [
+                        ['titulo' => 'AGENTS.md com convenções de stack, prompts e versões', 'estado' => 'development'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.4.0',
             'data' => '2026-09-05',
             'estado' => 'development',

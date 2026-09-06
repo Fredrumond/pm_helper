@@ -125,16 +125,48 @@ class CardParserService
     {
         return [
             'title' => $data['title'] ?? 'Card sem título',
-            'type' => $this->validateEnum($data['type'] ?? 'feature', ['feature', 'bug', 'tech_debt', 'spike']),
-            'user_story' => $data['user_story'] ?? '',
-            'context' => $data['context'] ?? null,
-            'acceptance_criteria' => (array) ($data['acceptance_criteria'] ?? []),
-            'out_of_scope' => (array) ($data['out_of_scope'] ?? []),
-            'technical_notes' => $data['technical_notes'] ?? null,
+            'objetivo' => $this->nullableString($data['objetivo'] ?? null) ?? '',
+            'como_funciona_hoje' => $this->nullableString($data['como_funciona_hoje'] ?? null),
+            'regras' => $this->stringList($data['regras'] ?? []),
+            'onde' => $this->stringList($data['onde'] ?? []),
+            'aceite' => $this->stringList($data['aceite'] ?? []),
+            'o_que_nao_fazer' => $this->stringList($data['o_que_nao_fazer'] ?? []),
+            'stakeholders' => $this->stringList($data['stakeholders'] ?? []),
+            'como_validar' => $this->nullableString($data['como_validar'] ?? null),
             'priority' => $this->validateEnum($data['priority'] ?? 'medium', ['low', 'medium', 'high', 'critical']),
-            'labels' => (array) ($data['labels'] ?? []),
-            'estimated_complexity' => $this->validateEnum($data['estimated_complexity'] ?? null, ['XS', 'S', 'M', 'L', 'XL']),
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $value): array
+    {
+        return array_values(array_filter(
+            array_map(function (mixed $item): string {
+                if (is_string($item)) {
+                    return trim($item);
+                }
+
+                if (is_scalar($item)) {
+                    return trim((string) $item);
+                }
+
+                return '';
+            }, (array) $value),
+            fn (string $item): bool => $item !== '',
+        ));
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $string = trim((string) $value);
+
+        return $string === '' ? null : $string;
     }
 
     private function validateEnum(?string $value, array $allowed): ?string

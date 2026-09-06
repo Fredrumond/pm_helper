@@ -83,10 +83,10 @@
             <form id="new-conv-form" method="POST" action="{{ route('conversations.store') }}" class="hidden">@csrf</form>
         @else
             @if ($showGenerateCardButton)
-                <div class="max-w-3xl mx-auto mb-3" wire:key="generate-card-cta" x-data>
+                <div class="max-w-3xl mx-auto mb-3" wire:key="generate-card-cta">
                     <button
                         type="button"
-                        @click.prevent="$wire.generateCard()"
+                        wire:click="generateCard"
                         wire:loading.attr="disabled"
                         wire:target="generateCard,sendMessage"
                         class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"

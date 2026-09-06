@@ -27,26 +27,25 @@
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-1">
                                     <span class="text-xs px-1.5 py-0.5 rounded font-medium
-                                        {{ match($card->type) {
-                                            'feature'   => 'bg-blue-50 text-blue-600',
-                                            'bug'       => 'bg-red-50 text-red-600',
-                                            'tech_debt' => 'bg-orange-50 text-orange-600',
-                                            'spike'     => 'bg-purple-50 text-purple-600',
-                                            default     => 'bg-gray-50 text-gray-500',
-                                        } }}">{{ $card->typeLabel() }}</span>
+                                        {{ match($card->priority) {
+                                            'low'      => 'bg-gray-50 text-gray-500',
+                                            'medium'   => 'bg-yellow-50 text-yellow-700',
+                                            'high'     => 'bg-orange-50 text-orange-700',
+                                            'critical' => 'bg-red-50 text-red-700',
+                                            default    => 'bg-gray-50 text-gray-500',
+                                        } }}">{{ $card->priorityLabel() }}</span>
                                     <span class="text-xs px-1.5 py-0.5 rounded font-medium
                                         {{ $card->isApproved() ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600' }}">
                                         {{ $card->isApproved() ? '✓ Aprovado' : 'Rascunho' }}
                                     </span>
                                 </div>
                                 <p class="font-semibold text-gray-900 group-hover:text-indigo-600 truncate">{{ $card->title }}</p>
-                                <p class="text-xs text-gray-400 mt-1 truncate">{{ $card->user_story }}</p>
+                                @if ($card->objetivo)
+                                    <p class="text-xs text-gray-400 mt-1 truncate">{{ $card->objetivo }}</p>
+                                @endif
                             </div>
                             <div class="ml-4 text-xs text-gray-400 shrink-0 text-right">
                                 <p>{{ $card->created_at->format('d/m/Y') }}</p>
-                                @if ($card->estimated_complexity)
-                                    <p class="mt-1 font-medium text-indigo-500">{{ $card->estimated_complexity }}</p>
-                                @endif
                             </div>
                         </div>
                     </a>

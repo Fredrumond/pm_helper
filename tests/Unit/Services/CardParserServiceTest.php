@@ -63,4 +63,40 @@ TXT;
         $this->assertFalse($parser->isGenerateCardRequest('Pode gerar o card depois'));
         $this->assertFalse($parser->isGenerateCardRequest('Qual o problema?'));
     }
+
+    public function test_normalizes_new_framework_card_json(): void
+    {
+        $parser = new CardParserService;
+        $content = <<<'TXT'
+Card gerado.
+<CARD_JSON>
+{
+  "title": "Checkout MVP",
+  "objetivo": "Permitir pagamento no checkout.",
+  "como_funciona_hoje": "",
+  "regras": ["Exibir meios de pagamento.", 12, ""],
+  "onde": ["Checkout"],
+  "aceite": ["Comprador com carrinho: ao pagar, confirma o pedido."],
+  "o_que_nao_fazer": [],
+  "stakeholders": ["Ana Silva"],
+  "como_validar": "Em staging, abrir o checkout e pagar com cartão de teste.",
+  "priority": "high"
+}
+</CARD_JSON>
+TXT;
+
+        $this->assertTrue($parser->hasCard($content));
+        $this->assertSame([
+            'title' => 'Checkout MVP',
+            'objetivo' => 'Permitir pagamento no checkout.',
+            'como_funciona_hoje' => null,
+            'regras' => ['Exibir meios de pagamento.', '12'],
+            'onde' => ['Checkout'],
+            'aceite' => ['Comprador com carrinho: ao pagar, confirma o pedido.'],
+            'o_que_nao_fazer' => [],
+            'stakeholders' => ['Ana Silva'],
+            'como_validar' => 'Em staging, abrir o checkout e pagar com cartão de teste.',
+            'priority' => 'high',
+        ], $parser->parse($content));
+    }
 }

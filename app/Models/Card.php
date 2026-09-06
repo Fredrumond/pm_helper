@@ -14,22 +14,24 @@ class Card extends Model
         'conversation_id',
         'user_id',
         'title',
-        'type',
-        'user_story',
-        'context',
-        'acceptance_criteria',
-        'out_of_scope',
-        'technical_notes',
+        'objetivo',
+        'como_funciona_hoje',
+        'regras',
+        'onde',
+        'aceite',
+        'o_que_nao_fazer',
+        'stakeholders',
+        'como_validar',
         'priority',
-        'labels',
-        'estimated_complexity',
         'status',
     ];
 
     protected $casts = [
-        'acceptance_criteria' => 'array',
-        'out_of_scope'        => 'array',
-        'labels'              => 'array',
+        'regras' => 'array',
+        'onde' => 'array',
+        'aceite' => 'array',
+        'o_que_nao_fazer' => 'array',
+        'stakeholders' => 'array',
     ];
 
     public function conversation(): BelongsTo
@@ -50,17 +52,6 @@ class Card extends Model
             'high'     => 'Alta',
             'critical' => 'Crítica',
             default    => $this->priority,
-        };
-    }
-
-    public function typeLabel(): string
-    {
-        return match($this->type) {
-            'feature'   => 'Feature',
-            'bug'       => 'Bug',
-            'tech_debt' => 'Tech Debt',
-            'spike'     => 'Spike',
-            default     => $this->type,
         };
     }
 

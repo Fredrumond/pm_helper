@@ -71,7 +71,7 @@ class OpenRouterServiceTest extends TestCase
             'generation_id' => 'gen-test-1',
             'model' => 'test/model',
             'step' => 'interview',
-            'prompt_version' => 'v2',
+            'prompt_version' => 'v3',
             'provider' => 'TestProvider',
             'prompt_tokens' => 10,
             'completion_tokens' => 4,
@@ -81,7 +81,7 @@ class OpenRouterServiceTest extends TestCase
         ]);
         $this->assertSame(0.0012, (float) LlmUsage::query()->first()->cost);
         $this->assertSame(64, strlen((string) LlmUsage::query()->first()->prompt_hash));
-        $this->assertSame('v2', $conversation->fresh()->prompt_version);
+        $this->assertSame('v3', $conversation->fresh()->prompt_version);
         $this->assertSame('interview', $conversation->fresh()->prompt_name);
         $this->assertSame('interview', $conversation->fresh()->current_step);
 
@@ -90,7 +90,7 @@ class OpenRouterServiceTest extends TestCase
                 && $log->message === 'OpenRouter API response'
                 && $log->context['conversation_id'] === $conversation->id
                 && $log->context['status'] === 200
-                && $log->context['prompt'] === 'interview@v2'
+                && $log->context['prompt'] === 'interview@v3'
                 && $log->context['step'] === 'interview'
                 && $log->context['model'] === 'test/model'
                 && $log->context['id'] === 'gen-test-1'
@@ -400,7 +400,7 @@ class OpenRouterServiceTest extends TestCase
             'conversation_id' => $conversation->id,
             'generation_id' => 'gen-card-1',
             'step' => 'card_generation',
-            'prompt_version' => 'v1',
+            'prompt_version' => 'v2',
         ]);
 
         Http::assertSent(function (Request $request) {
