@@ -4,6 +4,7 @@ use App\Http\Controllers\CardController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\MetricsController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\VersoesController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('conversations.index'));
@@ -30,6 +31,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Métricas
     Route::get('/metrics', [MetricsController::class, 'index'])->name('metrics.index');
+
+    // Versões
+    Route::get('/versoes', [VersoesController::class, 'index'])->name('versoes.index');
 
 });
 

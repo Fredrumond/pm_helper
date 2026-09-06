@@ -21,6 +21,10 @@
                     <x-nav-link :href="route('metrics.index')" :active="request()->routeIs('metrics.*')">
                         Métricas
                     </x-nav-link>
+                    <x-nav-link :href="route('versoes.index')" :active="request()->routeIs('versoes.*')">
+                        Versões
+                        <span class="ms-1.5 font-mono text-[11px] text-gray-400">{{ \App\Support\Versoes::numeroAtual() }}</span>
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -81,6 +85,10 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('metrics.index')" :active="request()->routeIs('metrics.*')">
                 Métricas
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('versoes.index')" :active="request()->routeIs('versoes.*')">
+                Versões
+                <span class="ms-1 font-mono text-[11px] text-gray-400">{{ \App\Support\Versoes::numeroAtual() }}</span>
             </x-responsive-nav-link>
         </div>
 
