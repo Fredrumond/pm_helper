@@ -18,14 +18,29 @@
                     <h2 class="font-semibold text-gray-800 truncate text-sm">{{ $conversation->title }}</h2>
                     @if ($conversation->isCompleted())
                         <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 shrink-0">✓ Card gerado</span>
+                    @elseif ($conversation->isScopeTooBroad())
+                        <span class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 shrink-0">Escopo amplo demais</span>
                     @else
                         <span
-                            x-data="{ complete: @js($conversation->isInterviewComplete()) }"
-                            x-on:interview-ready.window="complete = true"
-                            class="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-600 shrink-0"
-                            x-text="complete ? 'Pronto para gerar o card' : 'Interview em andamento'"
+                            x-data="{ complete: @js($conversation->isInterviewComplete()), scopeTooBroad: false }"
+                            x-on:interview-ready.window="if (!scopeTooBroad) complete = true"
+                            x-on:interview-scope-too-broad.window="scopeTooBroad = true; complete = false"
+                            class="shrink-0"
                         >
-                            {{ $conversation->isInterviewComplete() ? 'Pronto para gerar o card' : 'Interview em andamento' }}
+                            <span
+                                x-show="!scopeTooBroad"
+                                class="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-600"
+                                x-text="complete ? 'Pronto para gerar o card' : 'Interview em andamento'"
+                            >
+                                {{ $conversation->isInterviewComplete() ? 'Pronto para gerar o card' : 'Interview em andamento' }}
+                            </span>
+                            <span
+                                x-show="scopeTooBroad"
+                                x-cloak
+                                class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800"
+                            >
+                                Escopo amplo demais
+                            </span>
                         </span>
                     @endif
                 </div>

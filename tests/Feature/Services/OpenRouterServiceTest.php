@@ -71,7 +71,7 @@ class OpenRouterServiceTest extends TestCase
             'generation_id' => 'gen-test-1',
             'model' => 'test/model',
             'step' => 'interview',
-            'prompt_version' => 'v3',
+            'prompt_version' => 'v4',
             'provider' => 'TestProvider',
             'prompt_tokens' => 10,
             'completion_tokens' => 4,
@@ -81,7 +81,7 @@ class OpenRouterServiceTest extends TestCase
         ]);
         $this->assertSame(0.0012, (float) LlmUsage::query()->first()->cost);
         $this->assertSame(64, strlen((string) LlmUsage::query()->first()->prompt_hash));
-        $this->assertSame('v3', $conversation->fresh()->prompt_version);
+        $this->assertSame('v4', $conversation->fresh()->prompt_version);
         $this->assertSame('interview', $conversation->fresh()->prompt_name);
         $this->assertSame('interview', $conversation->fresh()->current_step);
 
@@ -90,7 +90,7 @@ class OpenRouterServiceTest extends TestCase
                 && $log->message === 'OpenRouter API response'
                 && $log->context['conversation_id'] === $conversation->id
                 && $log->context['status'] === 200
-                && $log->context['prompt'] === 'interview@v3'
+                && $log->context['prompt'] === 'interview@v4'
                 && $log->context['step'] === 'interview'
                 && $log->context['model'] === 'test/model'
                 && $log->context['id'] === 'gen-test-1'
@@ -107,6 +107,47 @@ class OpenRouterServiceTest extends TestCase
                 && $request['messages'][0]['role'] === 'system'
                 && str_contains((string) $request['messages'][0]['content'], 'NUNCA gere um card, JSON de card')
                 && $request['messages'][1]['content'] === 'Quero um card';
+        });
+    }
+
+    public function test_keeps_pinned_interview_v3_when_current_is_v4(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Ok']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Entrevista v3',
+            'prompt_name' => 'interview',
+            'prompt_version' => 'v3',
+        ]);
+
+        (new OpenRouterService)->chat($conversation);
+
+        $this->assertSame('v3', $conversation->fresh()->prompt_version);
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'step' => 'interview',
+            'prompt_version' => 'v3',
+        ]);
+
+        Http::assertSent(function (Request $request) {
+            $system = (string) $request['messages'][0]['content'];
+
+            return str_contains($system, '<INTERVIEW_COMPLETE>')
+                && ! str_contains($system, '<INTERVIEW_SCOPE_TOO_BROAD>');
         });
     }
 

@@ -57,7 +57,7 @@ return [
             'version' => env('CHAT_PROMPT_VERSION', 'v1'),
         ],
         'interview' => [
-            'version' => env('CHAT_INTERVIEW_PROMPT_VERSION', 'v3'),
+            'version' => env('CHAT_INTERVIEW_PROMPT_VERSION', 'v4'),
         ],
         'card_generation' => [
             'version' => env('CHAT_CARD_PROMPT_VERSION', 'v2'),

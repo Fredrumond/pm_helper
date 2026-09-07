@@ -27,6 +27,75 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.5.4',
+            'data' => '2026-09-07',
+            'estado' => 'development',
+            'titulo' => 'Trava de escopo amplo mais tolerante e selo imediato',
+            'resumo' => 'A detecção de INTERVIEW_SCOPE_TOO_BROAD aceita conteúdo interno e self-closing; o header troca o selo na mesma sessão; helpers de entrevista pronta respeitam a tag.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Conversas',
+                    'itens' => [
+                        ['titulo' => 'Parser alinha detecção e limpeza da tag de escopo amplo', 'estado' => 'development', 'nota' => 'Tag vazia, com texto interno ou self-closing entram em scope_too_broad; looksInterviewReady e extractInterviewSummary recusam a tag'],
+                        ['titulo' => 'Selo Escopo amplo demais atualiza sem reload', 'estado' => 'development', 'nota' => 'Evento interview-scope-too-broad no header Alpine; persistScopeTooBroad unifica o primeiro persist e a reentrada'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.5.3',
+            'data' => '2026-09-07',
+            'estado' => 'development',
+            'titulo' => 'Trava de geração quando o escopo da entrevista é amplo',
+            'resumo' => 'A tag INTERVIEW_SCOPE_TOO_BROAD passa a bloquear a conversa (current_step scope_too_broad): sem resumo, sem botão Gerar Card e sem geração, mesmo se o PM insistir. O caminho feliz da entrevista de um card permanece inalterado.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Conversas',
+                    'itens' => [
+                        ['titulo' => 'Estado grudento scope_too_broad recusa geração de card', 'estado' => 'development', 'nota' => 'Parser, sendMessage, generateCard e atalho “gere o card”; selo no header; composer segue aberto'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.5.2',
+            'data' => '2026-09-07',
+            'estado' => 'development',
+            'titulo' => 'Prompt de entrevista v4 recusa escopo de épico',
+            'resumo' => 'A versão corrente do prompt de interview passa a ser v4: recusa demanda equivalente a vários cards, pede retorno com um card definido e emite INTERVIEW_SCOPE_TOO_BROAD, sem gerar card nem INTERVIEW_COMPLETE.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Prompts',
+                    'itens' => [
+                        ['titulo' => 'Prompt de entrevista (v4)', 'estado' => 'development', 'nota' => 'Um card por entrevista; tag INTERVIEW_SCOPE_TOO_BROAD no escopo amplo; conversas em v3 permanecem no v3'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.5.1',
+            'data' => '2026-09-07',
+            'estado' => 'development',
+            'titulo' => 'Orientação de escopo no empty state do Interview',
+            'resumo' => 'A tela inicial do Assistente de Interview passa a deixar explícito que a entrevista cobre um único card e que o épico deve estar definido antes de começar.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Conversas',
+                    'itens' => [
+                        ['titulo' => 'Copy do empty state: um card por entrevista e épico prévio', 'estado' => 'development'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.5.0',
             'data' => '2026-09-06',
             'estado' => 'development',

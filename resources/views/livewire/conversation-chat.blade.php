@@ -14,8 +14,8 @@
                         </svg>
                     </div>
                     <h3 class="font-semibold text-gray-800 mb-1">Assistente de Interview</h3>
-                    <p class="text-sm text-gray-500 max-w-sm mx-auto">
-                        Descreva uma necessidade ou ideia. O assistente conduz a entrevista e, quando estiver pronto, você gera o card.
+                    <p class="text-sm text-gray-500 max-w-md mx-auto">
+                        Esta entrevista cobre um único card. Defina o épico antes de começar. Com o épico definido, descreva a necessidade do card — o assistente conduz a entrevista e, quando estiver pronto, você gera o card.
                     </p>
                 </div>
             </div>

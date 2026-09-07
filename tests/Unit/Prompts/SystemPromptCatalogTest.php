@@ -28,6 +28,7 @@ class SystemPromptCatalogTest extends TestCase
         $this->assertContains('v1', $catalog->versions('interview'));
         $this->assertContains('v2', $catalog->versions('interview'));
         $this->assertContains('v3', $catalog->versions('interview'));
+        $this->assertContains('v4', $catalog->versions('interview'));
         $this->assertContains('v1', $catalog->versions('card_generation'));
         $this->assertContains('v2', $catalog->versions('card_generation'));
     }
@@ -37,11 +38,25 @@ class SystemPromptCatalogTest extends TestCase
         $prompt = (new SystemPromptCatalog)->current('interview');
 
         $this->assertSame('interview', $prompt->name);
+        $this->assertSame('v4', $prompt->version);
+        $this->assertSame('interview@v4', $prompt->identifier());
+        $this->assertStringContainsString('<INTERVIEW_COMPLETE>', $prompt->content);
+        $this->assertStringContainsString('<INTERVIEW_SCOPE_TOO_BROAD></INTERVIEW_SCOPE_TOO_BROAD>', $prompt->content);
+        $this->assertStringContainsString('fluxo completo de onboarding com KYC, abertura de conta e primeiro investimento', $prompt->content);
+        $this->assertStringContainsString('Nunca emita `<INTERVIEW_COMPLETE>` nem `<INTERVIEW_SUMMARY>`', $prompt->content);
+        $this->assertStringContainsString('Na mesma mensagem do resumo', $prompt->content);
+        $this->assertStringContainsString('Objetivo: ...', $prompt->content);
+        $this->assertStringNotContainsString('<CARD_JSON>', $prompt->content);
+    }
+
+    public function test_keeps_interview_v3_unchanged_and_loadable(): void
+    {
+        $prompt = (new SystemPromptCatalog)->get('interview', 'v3');
+
         $this->assertSame('v3', $prompt->version);
         $this->assertSame('interview@v3', $prompt->identifier());
         $this->assertStringContainsString('<INTERVIEW_COMPLETE>', $prompt->content);
-        $this->assertStringContainsString('Na mesma mensagem do resumo', $prompt->content);
-        $this->assertStringContainsString('Objetivo: ...', $prompt->content);
+        $this->assertStringNotContainsString('<INTERVIEW_SCOPE_TOO_BROAD>', $prompt->content);
         $this->assertStringNotContainsString('<CARD_JSON>', $prompt->content);
     }
 

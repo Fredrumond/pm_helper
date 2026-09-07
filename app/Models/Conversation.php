@@ -56,6 +56,11 @@ class Conversation extends Model
         return is_string($this->interview_summary) && trim($this->interview_summary) !== '';
     }
 
+    public function isScopeTooBroad(): bool
+    {
+        return $this->current_step === 'scope_too_broad';
+    }
+
     /**
      * @return array{calls: int, prompt_tokens: int, completion_tokens: int, total_tokens: int, cached_tokens: int, cost: float}
      */

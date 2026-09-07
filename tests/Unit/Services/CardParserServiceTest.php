@@ -54,6 +54,76 @@ TXT;
         $this->assertTrue($parser->hasInterviewComplete($content));
     }
 
+    public function test_detects_and_strips_interview_scope_too_broad_tag(): void
+    {
+        $parser = new CardParserService;
+        $content = <<<'TXT'
+Isso não cabe em um único card. Volte com o card mais definido.
+
+<INTERVIEW_SCOPE_TOO_BROAD></INTERVIEW_SCOPE_TOO_BROAD>
+TXT;
+
+        $this->assertTrue($parser->hasInterviewScopeTooBroad($content));
+        $this->assertFalse($parser->hasInterviewComplete($content));
+        $this->assertSame(
+            'Isso não cabe em um único card. Volte com o card mais definido.',
+            $parser->extractTextOnly($content)
+        );
+    }
+
+    public function test_detects_scope_too_broad_tag_variants(): void
+    {
+        $parser = new CardParserService;
+        $prefix = 'Isso não cabe em um único card.';
+        $variants = [
+            '<INTERVIEW_SCOPE_TOO_BROAD></INTERVIEW_SCOPE_TOO_BROAD>',
+            '<INTERVIEW_SCOPE_TOO_BROAD>épico com vários cards</INTERVIEW_SCOPE_TOO_BROAD>',
+            '<INTERVIEW_SCOPE_TOO_BROAD/>',
+            '<INTERVIEW_SCOPE_TOO_BROAD />',
+            "<INTERVIEW_SCOPE_TOO_BROAD>\n</INTERVIEW_SCOPE_TOO_BROAD>",
+        ];
+
+        foreach ($variants as $tag) {
+            $content = $prefix.' '.$tag;
+
+            $this->assertTrue($parser->hasInterviewScopeTooBroad($content), $tag);
+            $this->assertFalse($parser->looksInterviewReady($content), $tag);
+            $this->assertNull($parser->extractInterviewSummary($content), $tag);
+            $this->assertFalse($parser->hasInterviewComplete($content), $tag);
+            $this->assertSame($prefix, $parser->extractTextOnly($content), $tag);
+        }
+    }
+
+    public function test_scope_too_broad_tag_wins_over_interview_complete_and_heuristic(): void
+    {
+        $parser = new CardParserService;
+
+        $withComplete = <<<'TXT'
+A entrevista está fechada.
+
+<INTERVIEW_COMPLETE>
+<INTERVIEW_SUMMARY>
+Problema: onboarding completo
+</INTERVIEW_SUMMARY>
+</INTERVIEW_COMPLETE>
+<INTERVIEW_SCOPE_TOO_BROAD>épico</INTERVIEW_SCOPE_TOO_BROAD>
+TXT;
+
+        $this->assertTrue($parser->hasInterviewScopeTooBroad($withComplete));
+        $this->assertFalse($parser->looksInterviewReady($withComplete));
+        $this->assertNull($parser->extractInterviewSummary($withComplete));
+        $this->assertFalse($parser->hasInterviewComplete($withComplete));
+        $this->assertStringNotContainsString('INTERVIEW_SCOPE_TOO_BROAD', $parser->extractTextOnly($withComplete));
+        $this->assertStringNotContainsString('INTERVIEW_COMPLETE', $parser->extractTextOnly($withComplete));
+        $this->assertStringNotContainsString('épico', $parser->extractTextOnly($withComplete));
+
+        $withHeuristic = 'A entrevista está fechada e você já pode gerar o card no produto. <INTERVIEW_SCOPE_TOO_BROAD/>';
+
+        $this->assertFalse($parser->looksInterviewReady($withHeuristic));
+        $this->assertNull($parser->extractInterviewSummary($withHeuristic));
+        $this->assertFalse($parser->hasInterviewComplete($withHeuristic));
+    }
+
     public function test_detects_generate_card_request(): void
     {
         $parser = new CardParserService;

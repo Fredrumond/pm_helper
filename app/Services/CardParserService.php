@@ -8,6 +8,11 @@ use Illuminate\Support\Collection;
 class CardParserService
 {
     /**
+     * Aceita tag vazia, com conteúdo interno, self-closing ou abertura sem fechamento.
+     */
+    private const INTERVIEW_SCOPE_TOO_BROAD_PATTERN = '/<INTERVIEW_SCOPE_TOO_BROAD\b[^>]*\/>|<INTERVIEW_SCOPE_TOO_BROAD\b[^>]*>.*?<\/INTERVIEW_SCOPE_TOO_BROAD>|<INTERVIEW_SCOPE_TOO_BROAD\b[^>]*>/is';
+
+    /**
      * Verifica se a resposta do assistente contém um card gerado.
      */
     public function hasCard(string $content): bool
@@ -16,10 +21,22 @@ class CardParserService
     }
 
     /**
+     * Verifica se a entrevista foi recusada por escopo amplo demais.
+     */
+    public function hasInterviewScopeTooBroad(string $content): bool
+    {
+        return (bool) preg_match(self::INTERVIEW_SCOPE_TOO_BROAD_PATTERN, $content);
+    }
+
+    /**
      * Verifica se a entrevista foi sinalizada como completa.
      */
     public function hasInterviewComplete(string $content): bool
     {
+        if ($this->hasInterviewScopeTooBroad($content)) {
+            return false;
+        }
+
         return $this->extractInterviewSummary($content) !== null
             || $this->looksInterviewReady($content);
     }
@@ -29,6 +46,10 @@ class CardParserService
      */
     public function looksInterviewReady(string $content): bool
     {
+        if ($this->hasInterviewScopeTooBroad($content)) {
+            return false;
+        }
+
         $normalized = mb_strtolower($content);
 
         return (bool) preg_match(
@@ -55,6 +76,10 @@ class CardParserService
      */
     public function extractInterviewSummary(string $content): ?string
     {
+        if ($this->hasInterviewScopeTooBroad($content)) {
+            return null;
+        }
+
         if (preg_match('/<INTERVIEW_SUMMARY>(.*?)<\/INTERVIEW_SUMMARY>/is', $content, $matches) === 1) {
             $summary = trim($matches[1]);
 
@@ -186,6 +211,7 @@ class CardParserService
         $content = preg_replace('/<CARD_JSON>.*?<\/CARD_JSON>/s', '', $content) ?? $content;
         $content = preg_replace('/<INTERVIEW_COMPLETE>.*?<\/INTERVIEW_COMPLETE>/is', '', $content) ?? $content;
         $content = preg_replace('/<INTERVIEW_SUMMARY>.*?<\/INTERVIEW_SUMMARY>/is', '', $content) ?? $content;
+        $content = preg_replace(self::INTERVIEW_SCOPE_TOO_BROAD_PATTERN, '', $content) ?? $content;
 
         return trim($content);
     }

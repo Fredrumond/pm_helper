@@ -307,6 +307,24 @@ TXT;
             ->assertDontSee('<script>alert("xss")</script>', false);
     }
 
+    public function test_empty_state_orients_pm_to_single_card_and_defined_epic(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->assertSee('único card')
+            ->assertSee('épico definido')
+            ->assertDontSee('Descreva uma necessidade ou ideia. O assistente conduz a entrevista')
+            ->assertSee('Descreva sua necessidade ou ideia')
+            ->assertSee('wire:submit="sendMessage"', false)
+            ->assertDontSee('Gerar Card');
+    }
+
     public function test_renders_composer_with_models_and_deferred_actions(): void
     {
         $user = User::factory()->create();
@@ -608,5 +626,216 @@ TXT;
                 && str_contains((string) $request['messages'][1]['content'], 'LP para vender ebooks')
                 && count($request['messages']) === 2;
         });
+    }
+
+    public function test_scope_too_broad_tag_blocks_card_generation_and_generate_card_shortcut(): void
+    {
+        $reply = <<<'TXT'
+Isso não cabe em um único card. Volte com o card mais definido para retomarmos.
+
+<INTERVIEW_SCOPE_TOO_BROAD></INTERVIEW_SCOPE_TOO_BROAD>
+TXT;
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => $reply]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Onboarding',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero o fluxo completo de onboarding com KYC, abertura de conta e primeiro investimento')
+            ->call('sendMessage')
+            ->assertDispatched('interview-scope-too-broad')
+            ->assertSee('Isso não cabe em um único card. Volte com o card mais definido para retomarmos.')
+            ->assertDontSee('INTERVIEW_SCOPE_TOO_BROAD')
+            ->assertDontSee('Gerar Card')
+            ->assertSee('wire:submit="sendMessage"', false);
+
+        $conversation->refresh();
+        $this->assertSame('scope_too_broad', $conversation->current_step);
+        $this->assertNull($conversation->interview_summary);
+        $this->assertFalse($conversation->isInterviewComplete());
+        $this->assertTrue($conversation->isScopeTooBroad());
+        $this->assertDatabaseMissing('cards', [
+            'conversation_id' => $conversation->id,
+        ]);
+
+        $component
+            ->set('input', 'gere o card')
+            ->call('sendMessage')
+            ->assertNoRedirect()
+            ->assertSee('Volte com um card mais definido')
+            ->assertDontSee('Gerar Card');
+
+        $this->assertDatabaseMissing('cards', [
+            'conversation_id' => $conversation->id,
+        ]);
+        $this->assertNull($conversation->fresh()->interview_summary);
+        $this->assertSame('scope_too_broad', $conversation->fresh()->current_step);
+        Http::assertSentCount(1);
+    }
+
+    public function test_generate_card_refuses_when_scope_is_too_broad_without_calling_openrouter(): void
+    {
+        Http::preventStrayRequests();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Onboarding',
+            'current_step' => 'scope_too_broad',
+        ]);
+        $conversation->messages()->create([
+            'role' => 'user',
+            'content' => 'Quero o onboarding completo',
+        ]);
+        $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => 'Isso não cabe em um único card. <INTERVIEW_SCOPE_TOO_BROAD></INTERVIEW_SCOPE_TOO_BROAD>',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('generateCard')
+            ->assertNoRedirect()
+            ->assertSee('Volte com um card mais definido')
+            ->assertDontSee('Gerar Card')
+            ->assertSee('wire:submit="sendMessage"', false);
+
+        $this->assertDatabaseMissing('cards', [
+            'conversation_id' => $conversation->id,
+        ]);
+        $this->assertNull($conversation->fresh()->interview_summary);
+        Http::assertNothingSent();
+    }
+
+    public function test_scope_too_broad_stays_blocked_when_later_message_signals_interview_complete(): void
+    {
+        $reply = <<<'TXT'
+Entendi. Podemos gerar o card.
+
+<INTERVIEW_COMPLETE>
+<INTERVIEW_SUMMARY>
+Problema: checkout sem pagamento
+</INTERVIEW_SUMMARY>
+</INTERVIEW_COMPLETE>
+TXT;
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => $reply]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Onboarding',
+            'prompt_name' => 'interview',
+            'prompt_version' => 'v4',
+            'current_step' => 'scope_too_broad',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Pode fechar a entrevista mesmo assim')
+            ->call('sendMessage')
+            ->assertDispatched('interview-scope-too-broad')
+            ->assertSee('Entendi. Podemos gerar o card.')
+            ->assertDontSee('Gerar Card')
+            ->assertDontSee('<INTERVIEW_COMPLETE>', false);
+
+        $conversation->refresh();
+        $this->assertSame('scope_too_broad', $conversation->current_step);
+        $this->assertNull($conversation->interview_summary);
+        $this->assertFalse($conversation->isInterviewComplete());
+        $this->assertDatabaseMissing('cards', [
+            'conversation_id' => $conversation->id,
+        ]);
+    }
+
+    public function test_scope_too_broad_with_inner_tag_content_still_blocks_generation(): void
+    {
+        $reply = <<<'TXT'
+Isso não cabe em um único card. Volte com o card mais definido.
+
+<INTERVIEW_SCOPE_TOO_BROAD>fluxo de onboarding completo</INTERVIEW_SCOPE_TOO_BROAD>
+TXT;
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => $reply]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Onboarding',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero o onboarding completo')
+            ->call('sendMessage')
+            ->assertDispatched('interview-scope-too-broad')
+            ->assertSee('Isso não cabe em um único card. Volte com o card mais definido.')
+            ->assertDontSee('INTERVIEW_SCOPE_TOO_BROAD')
+            ->assertDontSee('Gerar Card');
+
+        $conversation->refresh();
+        $this->assertSame('scope_too_broad', $conversation->current_step);
+        $this->assertNull($conversation->interview_summary);
+        $this->assertFalse($conversation->isInterviewComplete());
+        $this->assertTrue($conversation->isScopeTooBroad());
+    }
+
+    public function test_conversation_header_does_not_show_ready_when_scope_is_too_broad(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Onboarding',
+            'current_step' => 'scope_too_broad',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('conversations.show', $conversation))
+            ->assertOk()
+            ->assertDontSee('Pronto para gerar o card')
+            ->assertSee('Escopo amplo demais')
+            ->assertSee('wire:submit="sendMessage"', false);
+    }
+
+    public function test_conversation_header_listens_for_scope_too_broad_during_interview(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Onboarding',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('conversations.show', $conversation))
+            ->assertOk()
+            ->assertSee('Interview em andamento')
+            ->assertSee('x-on:interview-scope-too-broad.window', false)
+            ->assertSee('Escopo amplo demais');
     }
 }

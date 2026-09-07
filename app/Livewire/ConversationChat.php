@@ -70,6 +70,13 @@ class ConversationChat extends Component
         if ($parser->isGenerateCardRequest($text)) {
             $this->conversation->refresh();
             $this->conversation->load('messages');
+
+            if ($this->conversation->isScopeTooBroad()) {
+                $this->refuseCardGenerationDueToBroadScope();
+
+                return;
+            }
+
             $this->ensureInterviewSummary($parser);
             $this->generateCard($openRouter, $parser);
 
@@ -79,6 +86,7 @@ class ConversationChat extends Component
         try {
             $this->conversation->refresh();
             $this->conversation->load('messages');
+            $alreadyScopeTooBroad = $this->conversation->isScopeTooBroad();
 
             $assistantResponse = $openRouter->chat($this->conversation, $this->selectedModel);
 
@@ -88,9 +96,13 @@ class ConversationChat extends Component
                 'content' => $assistantResponse,
             ]);
 
-            $this->captureInterviewSummary($parser, $assistantResponse);
+            if ($alreadyScopeTooBroad) {
+                $this->persistScopeTooBroad();
+            } else {
+                $this->captureInterviewSummary($parser, $assistantResponse);
+            }
 
-            if ($parser->hasCard($assistantResponse)) {
+            if ($parser->hasCard($assistantResponse) && ! $this->conversation->isScopeTooBroad()) {
                 $this->persistCard($parser, $assistantResponse);
             }
         } catch (LlmTemporarilyUnavailableException $e) {
@@ -122,13 +134,20 @@ class ConversationChat extends Component
             return;
         }
 
+        $this->conversation->refresh();
+
+        if ($this->conversation->isScopeTooBroad()) {
+            $this->refuseCardGenerationDueToBroadScope();
+
+            return;
+        }
+
         $this->generatingCard = true;
 
         Log::info('Geração de card solicitada', [
             'conversation_id' => $this->conversation->id,
         ]);
 
-        $this->conversation->refresh();
         $this->conversation->load('messages');
         $this->ensureInterviewSummary($parser);
 
@@ -194,6 +213,18 @@ class ConversationChat extends Component
 
     private function captureInterviewSummary(CardParserService $parser, string $response): void
     {
+        $this->conversation->refresh();
+
+        if ($this->conversation->isScopeTooBroad()) {
+            return;
+        }
+
+        if ($parser->hasInterviewScopeTooBroad($response)) {
+            $this->persistScopeTooBroad();
+
+            return;
+        }
+
         $summary = $parser->extractInterviewSummary($response);
 
         if ($summary === null && $parser->looksInterviewReady($response)) {
@@ -209,7 +240,7 @@ class ConversationChat extends Component
 
     private function ensureInterviewSummary(CardParserService $parser): void
     {
-        if ($this->conversation->isInterviewComplete()) {
+        if ($this->conversation->isInterviewComplete() || $this->conversation->isScopeTooBroad()) {
             return;
         }
 
@@ -231,6 +262,37 @@ class ConversationChat extends Component
         ]);
 
         $this->dispatch('interview-ready');
+    }
+
+    private function persistScopeTooBroad(): void
+    {
+        $firstMark = ! $this->conversation->isScopeTooBroad();
+
+        $this->conversation->update([
+            'current_step' => 'scope_too_broad',
+            'interview_summary' => null,
+        ]);
+
+        $this->dispatch('interview-scope-too-broad');
+
+        if ($firstMark) {
+            Log::info('Entrevista bloqueada por escopo amplo', [
+                'conversation_id' => $this->conversation->id,
+                'current_step' => 'scope_too_broad',
+            ]);
+        }
+    }
+
+    private function refuseCardGenerationDueToBroadScope(): void
+    {
+        Message::create([
+            'conversation_id' => $this->conversation->id,
+            'role' => 'assistant',
+            'content' => 'Este escopo ainda é amplo demais para um único card. Volte com um card mais definido para retomarmos a entrevista — não vou gerar o card agora.',
+        ]);
+
+        $this->conversation->refresh();
+        $this->conversation->load(['messages', 'card']);
     }
 
     private function recordSoftLlmUnavailable(LlmTemporarilyUnavailableException $e): void
@@ -279,7 +341,9 @@ class ConversationChat extends Component
             'messages' => $this->conversation->messages,
             'card' => $this->conversation->card,
             'models' => ChatComposer::models(),
-            'showGenerateCardButton' => $this->conversation->isInterviewComplete() && ! $this->conversation->isCompleted(),
+            'showGenerateCardButton' => $this->conversation->isInterviewComplete()
+                && ! $this->conversation->isCompleted()
+                && ! $this->conversation->isScopeTooBroad(),
             'selectedModelMeta' => $selected ?? [
                 'id' => $this->selectedModel,
                 'name' => $this->selectedModel,
