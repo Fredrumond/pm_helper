@@ -24,6 +24,100 @@ return [
         'bug' => 'Bug',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Evolução dos prompts
+    |--------------------------------------------------------------------------
+    |
+    | Cada entry documenta o que mudou de uma versão para a próxima.
+    | Ordem cronológica crescente dentro de cada step (v1 primeiro).
+    | Nunca edite uma versão já registrada; adicione sempre no final do array
+    | do step correspondente.
+    |
+    */
+    'prompts' => [
+
+        'interview' => [
+            [
+                'versao'  => 'v1',
+                'data'    => '2026-09-05',
+                'release' => '0.3.0',
+                'resumo'  => 'Primeira versão do prompt de entrevista. Framework clássico de product discovery (problema, persona, contexto, impacto, critérios de sucesso e aceite, fora do escopo, restrições técnicas). A entrevista era dividida em três fases, e a emissão das tags de encerramento só ocorria após o PM confirmar explicitamente o resumo em uma mensagem separada.',
+                'mudancas' => [],
+            ],
+            [
+                'versao'  => 'v2',
+                'data'    => '2026-09-05',
+                'release' => '0.3.0',
+                'resumo'  => 'Mantém o mesmo framework do v1, mas remove a espera de confirmação do PM: o resumo e as tags de encerramento passam a ser emitidos na mesma mensagem. Aceita pedido de pular etapas quando o contexto já é suficiente, em vez de insistir nas fases.',
+                'mudancas' => [
+                    'Fase de validação unificada: resumo e tags INTERVIEW_COMPLETE emitidos na mesma mensagem, sem aguardar confirmação do PM',
+                    'Comportamento ao pular etapas: se o PM pedir para avançar e já houver contexto suficiente, a entrevista encerra imediatamente',
+                ],
+            ],
+            [
+                'versao'  => 'v3',
+                'data'    => '2026-09-06',
+                'release' => '0.5.0',
+                'resumo'  => 'Adota o framework de cards do time no lugar do framework clássico. O fluxo passa a cobrir Objetivo, Como funciona hoje, Regras, Onde, Aceite, O que não fazer, Stakeholders e Como validar — cinco fases no lugar de três. O INTERVIEW_SUMMARY passa a usar os campos do novo framework. Adiciona bloco de Regras do Framework com diretrizes explícitas de comportamento vs implementação.',
+                'mudancas' => [
+                    'Framework substituído: sai user story + critérios de aceite, entra Objetivo / Como funciona hoje / Regras / Onde / Aceite / O que não fazer / Stakeholders / Como validar',
+                    'Cinco fases no lugar de três (novo: Regras e onde, Aceite e limites, Pessoas e validação)',
+                    'INTERVIEW_SUMMARY atualizado com os novos campos do framework',
+                    'Bloco "Regras do Framework" adicionado: comportamento ≠ implementação; testável por colega de produto; dúvidas técnicas e decisões em aberto registradas explicitamente',
+                    'Stakeholders passam a exigir nomes de pessoas, nunca times ou áreas genéricas',
+                    '"Como funciona hoje" e "O que não fazer" marcados como opcionais com critério explícito',
+                ],
+            ],
+            [
+                'versao'  => 'v4',
+                'data'    => '2026-09-07',
+                'release' => '0.5.2',
+                'resumo'  => 'Adiciona trava de escopo amplo: quando a demanda equivale a vários cards, o modelo recusa a conduzir a entrevista, emite a tag INTERVIEW_SCOPE_TOO_BROAD e pede que o PM retorne com um card definido. INTERVIEW_COMPLETE e INTERVIEW_SUMMARY ficam bloqueados enquanto o escopo permanecer amplo. O caminho feliz (único card) permanece idêntico ao v3.',
+                'mudancas' => [
+                    'Nova seção "Escopo: um card por entrevista" com critério de escopo amplo e protocolo de rejeição',
+                    'Tag INTERVIEW_SCOPE_TOO_BROAD emitida quando a demanda cobre vários cards; impede qualquer encerramento feliz',
+                    'Comportamento ao insistir: o modelo repete a recomendação e não avança para geração',
+                    'Fase 5 de encerramento passa a ter guarda explícita: tags de entrevista pronta só para escopo de um card',
+                ],
+            ],
+        ],
+
+        'card_generation' => [
+            [
+                'versao'  => 'v1',
+                'data'    => '2026-09-05',
+                'release' => '0.3.0',
+                'resumo'  => 'Primeira versão do prompt de geração de card. Recebe o INTERVIEW_SUMMARY e gera JSON com os campos clássicos: title, type, user_story, context, acceptance_criteria, out_of_scope, technical_notes, priority, labels e estimated_complexity.',
+                'mudancas' => [],
+            ],
+            [
+                'versao'  => 'v2',
+                'data'    => '2026-09-06',
+                'release' => '0.5.0',
+                'resumo'  => 'Espelha a mudança de framework do interview/v3. O JSON de saída adota os campos do framework do time: objetivo, como_funciona_hoje, regras, onde, aceite, o_que_nao_fazer, stakeholders e como_validar. Campos clássicos (user_story, type, labels, estimated_complexity) são removidos. Adiciona as mesmas regras de comportamento vs implementação do prompt de entrevista.',
+                'mudancas' => [
+                    'JSON de saída substituído: sai user_story / context / acceptance_criteria, entra objetivo / como_funciona_hoje / regras / onde / aceite / o_que_nao_fazer / stakeholders / como_validar',
+                    'Campos removidos: type, labels, estimated_complexity',
+                    'Regras do framework adicionadas: comportamento ≠ implementação; testável por colega de produto; lacunas explicitadas',
+                    'como_funciona_hoje aceita null quando a funcionalidade é nova e independente',
+                    'stakeholders: lista de nomes de pessoas; lista vazia se o resumo não trouxer nomes',
+                ],
+            ],
+        ],
+
+        'discovery' => [
+            [
+                'versao'  => 'v1',
+                'data'    => '2026-09-05',
+                'release' => '0.3.0',
+                'resumo'  => 'Modo legado: um único prompt conduzia a entrevista e gerava o card no mesmo fluxo, sem separação de steps. Framework clássico (problema, persona, contexto, impacto, critérios de sucesso e aceite, fora do escopo, restrições técnicas). Substituído pelos steps interview + card_generation a partir do release 0.3.0; mantido apenas para conversas antigas.',
+                'mudancas' => [],
+            ],
+        ],
+
+    ],
+
     'releases' => [
 
         [

@@ -39,6 +39,7 @@ class VersoesIndex extends Component
             'totalEntregas' => Versoes::totalEntregas(),
             'releases' => Versoes::filtrar($estado, $this->busca),
             'filtrando' => $estado !== null || trim($this->busca) !== '',
+            'prompts' => Versoes::prompts(),
         ]);
     }
 }

@@ -91,6 +91,98 @@
         </p>
     </div>
 
+    {{-- ──────────────────────────────────────────────────────────
+         Evolução dos prompts
+    ────────────────────────────────────────────────────────── --}}
+    @if (! empty($prompts))
+        @php
+            $stepLabels = [
+                'interview'       => 'Interview',
+                'card_generation' => 'Card Generation',
+                'discovery'       => 'Discovery',
+            ];
+        @endphp
+
+        <div>
+            <h2 class="text-lg font-bold text-gray-900">Evolução dos prompts</h2>
+            <p class="text-sm text-gray-500 mt-0.5">O que mudou de uma versão para a outra em cada step.</p>
+        </div>
+
+        <div class="space-y-5">
+            @foreach ($prompts as $step => $versoes)
+                <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <div class="px-5 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-gray-800 tracking-wide uppercase">
+                            {{ $stepLabels[$step] ?? $step }}
+                        </h3>
+                        <span class="text-xs text-gray-400">{{ count($versoes) }} {{ count($versoes) === 1 ? 'versão' : 'versões' }}</span>
+                    </div>
+
+                    <div class="divide-y divide-gray-100">
+                        @foreach (array_reverse($versoes) as $idx => $entrada)
+                            <div class="px-5 py-4" x-data="{ aberto: {{ $idx === 0 ? 'true' : 'false' }} }">
+                                <button
+                                    type="button"
+                                    class="flex w-full items-start justify-between gap-3 text-left"
+                                    @click="aberto = !aberto"
+                                >
+                                    <div class="flex flex-wrap items-center gap-2 min-w-0">
+                                        <span class="font-mono text-sm font-semibold text-indigo-600">
+                                            {{ $step }}/{{ $entrada['versao'] }}
+                                        </span>
+                                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                                            release {{ $entrada['release'] }}
+                                        </span>
+                                        <span class="text-xs text-gray-400">
+                                            {{ \Illuminate\Support\Carbon::parse($entrada['data'])->format('d/m/Y') }}
+                                        </span>
+                                    </div>
+                                    <svg
+                                        class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 transition-transform duration-150"
+                                        :class="{ 'rotate-180': aberto }"
+                                        xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                                    >
+                                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+
+                                <div x-show="aberto" x-transition class="mt-3 space-y-3">
+                                    <p class="text-sm text-gray-600">{{ $entrada['resumo'] }}</p>
+
+                                    @if (! empty($entrada['mudancas']))
+                                        <div>
+                                            <p class="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">O que mudou em relação à versão anterior</p>
+                                            <ul class="space-y-1.5">
+                                                @foreach ($entrada['mudancas'] as $mudanca)
+                                                    <li class="flex gap-2 text-sm text-gray-700">
+                                                        <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400"></span>
+                                                        {{ $mudanca }}
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @else
+                                        <p class="text-xs text-gray-400 italic">Versão inicial — sem predecessora para comparar.</p>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endforeach
+        </div>
+
+        <hr class="border-gray-200" />
+    @endif
+
+    {{-- ──────────────────────────────────────────────────────────
+         Timeline de releases
+    ────────────────────────────────────────────────────────── --}}
+    <div>
+        <h2 class="text-lg font-bold text-gray-900">Releases</h2>
+        <p class="text-sm text-gray-500 mt-0.5">Histórico de entregas com módulos, itens e commits.</p>
+    </div>
+
     @if ($releases === [])
         <div class="bg-white border border-gray-200 rounded-xl px-5 py-10 text-center">
             <p class="text-sm text-gray-600">Nenhuma entrega encontrada com esses filtros.</p>

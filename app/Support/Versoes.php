@@ -17,6 +17,16 @@ class Versoes
     }
 
     /**
+     * Evolução dos prompts por step, em ordem cronológica crescente.
+     *
+     * @return array<string, list<array<string, mixed>>>
+     */
+    public static function prompts(): array
+    {
+        return config('versoes.prompts', []);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public static function atual(): ?array
