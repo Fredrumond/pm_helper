@@ -5,7 +5,7 @@
 - **PHP 8.3** + **Laravel 13** + **Livewire 4**
 - **Tailwind CSS** + **Vite**
 - **MySQL** via Docker (nginx + PHP-FPM + MySQL)
-- **OpenRouter** como gateway de LLM (com fallback automático via `OPENROUTER_FALLBACK_MODEL`)
+- **OpenRouter** como adapter padrão de LLM (via `LlmGateway` + `LlmRouter`; fallback automático via `OPENROUTER_FALLBACK_MODEL`)
 - Autenticação via **Laravel Breeze**
 - Testes com **PHPUnit** (`composer test`)
 
@@ -19,7 +19,8 @@ app/
   Livewire/        # Componentes Livewire (ConversationChat, CardPreview…)
   Models/          # Eloquent (Conversation, Message, Card, LlmUsage…)
   Prompts/         # Catálogo e métricas de prompts (SystemPromptCatalog)
-  Services/        # OpenRouterService, CardParserService
+  Contracts/       # Ports (LlmGateway)
+  Services/        # LlmRouter, CardParserService, Adapters/OpenRouterAdapter
 
 config/
   versoes.php      # Changelog do projeto — SEMPRE atualizar após cada entrega

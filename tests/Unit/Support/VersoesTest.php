@@ -11,10 +11,10 @@ class VersoesTest extends TestCase
     {
         $versoes = array_column(Versoes::todas(), 'versao');
 
-        $this->assertSame('0.5.4', $versoes[0]);
+        $this->assertSame('0.5.9', $versoes[0]);
         $this->assertContains('0.1.0', $versoes);
-        $this->assertSame('0.5.4', Versoes::numeroAtual());
-        $this->assertSame('Trava de escopo amplo mais tolerante e selo imediato', Versoes::atual()['titulo']);
+        $this->assertSame('0.5.9', Versoes::numeroAtual());
+        $this->assertSame('ADR da arquitetura LLM', Versoes::atual()['titulo']);
         $this->assertGreaterThan(0, Versoes::totalEntregas());
         $this->assertSame(['stable', 'development', 'test', 'bug'], array_keys(Versoes::contagemPorEstado()));
     }
@@ -38,9 +38,11 @@ class VersoesTest extends TestCase
     {
         $releases = Versoes::filtrar('bug');
 
-        $this->assertSame([], $releases);
+        $this->assertSame(['0.5.8', '0.5.6'], array_column($releases, 'versao'));
+        $this->assertSame('MiniMax M3 removido do catálogo e do default', $releases[0]['modulos'][0]['itens'][0]['titulo']);
+        $this->assertCount(1, $releases[0]['modulos'][0]['itens']);
 
-        $development = Versoes::filtrar('development', 'OpenRouter');
+        $development = Versoes::filtrar('development', 'first commit');
 
         $this->assertSame([], $development);
     }

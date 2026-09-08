@@ -121,6 +121,92 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.5.9',
+            'data' => '2026-09-08',
+            'estado' => 'development',
+            'titulo' => 'ADR da arquitetura LLM',
+            'resumo' => 'Registra a decisão de desacoplar a LLM com Ports & Adapters: contrato LlmGateway, LlmRouter por prefixo e OpenRouterAdapter como default.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Docs',
+                    'itens' => [
+                        ['titulo' => 'ADR 0001 — desacoplar LLM com Ports & Adapters', 'estado' => 'development', 'nota' => 'docs/adr/0001-desacoplar-llm-com-ports-e-adapters.md'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.5.8',
+            'data' => '2026-09-08',
+            'estado' => 'bug',
+            'titulo' => 'Catálogo de modelos sem MiniMax M3',
+            'resumo' => 'Remove minimax/minimax-m3:free, que deixou de responder. O composer passa a listar Nemotron 3 Ultra, Laguna S 2.1, Nemotron 3.5 Lightning e Ling 3.0 Flash Fin, nessa ordem.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'MiniMax M3 removido do catálogo e do default', 'estado' => 'bug', 'nota' => 'OPENROUTER_MODEL agora é nvidia/nemotron-3-ultra-550b-a55b:free; fallbacks são Laguna, Lightning e Ling'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.5.7',
+            'data' => '2026-09-08',
+            'estado' => 'development',
+            'titulo' => 'LLM desacoplada via Ports & Adapters',
+            'resumo' => 'ConversationChat passa a depender do contrato LlmGateway. OpenRouter vira adapter; LlmRouter escolhe o provedor pelo prefixo do modelo.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'Port LlmGateway e LlmRouter', 'estado' => 'development', 'nota' => 'Router resolve o adapter pelo prefixo do modelo e cai no OpenRouterAdapter por padrão'],
+                        ['titulo' => 'OpenRouterService extraído para OpenRouterAdapter', 'estado' => 'development', 'nota' => 'ConversationChat deixa de conhecer o provedor; mensagens de erro genéricas (Erro LLM)'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.5.6',
+            'data' => '2026-09-08',
+            'estado' => 'bug',
+            'titulo' => 'Login via ngrok sem erro 419 de CSRF',
+            'resumo' => 'O app passa a confiar em proxies TLS (ngrok) e a gerar URLs/cookies em HTTPS, evitando o 419 no POST /login ao apresentar o MVP em outro computador.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Auth',
+                    'itens' => [
+                        ['titulo' => 'TrustProxies e HTTPS atrás do ngrok', 'estado' => 'bug', 'nota' => 'X-Forwarded-Proto honrado no Laravel e no nginx; formulário de login usa a URL HTTPS pública'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.5.5',
+            'data' => '2026-09-07',
+            'estado' => 'development',
+            'titulo' => 'README alinhado à versão atual e ao OpenRouter',
+            'resumo' => 'README curto com stack atual (Livewire 4), fluxo de entrevista e geração de card, e OpenRouter como único gateway de LLM.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Docs',
+                    'itens' => [
+                        ['titulo' => 'README atualizado para o MVP 0.5.x', 'estado' => 'development', 'nota' => 'OpenRouter explícito; setup sem bootstrap legado; modelos e fila obsoletos removidos'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.5.4',
             'data' => '2026-09-07',
             'estado' => 'development',

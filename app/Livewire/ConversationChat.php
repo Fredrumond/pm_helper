@@ -2,12 +2,12 @@
 
 namespace App\Livewire;
 
+use App\Contracts\LlmGateway;
 use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Card;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Services\CardParserService;
-use App\Services\OpenRouterService;
 use App\Support\ChatComposer;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -46,7 +46,7 @@ class ConversationChat extends Component
         session(['chat.selected_model' => $model]);
     }
 
-    public function sendMessage(OpenRouterService $openRouter, CardParserService $parser): void
+    public function sendMessage(LlmGateway $llm, CardParserService $parser): void
     {
         if (trim($this->input) === '' || $this->conversation->isCompleted()) {
             return;
@@ -78,7 +78,7 @@ class ConversationChat extends Component
             }
 
             $this->ensureInterviewSummary($parser);
-            $this->generateCard($openRouter, $parser);
+            $this->generateCard($llm, $parser);
 
             return;
         }
@@ -88,7 +88,7 @@ class ConversationChat extends Component
             $this->conversation->load('messages');
             $alreadyScopeTooBroad = $this->conversation->isScopeTooBroad();
 
-            $assistantResponse = $openRouter->chat($this->conversation, $this->selectedModel);
+            $assistantResponse = $llm->chat($this->conversation, $this->selectedModel);
 
             Message::create([
                 'conversation_id' => $this->conversation->id,
@@ -108,7 +108,7 @@ class ConversationChat extends Component
         } catch (LlmTemporarilyUnavailableException $e) {
             $this->recordSoftLlmUnavailable($e);
         } catch (Throwable $e) {
-            Log::error('Falha ao consultar a OpenRouter', [
+            Log::error('Falha ao consultar a LLM', [
                 'conversation_id' => $this->conversation->id,
                 'error' => $e->getMessage(),
             ]);
@@ -116,7 +116,7 @@ class ConversationChat extends Component
             Message::create([
                 'conversation_id' => $this->conversation->id,
                 'role' => 'assistant',
-                'content' => '⚠️ Erro OpenRouter: '.$e->getMessage(),
+                'content' => '⚠️ Erro LLM: '.$e->getMessage(),
             ]);
         }
 
@@ -128,7 +128,7 @@ class ConversationChat extends Component
         }
     }
 
-    public function generateCard(OpenRouterService $openRouter, CardParserService $parser): void
+    public function generateCard(LlmGateway $llm, CardParserService $parser): void
     {
         if ($this->generatingCard) {
             return;
@@ -172,7 +172,7 @@ class ConversationChat extends Component
         }
 
         try {
-            $assistantResponse = $openRouter->generateCard(
+            $assistantResponse = $llm->generateCard(
                 $this->conversation,
                 (string) $this->conversation->interview_summary,
                 $this->selectedModel,
@@ -198,7 +198,7 @@ class ConversationChat extends Component
             Message::create([
                 'conversation_id' => $this->conversation->id,
                 'role' => 'assistant',
-                'content' => '⚠️ Erro OpenRouter: '.$e->getMessage(),
+                'content' => '⚠️ Erro LLM: '.$e->getMessage(),
             ]);
         }
 

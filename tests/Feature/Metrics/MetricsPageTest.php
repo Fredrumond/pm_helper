@@ -48,7 +48,7 @@ class MetricsPageTest extends TestCase
         $conversation->messages()->create(['role' => 'user', 'content' => 'Quero pagar']);
         LlmUsage::query()->create([
             'conversation_id' => $conversation->id,
-            'model' => 'minimax/minimax-m3:free',
+            'model' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
             'prompt_version' => 'v1',
             'provider' => 'GMICloud',
             'prompt_tokens' => 100,
@@ -77,7 +77,7 @@ class MetricsPageTest extends TestCase
         $this->actingAs($user)
             ->get(route('metrics.index'))
             ->assertOk()
-            ->assertSee('minimax/minimax-m3:free')
+            ->assertSee('nvidia/nemotron-3-ultra-550b-a55b:free')
             ->assertSee('Checkout')
             ->assertSee('prompt v1')
             ->assertSee('GMICloud')

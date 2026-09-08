@@ -87,7 +87,7 @@ class ConversationChatTest extends TestCase
             ->test(ConversationChat::class, ['conversation' => $conversation])
             ->set('input', 'Quero um card')
             ->call('sendMessage')
-            ->assertSee('Erro OpenRouter')
+            ->assertSee('Erro LLM')
             ->assertSee('HTTP 401')
             ->assertSee('Missing Authentication header');
 
@@ -137,7 +137,7 @@ class ConversationChatTest extends TestCase
             ->set('input', 'Quero um checkout')
             ->call('sendMessage')
             ->assertSee('Qual o impacto disso?')
-            ->assertDontSee('Erro OpenRouter')
+            ->assertDontSee('Erro LLM')
             ->assertDontSee('rate-limited')
             ->assertDontSee('429');
 
@@ -179,7 +179,7 @@ class ConversationChatTest extends TestCase
             ->set('input', 'Quero um checkout')
             ->call('sendMessage')
             ->assertSee('Não consegui continuar agora')
-            ->assertDontSee('Erro OpenRouter')
+            ->assertDontSee('Erro LLM')
             ->assertDontSee('rate-limited')
             ->assertDontSee('HTTP 429');
     }

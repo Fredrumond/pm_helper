@@ -38,7 +38,7 @@ class SessionUsageTest extends TestCase
         LlmUsage::query()->create([
             'conversation_id' => $conversation->id,
             'generation_id' => 'gen-1',
-            'model' => 'minimax/minimax-m3:free',
+            'model' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
             'prompt_version' => 'v1',
             'provider' => 'GMICloud',
             'prompt_tokens' => 850,
@@ -51,7 +51,7 @@ class SessionUsageTest extends TestCase
         LlmUsage::query()->create([
             'conversation_id' => $conversation->id,
             'generation_id' => 'gen-2',
-            'model' => 'minimax/minimax-m3:free',
+            'model' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
             'provider' => 'GMICloud',
             'prompt_tokens' => 200,
             'completion_tokens' => 50,
@@ -66,7 +66,7 @@ class SessionUsageTest extends TestCase
             ->assertOk()
             ->assertSee('Consumo da sessão')
             ->assertSee('1,231')
-            ->assertSee('minimax/minimax-m3:free')
+            ->assertSee('nvidia/nemotron-3-ultra-550b-a55b:free')
             ->assertSee('GMICloud')
             ->assertSee('Grátis')
             ->assertSee('$0.0015')
@@ -77,8 +77,8 @@ class SessionUsageTest extends TestCase
             ->assertOk()
             ->assertSee('Consumo da sessão')
             ->assertSee('1,231')
-            ->assertSee('#1 minimax/minimax-m3:free')
-            ->assertSee('#2 minimax/minimax-m3:free');
+            ->assertSee('#1 nvidia/nemotron-3-ultra-550b-a55b:free')
+            ->assertSee('#2 nvidia/nemotron-3-ultra-550b-a55b:free');
     }
 
     public function test_hides_usage_block_when_session_has_no_records(): void

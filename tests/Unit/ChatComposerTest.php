@@ -25,12 +25,13 @@ class ChatComposerTest extends TestCase
 
     public function test_catalog_contains_only_the_free_openrouter_models(): void
     {
-        config(['services.openrouter.model' => 'minimax/minimax-m3:free']);
+        config(['services.openrouter.model' => 'nvidia/nemotron-3-ultra-550b-a55b:free']);
 
         $this->assertSame([
-            'minimax/minimax-m3:free',
             'nvidia/nemotron-3-ultra-550b-a55b:free',
             'poolside/laguna-s-2.1:free',
+            'nvidia/nemotron-3.5-lightning:free',
+            'inclusionai/ling-3.0-flash-fin:free',
         ], array_column(ChatComposer::models(), 'id'));
     }
 

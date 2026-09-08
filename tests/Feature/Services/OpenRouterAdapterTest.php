@@ -6,7 +6,7 @@ use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Conversation;
 use App\Models\LlmUsage;
 use App\Models\User;
-use App\Services\OpenRouterService;
+use App\Services\Adapters\OpenRouterAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Log\Events\MessageLogged;
@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Tests\TestCase;
 
-class OpenRouterServiceTest extends TestCase
+class OpenRouterAdapterTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -62,7 +62,7 @@ class OpenRouterServiceTest extends TestCase
         ]);
         $conversation->load('messages');
 
-        $content = (new OpenRouterService)->chat($conversation);
+        $content = (new OpenRouterAdapter)->chat($conversation);
 
         $this->assertSame('Olá!', $content);
 
@@ -134,7 +134,7 @@ class OpenRouterServiceTest extends TestCase
             'prompt_version' => 'v3',
         ]);
 
-        (new OpenRouterService)->chat($conversation);
+        (new OpenRouterAdapter)->chat($conversation);
 
         $this->assertSame('v3', $conversation->fresh()->prompt_version);
         $this->assertDatabaseHas('llm_usages', [
@@ -174,12 +174,12 @@ class OpenRouterServiceTest extends TestCase
             'title' => 'Teste',
         ]);
 
-        (new OpenRouterService)->chat($conversation);
+        (new OpenRouterAdapter)->chat($conversation);
         $this->assertSame('v1', $conversation->fresh()->prompt_version);
 
         config(['chat.prompts.interview.version' => 'missing']);
 
-        (new OpenRouterService)->chat($conversation->fresh()->load('messages'));
+        (new OpenRouterAdapter)->chat($conversation->fresh()->load('messages'));
 
         Http::assertSentCount(2);
         $this->assertSame('v1', $conversation->fresh()->prompt_version);
@@ -211,7 +211,7 @@ class OpenRouterServiceTest extends TestCase
             'title' => 'Teste',
         ]);
 
-        (new OpenRouterService)->chat($conversation, 'openai/gpt-4o');
+        (new OpenRouterAdapter)->chat($conversation, 'openai/gpt-4o');
 
         Http::assertSent(fn (Request $request) => $request['model'] === 'openai/gpt-4o');
     }
@@ -238,7 +238,7 @@ class OpenRouterServiceTest extends TestCase
             'title' => 'Teste',
         ]);
 
-        (new OpenRouterService)->chat($conversation, 'unknown/model');
+        (new OpenRouterAdapter)->chat($conversation, 'unknown/model');
 
         Http::assertSent(fn (Request $request) => $request['model'] === 'test/model');
     }
@@ -250,7 +250,7 @@ class OpenRouterServiceTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('OPENROUTER_API_KEY');
 
-        new OpenRouterService;
+        new OpenRouterAdapter;
     }
 
     public function test_throws_http_status_and_openrouter_message_when_request_fails(): void
@@ -280,7 +280,7 @@ class OpenRouterServiceTest extends TestCase
         $this->expectExceptionMessage('OpenRouter retornou HTTP 401: Missing Authentication header');
 
         try {
-            (new OpenRouterService)->chat($conversation);
+            (new OpenRouterAdapter)->chat($conversation);
         } finally {
             $this->assertDatabaseCount('llm_usages', 0);
         }
@@ -308,7 +308,7 @@ class OpenRouterServiceTest extends TestCase
             'title' => 'Teste',
         ]);
 
-        (new OpenRouterService)->chat($conversation);
+        (new OpenRouterAdapter)->chat($conversation);
 
         $this->assertDatabaseHas('llm_usages', [
             'conversation_id' => $conversation->id,
@@ -343,7 +343,7 @@ class OpenRouterServiceTest extends TestCase
             'title' => 'Teste',
         ]);
 
-        (new OpenRouterService)->chat($conversation);
+        (new OpenRouterAdapter)->chat($conversation);
 
         $this->assertSame('discovery', $conversation->fresh()->prompt_name);
         $this->assertDatabaseHas('llm_usages', [
@@ -381,7 +381,7 @@ class OpenRouterServiceTest extends TestCase
             'prompt_version' => 'v1',
         ]);
 
-        (new OpenRouterService)->chat($conversation);
+        (new OpenRouterAdapter)->chat($conversation);
 
         Http::assertSent(fn (Request $request) => str_contains(
             (string) $request['messages'][0]['content'],
@@ -431,7 +431,7 @@ class OpenRouterServiceTest extends TestCase
             'content' => 'Quero um checkout',
         ]);
 
-        $content = (new OpenRouterService)->generateCard(
+        $content = (new OpenRouterAdapter)->generateCard(
             $conversation,
             'Problema: checkout sem pagamento',
         );
@@ -479,7 +479,7 @@ class OpenRouterServiceTest extends TestCase
 
         $conversation = $this->conversationWithUserMessage();
 
-        $content = (new OpenRouterService)->chat($conversation);
+        $content = (new OpenRouterAdapter)->chat($conversation);
 
         $this->assertSame('Resposta do fallback', $content);
         $this->assertDatabaseHas('llm_usages', [
@@ -522,7 +522,7 @@ class OpenRouterServiceTest extends TestCase
                 ], 200),
         ]);
 
-        $content = (new OpenRouterService)->chat($this->conversationWithUserMessage());
+        $content = (new OpenRouterAdapter)->chat($this->conversationWithUserMessage());
 
         $this->assertSame('Resposta da segunda fallback', $content);
         Http::assertSentCount(3);
@@ -551,7 +551,7 @@ class OpenRouterServiceTest extends TestCase
                 ], 200),
         ]);
 
-        $content = (new OpenRouterService)->chat($this->conversationWithUserMessage());
+        $content = (new OpenRouterAdapter)->chat($this->conversationWithUserMessage());
 
         $this->assertSame('Ok da segunda', $content);
         Http::assertSentCount(2);
@@ -579,7 +579,7 @@ class OpenRouterServiceTest extends TestCase
         $this->expectExceptionMessage('Não consegui continuar agora');
 
         try {
-            (new OpenRouterService)->chat($this->conversationWithUserMessage());
+            (new OpenRouterAdapter)->chat($this->conversationWithUserMessage());
         } finally {
             $this->assertDatabaseCount('llm_usages', 0);
         }
@@ -615,7 +615,7 @@ class OpenRouterServiceTest extends TestCase
             'interview_summary' => 'Problema: checkout sem pagamento',
         ]);
 
-        $content = (new OpenRouterService)->generateCard(
+        $content = (new OpenRouterAdapter)->generateCard(
             $conversation,
             'Problema: checkout sem pagamento',
         );

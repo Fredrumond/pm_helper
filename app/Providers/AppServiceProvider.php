@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Contracts\LlmGateway;
+use App\Services\Adapters\OpenRouterAdapter;
+use App\Services\LlmRouter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +15,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(LlmGateway::class, function ($app) {
+            return new LlmRouter(
+                default: $app->make(OpenRouterAdapter::class),
+                adapters: [],
+            );
+        });
     }
 
     /**
@@ -19,6 +28,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        if ($this->app->runningInConsole()) {
+            return;
+        }
+
+        $forwardedProto = request()->headers->get('X-Forwarded-Proto');
+
+        if ($forwardedProto === 'https' || str_contains((string) $forwardedProto, 'https')) {
+            URL::forceScheme('https');
+        }
     }
 }

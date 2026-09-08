@@ -13,11 +13,6 @@ return [
     */
     'models' => [
         [
-            'id' => 'minimax/minimax-m3:free',
-            'name' => 'MiniMax M3',
-            'tier' => 'Free',
-        ],
-        [
             'id' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
             'name' => 'Nemotron 3 Ultra',
             'tier' => 'Free',
@@ -25,6 +20,16 @@ return [
         [
             'id' => 'poolside/laguna-s-2.1:free',
             'name' => 'Laguna S 2.1',
+            'tier' => 'Free',
+        ],
+        [
+            'id' => 'nvidia/nemotron-3.5-lightning:free',
+            'name' => 'Nemotron 3.5 Lightning',
+            'tier' => 'Free',
+        ],
+        [
+            'id' => 'inclusionai/ling-3.0-flash-fin:free',
+            'name' => 'Ling 3.0 Flash Fin',
             'tier' => 'Free',
         ],
     ],

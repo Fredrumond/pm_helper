@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Adapters;
 
+use App\Contracts\LlmGateway;
 use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Conversation;
 use App\Models\LlmUsage;
@@ -12,7 +13,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class OpenRouterService
+class OpenRouterAdapter implements LlmGateway
 {
     private string $baseUrl = 'https://openrouter.ai/api/v1';
 
