@@ -32,6 +32,26 @@ return [
             'name' => 'Ling 3.0 Flash Fin',
             'tier' => 'Free',
         ],
+        [
+            'id' => 'gpt-4o-mini',
+            'name' => 'GPT-4o Mini',
+            'tier' => 'OpenAI',
+        ],
+        [
+            'id' => 'gpt-4o',
+            'name' => 'GPT-4o',
+            'tier' => 'OpenAI',
+        ],
+        [
+            'id' => 'gpt-4.1',
+            'name' => 'GPT-4.1',
+            'tier' => 'OpenAI',
+        ],
+        [
+            'id' => 'o4-mini',
+            'name' => 'o4 Mini',
+            'tier' => 'OpenAI',
+        ],
     ],
 
     /*

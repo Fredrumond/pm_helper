@@ -149,4 +149,53 @@ class SessionUsageTest extends TestCase
         $this->assertEqualsWithDelta(0.25, $summary['cost'], 0.0000001);
         $this->assertSame('$0.25', $conversation->fresh()->formattedUsageCost());
     }
+
+    public function test_estimates_cost_when_api_omits_usage_cost(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'OpenAI',
+        ]);
+
+        $usage = LlmUsage::recordFromResponse($conversation, [
+            'id' => 'chatcmpl-log-1',
+            'model' => 'gpt-4o-mini-2024-07-18',
+            'usage' => [
+                'prompt_tokens' => 1408,
+                'completion_tokens' => 51,
+                'total_tokens' => 1459,
+                'prompt_tokens_details' => ['cached_tokens' => 0],
+            ],
+            'choices' => [['finish_reason' => 'stop']],
+        ], 'gpt-4o-mini');
+
+        $this->assertSame('openai', $usage->provider);
+        $this->assertEqualsWithDelta(0.00024180, (float) $usage->cost, 0.00000001);
+        $this->assertSame('$0.0002418', $usage->formattedCost());
+    }
+
+    public function test_keeps_reported_cost_from_openrouter_even_when_zero(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'OpenRouter',
+        ]);
+
+        $usage = LlmUsage::recordFromResponse($conversation, [
+            'id' => 'gen-free',
+            'model' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
+            'provider' => 'GMICloud',
+            'usage' => [
+                'prompt_tokens' => 100,
+                'completion_tokens' => 20,
+                'total_tokens' => 120,
+                'cost' => 0,
+            ],
+        ], 'fallback');
+
+        $this->assertSame(0.0, (float) $usage->cost);
+        $this->assertSame('GMICloud', $usage->provider);
+    }
 }

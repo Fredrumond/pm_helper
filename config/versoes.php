@@ -121,6 +121,135 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.6.5',
+            'data' => '2026-09-08',
+            'estado' => 'development',
+            'titulo' => 'AGENTS.md alinhado ao adapter OpenAI',
+            'resumo' => 'Atualiza o guia de agentes com OpenAiAdapter, prefixos nativos, tabela de preços em config/llm.php, ADRs e a regra de só registrar o adapter quando a chave existir.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Docs',
+                    'itens' => [
+                        ['titulo' => 'AGENTS.md — stack, estrutura e convenções de adapter OpenAI', 'estado' => 'development', 'nota' => 'AGENTS.md'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.4',
+            'data' => '2026-09-08',
+            'estado' => 'development',
+            'titulo' => 'Docs: OpenAI no README e no guia de launch',
+            'resumo' => 'Atualiza README e MVP_LAUNCH_GUIDE para o adapter OpenAI: chave opcional, roteamento por prefixo nativo, custo estimado e o fato de que o conteúdo da conversa pode ir à OpenAI ou à OpenRouter conforme o modelo.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Docs',
+                    'itens' => [
+                        ['titulo' => 'README 0.6.3 — OpenAI no diagrama, setup e tabela de preços', 'estado' => 'development', 'nota' => 'README.md'],
+                        ['titulo' => 'Guia de launch: provedor, privacidade e custo estimado', 'estado' => 'development', 'nota' => 'docs/MVP_LAUNCH_GUIDE.md'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.3',
+            'data' => '2026-09-08',
+            'estado' => 'development',
+            'titulo' => 'ADRs do adapter OpenAI e da tabela de preços',
+            'resumo' => 'Registra duas decisões posteriores ao ADR 0001: roteamento OpenAI por prefixo nativo (gpt-, o1, o3, o4) e estimativa de custo em LlmUsage via config/llm.php quando a API não devolve usage.cost.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Docs',
+                    'itens' => [
+                        ['titulo' => 'ADR 0002 — rotear OpenAI direto por prefixo nativo', 'estado' => 'development', 'nota' => 'docs/adr/0002-rotear-openai-direto-por-prefixo-nativo.md'],
+                        ['titulo' => 'ADR 0003 — estimar custo de LLM pela tabela de preços', 'estado' => 'development', 'nota' => 'docs/adr/0003-estimar-custo-llm-pela-tabela-de-precos.md'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.2',
+            'data' => '2026-09-08',
+            'estado' => 'stable',
+            'titulo' => 'Métricas não marcam OpenAI como grátis',
+            'resumo' => 'Chamadas pagas com cost=0 (registros antigos ou API sem usage.cost) passam a mostrar o valor estimado pela tabela em config/llm.php. A página de métricas explica que modelos pagos consultam essa tabela e nunca aparecem como Grátis.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Métricas',
+                    'itens' => [
+                        ['titulo' => 'LlmUsage.effectiveCost estima pela tabela quando o custo gravado é 0', 'estado' => 'stable', 'nota' => 'Usado no resumo, por modelo, sessão e pipeline de prompt'],
+                        ['titulo' => 'Página /metrics aponta para config/llm.php', 'estado' => 'stable', 'nota' => 'Selo “tabela de preços” nas linhas estimadas'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.1',
+            'data' => '2026-09-08',
+            'estado' => 'stable',
+            'titulo' => 'Custo estimado para adapters sem usage.cost',
+            'resumo' => 'A OpenAI (e qualquer API direta) não devolve o valor gasto na resposta. O LlmUsage passa a estimar o custo pelos tokens e pela tabela em config/llm.php. Se a API já mandar usage.cost (OpenRouter), esse valor continua prevalecendo — inclusive 0 nos modelos grátis.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'LlmPricing estima USD a partir de tokens + tabela de preços', 'estado' => 'stable', 'nota' => 'app/Support/LlmPricing.php — snapshots resolvem pelo prefixo mais longo'],
+                        ['titulo' => 'LlmUsage.recordFromResponse preenche cost e provider quando a API omite', 'estado' => 'stable', 'nota' => 'Warning no log se o modelo não estiver em config/llm.php'],
+                        ['titulo' => 'Tabela de preços OpenAI: gpt-4o-mini, gpt-4o, gpt-4.1, o4-mini', 'estado' => 'stable', 'nota' => 'config/llm.php — obrigatório cadastrar ao adicionar adapter novo'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'LlmPricingTest + SessionUsageTest para custo estimado e custo reportado', 'estado' => 'stable', 'nota' => ''],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.0',
+            'data' => '2026-09-08',
+            'estado' => 'stable',
+            'titulo' => 'Adapter OpenAI direto',
+            'resumo' => 'Adiciona OpenAiAdapter que roteia modelos gpt-*, o1*, o3* e o4* direto para a API da OpenAI, sem passar pelo OpenRouter. A chave OPENAI_API_KEY é opcional; quando ausente, todos os modelos continuam indo para o OpenRouter. Catálogo do composer ganha GPT-4o Mini, GPT-4o, GPT-4.1 e o4 Mini.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'OpenAiAdapter — roteamento direto para api.openai.com', 'estado' => 'stable', 'nota' => 'app/Services/Adapters/OpenAiAdapter.php'],
+                        ['titulo' => 'LlmRouter registra prefixos gpt-, o1, o3, o4 → OpenAiAdapter', 'estado' => 'stable', 'nota' => 'Ativo apenas quando OPENAI_API_KEY está configurada'],
+                        ['titulo' => 'Modelos GPT-4o Mini, GPT-4o, GPT-4.1, o4 Mini no catálogo', 'estado' => 'stable', 'nota' => 'config/chat.php'],
+                    ],
+                ],
+                [
+                    'nome' => 'Config',
+                    'itens' => [
+                        ['titulo' => 'services.openai com api_key e model', 'estado' => 'stable', 'nota' => 'config/services.php'],
+                        ['titulo' => '.env.example documentado com OPENAI_API_KEY e OPENAI_MODEL', 'estado' => 'stable', 'nota' => ''],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'OpenAiAdapterTest — 8 cenários (chat, card, erros, rate limit, override de modelo)', 'estado' => 'stable', 'nota' => 'tests/Feature/Services/OpenAiAdapterTest.php'],
+                        ['titulo' => 'ChatComposerTest atualizado com novos modelos do catálogo', 'estado' => 'stable', 'nota' => ''],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.5.9',
             'data' => '2026-09-08',
             'estado' => 'development',

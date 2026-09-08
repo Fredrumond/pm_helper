@@ -76,7 +76,7 @@ class Conversation extends Model
             'completion_tokens' => (int) $usages->sum('completion_tokens'),
             'total_tokens' => (int) $usages->sum('total_tokens'),
             'cached_tokens' => (int) $usages->sum('cached_tokens'),
-            'cost' => (float) $usages->sum(fn (LlmUsage $usage) => (float) $usage->cost),
+            'cost' => (float) $usages->sum(fn (LlmUsage $usage) => $usage->effectiveCost()),
         ];
     }
 

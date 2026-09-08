@@ -1,7 +1,7 @@
 # PM Helper — Guia de Lançamento do MVP
 
-> **Versão de referência:** 0.5.4  
-> **Data:** 07/09/2026  
+> **Versão de referência:** 0.6.4  
+> **Data:** 08/09/2026  
 > **Público-alvo deste documento:** Liderança de produto e PMs que vão testar o PM Helper
 
 ---
@@ -56,7 +56,9 @@ Quando a entrevista encerra:
 - Cada chamada à LLM registra tokens consumidos, cache e custo em dólar
 - Widget de consumo exibido na sessão de chat
 - Seletor de modelo de IA (o PM pode escolher o modelo para a conversa)
-- Fallback automático para modelo secundário quando há rate limit
+- Dois provedores no mesmo seletor: modelos **free** via OpenRouter e modelos **OpenAI** (GPT-4o Mini, GPT-4o, GPT-4.1, o4 Mini) em chamada direta
+- Custo da OpenAI é **estimado** pela tabela interna de preços (a API não devolve o valor gasto). Custo da OpenRouter vem da própria API — inclusive `0` nos modelos grátis
+- Fallback automático para modelo secundário quando há rate limit — **só nos modelos OpenRouter**. Em rate limit da OpenAI, o chat pede para tentar de novo em instantes
 
 ### 6. Página de métricas
 
@@ -84,7 +86,8 @@ Quando a entrevista encerra:
 | Rastreio de tokens | ✅ Estável | Custo e consumo por chamada |
 | Métricas | ✅ Estável (UI) / 🔧 Dev (comparação) | Página acessível, filtros em refinamento |
 | Histórico de versões | 🔧 Development | Funcional, base para controle de evolução |
-| Fallback de LLM | ✅ Estável | Troca automática em rate limit |
+| Fallback de LLM | ✅ Estável | Troca automática em rate limit (só OpenRouter) |
+| Adapter OpenAI | ✅ Estável | Ativo só com `OPENAI_API_KEY`; ids `gpt-*` / `o4*` |
 
 **Leitura:** "Development" aqui significa que a feature está funcionando, mas ainda vai passar por iterações com base no uso real — não que está quebrada.
 
@@ -111,6 +114,8 @@ Ter um **épico definido**. O PM Helper trata de um card de cada vez — chegue 
 - Se o assistente rejeitar sua demanda por "escopo amplo", é sinal de que você descreveu um épico: quebre em cards e teste um por vez
 - Experimente pedir para pular etapas ("já tenho contexto suficiente, encerra") — o assistente vai encerrar se já tiver o mínimo, ou explicar o que ainda precisa
 - O seletor de modelo no chat permite testar com diferentes LLMs — vale experimentar
+- Modelos **Free** (Nemotron, Laguna, Ling…) passam pela OpenRouter e não geram custo
+- Modelos **OpenAI** são pagos e só funcionam se o ambiente tiver `OPENAI_API_KEY`. Sem a chave, a escolha desses modelos tende a falhar — use um modelo Free nesse caso
 
 ---
 
@@ -161,10 +166,13 @@ Não. Uma conversa = um card. Abra uma nova conversa para cada card. O assistent
 Isso é debate saudável! Anote o caso e traga para o time — pode ser que o critério do assistente precise de calibragem. É exatamente o tipo de feedback que vai melhorar o produto.
 
 **"Posso escolher qual modelo de IA usar?"**  
-Sim — o seletor de modelo aparece no canto inferior do chat. Os modelos disponíveis têm trade-offs de velocidade e custo visíveis nas métricas.
+Sim — o seletor de modelo aparece no canto inferior do chat. Os modelos Free passam pela OpenRouter; GPT-4o Mini, GPT-4o, GPT-4.1 e o4 Mini vão direto para a OpenAI. Os trade-offs de velocidade e custo aparecem nas métricas (`/metrics`).
 
 **"Os dados das entrevistas ficam seguros?"**  
-O produto roda na infraestrutura Docker do time, com banco MySQL isolado. Nenhum dado vai para servidores externos além das chamadas à API de LLM via OpenRouter (que não treina modelos com seus dados).
+O produto roda na infraestrutura Docker do time, com banco MySQL isolado. O conteúdo da conversa só sai do ambiente nas chamadas à LLM: modelos Free vão para a [OpenRouter](https://openrouter.ai) e modelos GPT/o4 vão direto para a [OpenAI](https://platform.openai.com). Nenhum dos dois treina modelos com esses dados no uso via API. Escolha o provedor no seletor de modelo.
+
+**"Por que o custo da OpenAI aparece como estimado?"**  
+A OpenAI devolve só tokens, não o valor em dólar. O PM Helper calcula o custo pela tabela interna (`config/llm.php`). A OpenRouter já manda o custo real — inclusive zero nos modelos grátis. A fatura do provedor pode divergir um pouco se o preço oficial mudar e a tabela atrasar.
 
 ---
 
@@ -191,9 +199,12 @@ Isso alimenta diretamente as próximas iterações.
 07/09 — v0.5.1  Empty state com orientação de escopo
 07/09 — v0.5.2  Prompt v4: recusa épicos com INTERVIEW_SCOPE_TOO_BROAD
 07/09 — v0.5.3  Trava de geração quando escopo é amplo
-07/09 — v0.5.4  ← atual: parser tolerante, selo de escopo atualiza em tempo real
+07/09 — v0.5.4  Parser tolerante, selo de escopo atualiza em tempo real
+08/09 — v0.6.0  Modelos OpenAI no seletor (chamada direta à API)
+08/09 — v0.6.3  Custo estimado nas métricas para chamadas OpenAI
+08/09 — v0.6.4  ← atual: docs alinhadas ao adapter OpenAI (README e guia de launch)
 ```
 
 ---
 
-*Documento gerado em 07/09/2026 com base no código e changelog do PM Helper v0.5.4.*
+*Documento gerado em 08/09/2026 com base no código e changelog do PM Helper v0.6.4.*

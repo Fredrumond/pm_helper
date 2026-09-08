@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\LlmGateway;
+use App\Services\Adapters\OpenAiAdapter;
 use App\Services\Adapters\OpenRouterAdapter;
 use App\Services\LlmRouter;
 use Illuminate\Support\Facades\URL;
@@ -16,9 +17,19 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(LlmGateway::class, function ($app) {
+            $adapters = [];
+
+            if (trim((string) config('services.openai.api_key')) !== '') {
+                $openAiAdapter = $app->make(OpenAiAdapter::class);
+                $adapters['gpt-']  = $openAiAdapter;
+                $adapters['o1']    = $openAiAdapter;
+                $adapters['o3']    = $openAiAdapter;
+                $adapters['o4']    = $openAiAdapter;
+            }
+
             return new LlmRouter(
                 default: $app->make(OpenRouterAdapter::class),
-                adapters: [],
+                adapters: $adapters,
             );
         });
     }

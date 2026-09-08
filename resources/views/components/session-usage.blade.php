@@ -64,7 +64,12 @@
                         </div>
                         <div class="text-right shrink-0">
                             <p class="text-xs font-semibold text-gray-700">{{ number_format($usage->total_tokens) }} tok</p>
-                            <p class="text-[11px] text-gray-400">{{ $usage->formattedCost() }}</p>
+                            <p class="text-[11px] text-gray-400">
+                                {{ $usage->formattedCost() }}
+                                @if ($usage->isEstimatedCost())
+                                    <span class="block">tabela de preços</span>
+                                @endif
+                            </p>
                         </div>
                     </div>
                 </li>

@@ -83,4 +83,35 @@ class ConsumptionMetricsTest extends TestCase
         $this->assertCount(2, $recent);
         $this->assertFalse($recent->contains(fn (LlmUsage $usage) => $usage->model === 'test/other'));
     }
+
+    public function test_estimates_paid_openai_models_instead_of_showing_them_as_free(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'LP de ebook',
+        ]);
+
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'model' => 'gpt-4o-mini-2024-07-18',
+            'prompt_tokens' => 1408,
+            'completion_tokens' => 51,
+            'total_tokens' => 1459,
+            'cached_tokens' => 0,
+            'cost' => 0,
+        ]);
+
+        $metrics = new ConsumptionMetrics;
+        $summary = $metrics->summary($user);
+        $byModel = $metrics->byModel($user)->keyBy('model');
+        $usage = $metrics->recent($user)->first();
+
+        $this->assertEqualsWithDelta(0.00024180, $summary['cost'], 0.00000001);
+        $this->assertSame('$0.0002418', $summary['formatted_cost']);
+        $this->assertTrue($byModel['gpt-4o-mini-2024-07-18']['estimated']);
+        $this->assertSame('$0.0002418', $byModel['gpt-4o-mini-2024-07-18']['formatted_cost']);
+        $this->assertTrue($usage->isEstimatedCost());
+        $this->assertSame('$0.0002418', $usage->formattedCost());
+    }
 }

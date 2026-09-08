@@ -30,6 +30,9 @@
                 <p class="text-[11px] text-gray-400 mt-1">
                     {{ number_format($summary['completed']) }} de {{ number_format($summary['conversations']) }} conversas concluídas
                 </p>
+                <p class="text-[11px] text-gray-400 mt-1">
+                    Pagos: tabela em <code class="text-gray-500">config/llm.php</code>
+                </p>
             </div>
         </dl>
 
@@ -142,6 +145,11 @@
         <section class="bg-white border border-gray-200 rounded-xl mb-8 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100">
                 <h2 class="text-sm font-semibold text-gray-900">Consumo por modelo</h2>
+                <p class="text-xs text-gray-400 mt-1">
+                    Modelos pagos (OpenAI e outros da tabela) nunca aparecem como grátis.
+                    O valor é estimado pelos tokens quando a API não devolve o custo —
+                    consulte <code class="text-gray-500">config/llm.php</code>.
+                </p>
             </div>
 
             @if ($byModel->isEmpty())
@@ -163,7 +171,12 @@
                                     <td class="px-5 py-3 font-medium text-gray-900">{{ $row['model'] }}</td>
                                     <td class="px-5 py-3 text-right text-gray-700">{{ number_format($row['calls']) }}</td>
                                     <td class="px-5 py-3 text-right text-gray-700">{{ number_format($row['total_tokens']) }}</td>
-                                    <td class="px-5 py-3 text-right text-gray-700">{{ $row['formatted_cost'] }}</td>
+                                    <td class="px-5 py-3 text-right text-gray-700">
+                                        {{ $row['formatted_cost'] }}
+                                        @if (! empty($row['estimated']))
+                                            <span class="block text-[10px] text-gray-400">tabela de preços</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -175,6 +188,10 @@
         <section class="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100">
                 <h2 class="text-sm font-semibold text-gray-900">Chamadas recentes</h2>
+                <p class="text-xs text-gray-400 mt-1">
+                    “Grátis” vale só para modelos sem preço na tabela. Chamadas OpenAI usam
+                    <code class="text-gray-500">config/llm.php</code>.
+                </p>
             </div>
 
             @if ($recent->isEmpty())
@@ -211,7 +228,12 @@
                             </div>
                             <div class="text-right shrink-0">
                                 <p class="text-xs font-semibold text-gray-700">{{ number_format($usage->total_tokens) }} tok</p>
-                                <p class="text-[11px] text-gray-400">{{ $usage->formattedCost() }}</p>
+                                <p class="text-[11px] text-gray-400">
+                                    {{ $usage->formattedCost() }}
+                                    @if ($usage->isEstimatedCost())
+                                        <span class="block">tabela de preços</span>
+                                    @endif
+                                </p>
                             </div>
                         </li>
                     @endforeach

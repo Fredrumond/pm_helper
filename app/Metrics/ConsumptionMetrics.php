@@ -24,28 +24,21 @@ class ConsumptionMetrics
      */
     public function summary(User $user): array
     {
-        $usage = $this->usagesFor($user)
-            ->selectRaw('COUNT(*) as calls')
-            ->selectRaw('COALESCE(SUM(prompt_tokens), 0) as prompt_tokens')
-            ->selectRaw('COALESCE(SUM(completion_tokens), 0) as completion_tokens')
-            ->selectRaw('COALESCE(SUM(total_tokens), 0) as total_tokens')
-            ->selectRaw('COALESCE(SUM(cached_tokens), 0) as cached_tokens')
-            ->selectRaw('COALESCE(SUM(cost), 0) as cost')
-            ->first();
+        $usages = $this->usagesFor($user)->get();
 
         $conversations = $user->conversations()
             ->selectRaw('COUNT(*) as total')
             ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
             ->first();
 
-        $cost = (float) ($usage->cost ?? 0);
+        $cost = (float) $usages->sum(fn (LlmUsage $usage) => $usage->effectiveCost());
 
         return [
-            'calls' => (int) ($usage->calls ?? 0),
-            'prompt_tokens' => (int) ($usage->prompt_tokens ?? 0),
-            'completion_tokens' => (int) ($usage->completion_tokens ?? 0),
-            'total_tokens' => (int) ($usage->total_tokens ?? 0),
-            'cached_tokens' => (int) ($usage->cached_tokens ?? 0),
+            'calls' => $usages->count(),
+            'prompt_tokens' => (int) $usages->sum('prompt_tokens'),
+            'completion_tokens' => (int) $usages->sum('completion_tokens'),
+            'total_tokens' => (int) $usages->sum('total_tokens'),
+            'cached_tokens' => (int) $usages->sum('cached_tokens'),
             'cost' => $cost,
             'formatted_cost' => LlmUsage::formatCost($cost),
             'conversations' => (int) ($conversations->total ?? 0),
@@ -59,20 +52,23 @@ class ConsumptionMetrics
     public function byModel(User $user): Collection
     {
         return $this->usagesFor($user)
-            ->selectRaw('model')
-            ->selectRaw('COUNT(*) as calls')
-            ->selectRaw('COALESCE(SUM(total_tokens), 0) as total_tokens')
-            ->selectRaw('COALESCE(SUM(cost), 0) as cost')
-            ->groupBy('model')
-            ->orderByDesc('total_tokens')
             ->get()
-            ->map(fn (LlmUsage $row): array => [
-                'model' => $row->model,
-                'calls' => (int) $row->calls,
-                'total_tokens' => (int) $row->total_tokens,
-                'cost' => (float) $row->cost,
-                'formatted_cost' => LlmUsage::formatCost((float) $row->cost),
-            ]);
+            ->groupBy('model')
+            ->map(function (Collection $group, string $model): array {
+                $cost = (float) $group->sum(fn (LlmUsage $usage) => $usage->effectiveCost());
+                $estimated = $group->contains(fn (LlmUsage $usage) => $usage->isEstimatedCost());
+
+                return [
+                    'model' => $model,
+                    'calls' => $group->count(),
+                    'total_tokens' => (int) $group->sum('total_tokens'),
+                    'cost' => $cost,
+                    'estimated' => $estimated,
+                    'formatted_cost' => LlmUsage::formatCost($cost),
+                ];
+            })
+            ->sortByDesc('total_tokens')
+            ->values();
     }
 
     /**

@@ -87,4 +87,31 @@ class MetricsPageTest extends TestCase
             ->assertDontSee('secret/other-model')
             ->assertDontSee('$9.99');
     }
+
+    public function test_shows_estimated_openai_cost_and_pricing_table_note(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Fazer minha LP de ebook vender mais',
+        ]);
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'model' => 'gpt-4o-mini-2024-07-18',
+            'step' => 'interview',
+            'prompt_version' => 'v4',
+            'prompt_tokens' => 1408,
+            'completion_tokens' => 51,
+            'total_tokens' => 1459,
+            'cost' => 0,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('metrics.index'))
+            ->assertOk()
+            ->assertSee('config/llm.php')
+            ->assertSee('tabela de preços')
+            ->assertSee('gpt-4o-mini-2024-07-18')
+            ->assertSee('$0.0002418');
+    }
 }

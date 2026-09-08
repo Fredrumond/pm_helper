@@ -29,9 +29,7 @@ class PromptMetrics
             ->whereNotNull('prompt_version')
             ->when($user, fn ($query) => $query->where('user_id', $user->id))
             ->withCount('messages')
-            ->withCount('llmUsages as usage_calls')
-            ->withSum('llmUsages as usage_tokens', 'total_tokens')
-            ->withSum('llmUsages as usage_cost', 'cost')
+            ->with('llmUsages')
             ->get()
             ->groupBy('prompt_version');
 
@@ -44,9 +42,9 @@ class PromptMetrics
                 'conversations' => $count,
                 'completed' => $completed,
                 'completion_rate' => $count > 0 ? round($completed / $count, 3) : 0.0,
-                'calls' => (int) $group->sum('usage_calls'),
-                'avg_tokens' => round((float) $group->avg(fn (Conversation $conversation) => (int) ($conversation->usage_tokens ?? 0)), 1),
-                'avg_cost' => round((float) $group->avg(fn (Conversation $conversation) => (float) ($conversation->usage_cost ?? 0)), 8),
+                'calls' => (int) $group->sum(fn (Conversation $conversation) => $conversation->llmUsages->count()),
+                'avg_tokens' => round((float) $group->avg(fn (Conversation $conversation) => (int) $conversation->llmUsages->sum('total_tokens')), 1),
+                'avg_cost' => round((float) $group->avg(fn (Conversation $conversation) => (float) $conversation->llmUsages->sum(fn (LlmUsage $usage) => $usage->effectiveCost())), 8),
                 'avg_messages' => round((float) $group->avg('messages_count'), 1),
             ];
         })->values();
@@ -88,9 +86,9 @@ class PromptMetrics
                 'conversations' => $group->pluck('conversation_id')->unique()->count(),
                 'calls' => $group->count(),
                 'avg_tokens' => round((float) $group->avg('total_tokens'), 1),
-                'avg_cost' => round((float) $group->avg(fn (LlmUsage $usage) => (float) $usage->cost), 8),
+                'avg_cost' => round((float) $group->avg(fn (LlmUsage $usage) => $usage->effectiveCost()), 8),
                 'total_tokens' => (int) $group->sum('total_tokens'),
-                'total_cost' => round((float) $group->sum(fn (LlmUsage $usage) => (float) $usage->cost), 8),
+                'total_cost' => round((float) $group->sum(fn (LlmUsage $usage) => $usage->effectiveCost()), 8),
             ];
         })->sortBy([
             ['step', 'asc'],

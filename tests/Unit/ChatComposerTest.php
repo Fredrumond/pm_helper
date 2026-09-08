@@ -23,7 +23,7 @@ class ChatComposerTest extends TestCase
         $this->assertSame('custom/test-model', ChatComposer::defaultModel());
     }
 
-    public function test_catalog_contains_only_the_free_openrouter_models(): void
+    public function test_catalog_contains_free_openrouter_and_openai_models(): void
     {
         config(['services.openrouter.model' => 'nvidia/nemotron-3-ultra-550b-a55b:free']);
 
@@ -32,6 +32,10 @@ class ChatComposerTest extends TestCase
             'poolside/laguna-s-2.1:free',
             'nvidia/nemotron-3.5-lightning:free',
             'inclusionai/ling-3.0-flash-fin:free',
+            'gpt-4o-mini',
+            'gpt-4o',
+            'gpt-4.1',
+            'o4-mini',
         ], array_column(ChatComposer::models(), 'id'));
     }
 
