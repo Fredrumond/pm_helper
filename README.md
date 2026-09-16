@@ -2,7 +2,7 @@
 
 Assistente de discovery para Product Managers. Conduz uma entrevista guiada pelo framework do time e gera um card estruturado ao final.
 
-**Versão atual:** 0.6.6
+**Versão atual:** 0.7.0
 
 ---
 
@@ -27,7 +27,7 @@ flowchart TD
     SIG -->|INTERVIEW_SCOPE_TOO_BROAD| BROAD["💾 Conversation\ncurrent_step: scope_too_broad"]
     SIG -->|INTERVIEW_SUMMARY detectado| IREADY["💾 Conversation\ninterview_summary\ncurrent_step: card_generation"]
     BROAD --> LOOP1
-    IREADY --> DOCS["📂 Se houver projeto: lê /docs via MCP\nresultado na sessão, não no banco"]
+    IREADY --> DOCS["📂 Se houver projeto: retrieval + briefing de /docs\n(ver fluxo abaixo)"]
     DOCS --> UNLOCK([Botão 'Gerar Card' habilitado])
 
     %% ── Caminho B: gerar card ────────────────────────────────
@@ -52,6 +52,50 @@ flowchart TD
     style BROAD fill:#fee2e2,stroke:#dc2626
     style NEW fill:#dbeafe,stroke:#3b82f6
 ```
+
+---
+
+## Fluxo de `/docs` — retrieval e briefing
+
+Disparado só no encerramento da entrevista, quando há projeto selecionado. Orquestrado pelo `DocsRetrievalService`. Sem projeto, este bloco não roda.
+
+> 💾 persiste no banco · 🤖 chama a LLM · 📂 lê `/docs` (MCP)
+
+```mermaid
+flowchart TD
+    START([Entrevista pronta + projeto]) --> LIST["📂 listDocsPaths — só paths, sem conteúdo"]
+    LIST --> RET["🤖 LLM::completePrompt()\nprompt docs_retrieval\n💾 LlmUsage — step: docs_retrieval"]
+    RET --> PARSE{JSON paths\nválidos?}
+
+    PARSE -->|não / vazio / erro| DUMP["📂 readProjectDocs — árvore inteira"]
+    PARSE -->|sim, máx. 10| READ["📂 readDocsByPaths — só o subset"]
+
+    DUMP --> STATUS{status ok?}
+    READ --> STATUS
+
+    STATUS -->|não| MSG["💾 Message — frase de revisão"]
+    STATUS -->|sim| BRIEF["🤖 LLM::completePrompt()\nprompt docs_briefing\n💾 LlmUsage — step: docs_briefing"]
+    BRIEF --> SAVE["💾 Message — frase de revisão\n💾 Message — briefing se houver"]
+    MSG --> SESS["sessão project_docs — não vai ao banco"]
+    SAVE --> SESS
+    SESS --> UNLOCK([Botão 'Gerar Card' habilitado])
+    UNLOCK --> CARD["🤖 LLM::generateCard()\nresumo + /docs da sessão se ok"]
+
+    style RET fill:#fef9c3,stroke:#ca8a04
+    style BRIEF fill:#fef9c3,stroke:#ca8a04
+    style CARD fill:#fef9c3,stroke:#ca8a04
+    style LIST fill:#ede9fe,stroke:#7c3aed
+    style READ fill:#ede9fe,stroke:#7c3aed
+    style DUMP fill:#ede9fe,stroke:#7c3aed
+    style SESS fill:#ede9fe,stroke:#7c3aed
+    style UNLOCK fill:#dcfce7,stroke:#16a34a
+    style SAVE fill:#dbeafe,stroke:#3b82f6
+```
+
+- **Retrieval** (`docs_retrieval@v1`): recebe o índice de paths + o `interview_summary`; devolve JSON `{"paths": [...]}`. Paths inventados ou fora de `/docs` são descartados. Falha, lista vazia ou parse inválido volta ao dump completo.
+- **Briefing** (`docs_briefing@v1`): só com status `ok`. Cruza o conteúdo lido com o resumo e gera texto livre em português (sobreposição, conflito, vocabulário). Falha ou vazio: só a frase de revisão, sem erro na UI.
+- O teto `GITHUB_MCP_MAX_CHARS` vale sobre o conteúdo **já filtrado**, não sobre a árvore inteira.
+- `generateCard` não relê o GitHub: usa o payload da sessão.
 
 ---
 
@@ -80,7 +124,7 @@ flowchart LR
 - Sem `OPENAI_API_KEY`, ids nativos como `gpt-4o-mini` caem no OpenRouter e tendem a falhar (slug correto seria `openai/gpt-4o-mini`)
 - Custo: a OpenRouter manda `usage.cost`; a OpenAI não — nesse caso o `LlmUsage` estima pela tabela em `config/llm.php`. Sem entrada na tabela o custo fica `0` e as métricas mentem
 
-Decisões de arquitetura: `docs/adr/` (0001 ports & adapters, 0002 prefixo nativo OpenAI, 0003 tabela de preços).
+Decisões de arquitetura: `docs/adr/` (0001 ports & adapters, 0002 prefixo nativo OpenAI, 0003 tabela de preços, 0004 MCP GitHub, 0005 retrieval versionado de `/docs`).
 
 ---
 
@@ -97,10 +141,12 @@ O catálogo completo fica em `config/chat.php`. O PM escolhe o modelo no chat. E
 
 ## Prompts e passos da entrevista
 
-| Passo | Prompt | Framework coberto |
-|-------|--------|-------------------|
-| `interview` / `discovery` | `resources/prompts/interview/v*.md` | Objetivo · Como funciona hoje · Regras · Onde · Aceite · O que não fazer · Stakeholders · Como validar |
-| `card_generation` | `resources/prompts/card_generation/v*.md` | Monta o JSON do card a partir do `interview_summary` |
+| Passo | Prompt | O que faz |
+|-------|--------|-----------|
+| `interview` / `discovery` | `resources/prompts/interview/v*.md` | Conduz a entrevista (Objetivo · Como funciona hoje · Regras · Onde · Aceite · O que não fazer · Stakeholders · Como validar) |
+| `docs_retrieval` | `resources/prompts/docs_retrieval/v*.md` | Escolhe até 10 paths de `/docs` a partir do índice + resumo |
+| `docs_briefing` | `resources/prompts/docs_briefing/v*.md` | Humaniza o cruzamento `/docs` × entrevista na conversa |
+| `card_generation` | `resources/prompts/card_generation/v*.md` | Monta o JSON do card a partir do `interview_summary` (+ `/docs` se a revisão ok) |
 
 Prompts são versionados (`v1`, `v2`, …). Novas versões nunca sobrescrevem as anteriores — registrar em `SystemPromptCatalog`.
 

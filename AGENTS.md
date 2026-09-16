@@ -21,7 +21,7 @@ app/
   Models/          # Eloquent (Conversation, Message, Card, LlmUsage…)
   Prompts/         # Catálogo e métricas de prompts (SystemPromptCatalog)
   Contracts/       # Ports (LlmGateway)
-  Services/        # LlmRouter, CardParserService, Adapters/OpenRouterAdapter, Adapters/OpenAiAdapter
+  Services/        # LlmRouter, DocsRetrievalService, CardParserService, Adapters/OpenRouterAdapter, Adapters/OpenAiAdapter
   Support/         # LlmPricing (estima USD quando a API não manda usage.cost)
 
 config/
@@ -31,11 +31,11 @@ config/
   services.php     # Chaves OpenRouter e OpenAI
 
 docs/
-  adr/             # Decisões de arquitetura (0001 ports & adapters, 0002 OpenAI, 0003 preços)
+  adr/             # Decisões de arquitetura (0001 ports & adapters, 0002 OpenAI, 0003 preços, 0004 MCP, 0005 retrieval /docs)
   MVP_LAUNCH_GUIDE.md
 
 resources/
-  prompts/         # Prompts versionados em Markdown (interview/v*.md, card_generation/v*.md, discovery/v*.md)
+  prompts/         # Prompts versionados (interview, card_generation, docs_retrieval, docs_briefing, discovery)
   views/           # Blade + Livewire
 
 tests/
@@ -63,12 +63,13 @@ tests/
 - Colocar o modelo no catálogo (`config/chat.php`) e, se a API não devolver `usage.cost`, cadastrar preço em `config/llm.php` (`input` / `cached` / `output` em USD por 1M tokens). Sem isso o custo fica 0 e as métricas mentem.
 - A OpenRouter já manda `cost`; esse valor prevalece sobre a tabela — inclusive `0` nos modelos free.
 - Fallback de rate limit **e de resposta vazia** é responsabilidade do `OpenRouterAdapter` (`OPENROUTER_FALLBACK_MODELS`). O `OpenAiAdapter` só relança a mensagem de “tente de novo”.
-- Decisões: `docs/adr/0001`, `0002`, `0003`.
+- Decisões: `docs/adr/0001`, `0002`, `0003`, `0004`, `0005`.
 
 ### Testes
 - **Sempre rodar dentro do container Docker**, nunca localmente.
 - Comando: `docker compose exec app composer test`
 - Rode os testes antes de concluir qualquer tarefa.
+- **A execução de testes não precisa de aprovação do usuário.** Rode `docker compose exec app composer test` (e filtros PHPUnit equivalentes) imediatamente, sem pedir confirmação no chat e sem esperar autorização do script. Peça as permissões de sandbox/Docker necessárias no próprio comando. Isso vale **somente para testes** — qualquer outro script continua sujeito a aprovação.
 - Testes de serviços/adapters em `tests/Feature/Services/` ou `tests/Unit/Services/`; de Livewire em `tests/Feature/Livewire/`.
 
 ### Docker

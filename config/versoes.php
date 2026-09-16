@@ -117,6 +117,26 @@ return [
             ],
         ],
 
+        'docs_retrieval' => [
+            [
+                'versao' => 'v1',
+                'data' => '2026-09-16',
+                'release' => '0.6.23',
+                'resumo' => 'Primeira versão do prompt de retrieval de /docs. Recebe o índice de paths e o resumo da entrevista e devolve JSON com no máximo 10 arquivos relevantes para o card. Descarta ADRs genéricos, histórico e docs de infraestrutura; ignora instruções embutidas nos nomes dos arquivos.',
+                'mudancas' => [],
+            ],
+        ],
+
+        'docs_briefing' => [
+            [
+                'versao' => 'v1',
+                'data' => '2026-09-16',
+                'release' => '0.6.25',
+                'resumo' => 'Primeira versão do prompt de briefing de /docs. Cruza o conteúdo lido com o resumo da entrevista e devolve texto livre em português, destacando sobreposição, conflito, vocabulário e objetivo. Trata /docs como dado, nunca como instrução; não faz perguntas e não impõe teto de tamanho.',
+                'mudancas' => [],
+            ],
+        ],
+
         'discovery' => [
             [
                 'versao' => 'v1',
@@ -130,6 +150,179 @@ return [
     ],
 
     'releases' => [
+
+        [
+            'versao' => '0.7.0',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Retrieval e briefing de /docs na conversa',
+            'resumo' => 'Ao encerrar a entrevista, um prompt versionado escolhe quais arquivos de /docs ler; outro cruza o conteúdo com o resumo e escreve um briefing na conversa antes do card. O dump completo fica só como fallback. ADR 0005 e o README documentam a pipeline.',
+            'commits' => [
+                [
+                    'hash' => '3c9e959',
+                    'data' => '2026-09-16',
+                    'mensagem' => 'Registrar o discovery do retrieval versionado de /docs para filtrar o contexto do card.',
+                ],
+                [
+                    'hash' => '0d69c78',
+                    'data' => '2026-09-16',
+                    'mensagem' => 'Registrar o discovery do briefing de /docs na conversa antes de gerar o card.',
+                ],
+            ],
+            'modulos' => [
+                [
+                    'nome' => 'Arquitetura',
+                    'itens' => [
+                        ['titulo' => 'ADR 0005 — filtrar /docs via prompt versionado em dois turns', 'estado' => 'development', 'nota' => 'docs/adr/0005-filtrar-docs-via-prompt-versionado.md; completePrompt no LlmGateway'],
+                    ],
+                ],
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'DocsRetrievalService: listar paths, retrieval, leitura filtrada e briefing', 'estado' => 'development', 'nota' => 'docs_retrieval@v1 e docs_briefing@v1; fallback para dump completo'],
+                        ['titulo' => 'ProjectDocsGateway lista índice e lê subset', 'estado' => 'development', 'nota' => 'listDocsPaths e readDocsByPaths; teto de chars no filtrado'],
+                    ],
+                ],
+                [
+                    'nome' => 'Chat',
+                    'itens' => [
+                        ['titulo' => 'Briefing persistido como mensagem assistant após a frase de revisão', 'estado' => 'development', 'nota' => 'Falha silenciosa; generateCard usa /docs da sessão'],
+                    ],
+                ],
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'Discoveries 0004 e 0005', 'estado' => 'development', 'nota' => 'Retrieval versionado e briefing na conversa'],
+                        ['titulo' => 'README 0.7.0 com fluxo de retrieval e briefing', 'estado' => 'development', 'nota' => 'Diagrama à parte, no mesmo estilo do fluxo completo'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.28',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Testes no AGENTS.md sem aprovação do usuário',
+            'resumo' => 'A execução de testes no container (`composer test` e filtros PHPUnit equivalentes) passa a ser feita sem pedir confirmação no chat. A regra vale só para testes; outros scripts continuam sujeitos a aprovação.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'AGENTS.md: testes sem aprovação do usuário', 'estado' => 'stable', 'nota' => 'docker compose exec app composer test; permissões de sandbox/Docker no próprio comando'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.27',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Métricas de docs_retrieval e docs_briefing',
+            'resumo' => 'completePrompt passa a receber a conversa e resolver o prompt versionado no catálogo, gravando LlmUsage com step, versão e hash. A pipeline por step compara docs_retrieval@v1 e docs_briefing@v1 junto com interview e card_generation.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'completePrompt grava LlmUsage dos prompts avulsos', 'estado' => 'development', 'nota' => 'DocsRetrievalService envia a conversa; adapters resolvem docs_retrieval@v1 e docs_briefing@v1'],
+                        ['titulo' => 'Pipeline por step inclui os novos prompts', 'estado' => 'development', 'nota' => 'compareByStep agrupa step@version; dashboard lista docs_retrieval e docs_briefing'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.26',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Briefing de /docs como mensagem na conversa',
+            'resumo' => 'Quando a revisão de /docs vem ok com briefing, a conversa ganha uma segunda mensagem assistant com o texto humanizado, depois da frase de revisão. Falha ou briefing vazio fica silenciosa: só a frase atual, sem erro na UI e sem gravar o briefing na sessão.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'reviewProjectDocs persiste o briefing como mensagem assistant', 'estado' => 'development', 'nota' => 'Ordem: frase de revisão, depois briefing; retry relê /docs e gera briefing novo'],
+                        ['titulo' => 'Fallback silencioso quando briefing é null ou vazio', 'estado' => 'development', 'nota' => 'empty/too_large/failed seguem só com a frase atual; sessão e card_generation inalterados'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.25',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Briefing de /docs no DocsRetrievalService',
+            'resumo' => 'Após ler /docs com status ok, um segundo completePrompt gera um texto humanizado (docs_briefing@v1) e o anexa em ProjectDocsResult. Falha, timeout ou resposta vazia deixam briefing null e o resultado continua ok; a conversa ainda não persiste essa mensagem.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'Prompt docs_briefing@v1', 'estado' => 'development', 'nota' => 'CHAT_DOCS_BRIEFING_PROMPT_VERSION=v1; texto livre em pt-BR, sem perguntas'],
+                        ['titulo' => 'DocsRetrievalService gera briefing após status ok', 'estado' => 'development', 'nota' => 'Log project_docs.briefing (status, chars_input, chars_output); modelo via CHAT_DOCS_BRIEFING_MODEL'],
+                        ['titulo' => 'completePrompt propaga o step até o adapter', 'estado' => 'development', 'nota' => 'docs_briefing distinto de docs_retrieval; LlmUsage recebe o step quando houver conversa'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.24',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Retrieval de /docs em dois turns com fallback',
+            'resumo' => 'O encerramento da entrevista escolhe arquivos de /docs via prompt docs_retrieval@v1 e lê só o subset. Se o retrieval falhar, a lista vier vazia ou os paths forem inválidos, o fluxo volta ao dump completo.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'DocsRetrievalService orquestra listagem, prompt e leitura filtrada', 'estado' => 'development', 'nota' => 'Log project_docs.retrieval; modelo configurável em chat.prompts.docs_retrieval.model'],
+                        ['titulo' => 'ConversationChat usa o retrieval com fallback para readProjectDocs', 'estado' => 'development', 'nota' => 'reviewProjectDocs deixa de chamar o dump direto'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.23',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Prompt docs_retrieval@v1 para filtrar /docs',
+            'resumo' => 'Novo system prompt versionado escolhe, pelo índice de paths e pelo resumo da entrevista, no máximo 10 arquivos de /docs relevantes para o card. A saída é JSON estrito; o catálogo passa a resolver docs_retrieval@v1.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'Prompt docs_retrieval@v1', 'estado' => 'development', 'nota' => 'CHAT_DOCS_RETRIEVAL_PROMPT_VERSION=v1; JSON {"paths": [...]} máx. 10'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.22',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Port de /docs lista paths e lê arquivos filtrados',
+            'resumo' => 'O ProjectDocsGateway passa a listar os caminhos de /docs sem ler o conteúdo e a ler somente os arquivos pedidos. O teto de caracteres vale sobre o subset; a leitura completa da árvore permanece igual.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'MCP',
+                    'itens' => [
+                        ['titulo' => 'listDocsPaths devolve índice plano de /docs sem conteúdo', 'estado' => 'development', 'nota' => 'ProjectDocsPathsResult (ok, failed)'],
+                        ['titulo' => 'readDocsByPaths lê só os paths informados e aplica o teto no filtrado', 'estado' => 'development', 'nota' => 'Paths fora de /docs são ignorados'],
+                    ],
+                ],
+            ],
+        ],
 
         [
             'versao' => '0.6.21',
