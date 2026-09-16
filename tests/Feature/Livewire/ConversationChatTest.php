@@ -2,14 +2,20 @@
 
 namespace Tests\Feature\Livewire;
 
+use App\Contracts\ProjectDocsGateway;
 use App\Livewire\ConversationChat;
 use App\Models\Conversation;
+use App\Models\Project;
 use App\Models\User;
+use App\Services\ProjectDocsResult;
 use App\Support\ChatComposer;
+use App\Support\CurrentProject;
+use App\Support\ProjectDocsReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use Tests\Support\FakeProjectDocsGateway;
 use Tests\TestCase;
 
 class ConversationChatTest extends TestCase
@@ -883,5 +889,324 @@ TXT;
             ->assertSee('Interview em andamento')
             ->assertSee('x-on:interview-scope-too-broad.window', false)
             ->assertSee('Escopo amplo demais');
+    }
+
+    public function test_closing_interview_without_project_does_not_call_docs_gateway(): void
+    {
+        $fake = $this->bindFakeProjectDocsGateway();
+
+        $this->fakeInterviewCompleteReply();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card')
+            ->assertDontSee('Revisão carregada')
+            ->assertDontSee('Tentar revisão novamente')
+            ->assertDontSee('Não há informações adicionais em /docs');
+
+        $this->assertSame([], $fake->calls);
+        $this->assertNull(ProjectDocsReview::get($conversation->id));
+        $this->assertSame(2, $conversation->messages()->count());
+    }
+
+    public function test_closing_interview_with_project_stores_ok_review_and_notifies(): void
+    {
+        $project = Project::factory()->create([
+            'repository' => 'acme/checkout',
+            'branch' => 'develop',
+        ]);
+        $fake = $this->bindFakeProjectDocsGateway(
+            ProjectDocsResult::ok("# Regras secretas\nPagamento obrigatório.", 3, 1),
+        );
+
+        $this->fakeInterviewCompleteReply();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        $this->session([CurrentProject::SESSION_KEY => $project->id]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card')
+            ->assertSee('Revisão carregada (3 arquivos). Você já pode gerar o card.')
+            ->assertDontSee('Tentar revisão novamente')
+            ->assertDontSee('Regras secretas')
+            ->assertDontSee('Pagamento obrigatório');
+
+        $this->assertSame([
+            ['repository' => 'acme/checkout', 'branch' => 'develop'],
+        ], $fake->calls);
+        $this->assertSame(3, $conversation->messages()->count());
+        $this->assertSame([
+            'status' => 'ok',
+            'content' => "# Regras secretas\nPagamento obrigatório.",
+            'project_id' => $project->id,
+            'repository' => 'acme/checkout',
+            'branch' => 'develop',
+            'file_count' => 3,
+            'skipped_non_text' => 1,
+            'chars' => mb_strlen("# Regras secretas\nPagamento obrigatório.", 'UTF-8'),
+        ], ProjectDocsReview::get($conversation->id));
+    }
+
+    public function test_empty_review_shows_retry_and_retry_rereads_without_generating_card(): void
+    {
+        $project = Project::factory()->create(['repository' => 'acme/checkout']);
+        $fake = $this->bindFakeProjectDocsGateway(
+            ProjectDocsResult::empty(),
+            ProjectDocsResult::ok('# Regras', 1, 0),
+        );
+        $this->fakeInterviewCompleteReply();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        $this->session([CurrentProject::SESSION_KEY => $project->id]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card')
+            ->assertSee('Não há informações adicionais em /docs')
+            ->assertSee('Tentar revisão novamente');
+
+        $this->assertSame('empty', ProjectDocsReview::get($conversation->id)['status']);
+        $this->assertNull(ProjectDocsReview::get($conversation->id)['content']);
+        Http::assertSentCount(1);
+
+        $component
+            ->call('retryProjectDocsReview')
+            ->assertNoRedirect()
+            ->assertSee('Revisão carregada (1 arquivo)')
+            ->assertDontSee('Tentar revisão novamente')
+            ->assertSee('Gerar Card');
+
+        $this->assertSame([
+            ['repository' => 'acme/checkout', 'branch' => 'main'],
+            ['repository' => 'acme/checkout', 'branch' => 'main'],
+        ], $fake->calls);
+        $this->assertSame('ok', ProjectDocsReview::get($conversation->id)['status']);
+        $this->assertSame('# Regras', ProjectDocsReview::get($conversation->id)['content']);
+        $this->assertDatabaseMissing('cards', [
+            'conversation_id' => $conversation->id,
+        ]);
+        Http::assertSentCount(1);
+    }
+
+    public function test_too_large_review_notifies_without_retry(): void
+    {
+        $project = Project::factory()->create(['repository' => 'acme/checkout']);
+        $tooLarge = $this->bindFakeProjectDocsGateway(ProjectDocsResult::tooLarge(8, 0, 120_000));
+        $this->fakeInterviewCompleteReply();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        $this->session([CurrentProject::SESSION_KEY => $project->id]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card')
+            ->assertSee('excede o teto')
+            ->assertDontSee('Tentar revisão novamente');
+
+        $this->assertSame([
+            ['repository' => 'acme/checkout', 'branch' => 'main'],
+        ], $tooLarge->calls);
+        $this->assertSame('too_large', ProjectDocsReview::get($conversation->id)['status']);
+        $this->assertNull(ProjectDocsReview::get($conversation->id)['content']);
+    }
+
+    public function test_failed_review_shows_retry_and_retry_rereads_without_generating_card(): void
+    {
+        $project = Project::factory()->create(['repository' => 'acme/checkout']);
+        $fake = $this->bindFakeProjectDocsGateway(
+            ProjectDocsResult::failed(ProjectDocsResult::ERROR_TIMEOUT),
+            ProjectDocsResult::ok('# Regras', 1, 0),
+        );
+
+        $this->fakeInterviewCompleteReply();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        $this->session([CurrentProject::SESSION_KEY => $project->id]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card')
+            ->assertSee('Não foi possível realizar a revisão final')
+            ->assertSee('Tentar revisão novamente');
+
+        $this->assertSame('failed', ProjectDocsReview::get($conversation->id)['status']);
+        $this->assertNull(ProjectDocsReview::get($conversation->id)['content']);
+        Http::assertSentCount(1);
+
+        $component
+            ->call('retryProjectDocsReview')
+            ->assertNoRedirect()
+            ->assertSee('Revisão carregada (1 arquivo)')
+            ->assertDontSee('Tentar revisão novamente')
+            ->assertSee('Gerar Card');
+
+        $this->assertSame([
+            ['repository' => 'acme/checkout', 'branch' => 'main'],
+            ['repository' => 'acme/checkout', 'branch' => 'main'],
+        ], $fake->calls);
+        $this->assertSame('ok', ProjectDocsReview::get($conversation->id)['status']);
+        $this->assertSame('# Regras', ProjectDocsReview::get($conversation->id)['content']);
+        $this->assertDatabaseMissing('cards', [
+            'conversation_id' => $conversation->id,
+        ]);
+        Http::assertSentCount(1);
+    }
+
+    public function test_retry_is_ignored_when_session_status_is_ok(): void
+    {
+        $project = Project::factory()->create(['repository' => 'acme/checkout']);
+        $fake = $this->bindFakeProjectDocsGateway();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'current_step' => 'card_generation',
+            'interview_summary' => 'Problema: checkout',
+        ]);
+
+        $payload = ProjectDocsReview::payloadFrom($project, ProjectDocsResult::ok('doc', 1, 0));
+
+        $this->session([
+            CurrentProject::SESSION_KEY => $project->id,
+            ProjectDocsReview::sessionKey($conversation->id) => $payload,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('retryProjectDocsReview')
+            ->assertDontSee('Tentar revisão novamente');
+
+        $this->assertSame([], $fake->calls);
+    }
+
+    public function test_generate_card_does_not_reread_project_docs(): void
+    {
+        $project = Project::factory()->create(['repository' => 'acme/checkout']);
+        $fake = $this->bindFakeProjectDocsGateway();
+
+        $reply = <<<'TXT'
+Card gerado.
+
+<CARD_JSON>
+{"title":"Checkout MVP","objetivo":"Permitir pagamento no checkout.","regras":["Exibir meios de pagamento."],"onde":["Checkout"],"aceite":["Comprador com carrinho: ao pagar, confirma."],"priority":"high"}
+</CARD_JSON>
+TXT;
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => $reply]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'prompt_name' => 'interview',
+            'prompt_version' => 'v1',
+            'current_step' => 'card_generation',
+            'interview_summary' => 'Problema: checkout sem pagamento',
+        ]);
+
+        $this->session([
+            CurrentProject::SESSION_KEY => $project->id,
+            ProjectDocsReview::sessionKey($conversation->id) => ProjectDocsReview::payloadFrom(
+                $project,
+                ProjectDocsResult::ok('# Regras', 1, 0),
+            ),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('generateCard')
+            ->assertRedirect(route('conversations.show', $conversation));
+
+        $this->assertSame([], $fake->calls);
+        Http::assertSent(function (Request $request) {
+            $docs = (string) $request['messages'][1]['content'];
+            $summary = (string) $request['messages'][2]['content'];
+
+            return count($request['messages']) === 3
+                && str_contains($docs, 'Regras do projeto (/docs)')
+                && str_contains($docs, '# Regras')
+                && str_contains($summary, 'Problema: checkout sem pagamento');
+        });
+    }
+
+    private function bindFakeProjectDocsGateway(ProjectDocsResult ...$results): FakeProjectDocsGateway
+    {
+        $fake = new FakeProjectDocsGateway;
+
+        foreach ($results as $result) {
+            $fake->queue($result);
+        }
+
+        $this->app->instance(ProjectDocsGateway::class, $fake);
+
+        return $fake;
+    }
+
+    private function fakeInterviewCompleteReply(): void
+    {
+        $reply = <<<'TXT'
+Entendi. Podemos gerar o card.
+
+<INTERVIEW_COMPLETE>
+<INTERVIEW_SUMMARY>
+Problema: checkout sem pagamento
+Persona: comprador
+</INTERVIEW_SUMMARY>
+</INTERVIEW_COMPLETE>
+TXT;
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => $reply]],
+                ],
+            ], 200),
+        ]);
     }
 }

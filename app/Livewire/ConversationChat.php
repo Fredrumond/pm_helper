@@ -3,12 +3,15 @@
 namespace App\Livewire;
 
 use App\Contracts\LlmGateway;
+use App\Contracts\ProjectDocsGateway;
 use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Card;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Services\CardParserService;
+use App\Services\ProjectDocsResult;
 use App\Support\ChatComposer;
+use App\Support\ProjectDocsReview;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -128,6 +131,18 @@ class ConversationChat extends Component
         }
     }
 
+    public function retryProjectDocsReview(ProjectDocsGateway $gateway): void
+    {
+        if ($this->conversation->isCompleted() || ! ProjectDocsReview::canRetry($this->conversation->id)) {
+            return;
+        }
+
+        $this->reviewProjectDocs($gateway);
+
+        $this->conversation->refresh();
+        $this->conversation->load(['messages', 'card']);
+    }
+
     public function generateCard(LlmGateway $llm, CardParserService $parser): void
     {
         if ($this->generatingCard) {
@@ -144,12 +159,17 @@ class ConversationChat extends Component
 
         $this->generatingCard = true;
 
-        Log::info('Geração de card solicitada', [
-            'conversation_id' => $this->conversation->id,
-        ]);
-
         $this->conversation->load('messages');
         $this->ensureInterviewSummary($parser);
+
+        $projectDocs = $this->projectDocsContextForCard();
+        $hasProjectDocs = is_string($projectDocs) && $projectDocs !== '';
+
+        Log::info('Geração de card solicitada', [
+            'conversation_id' => $this->conversation->id,
+            'has_project_docs' => $hasProjectDocs,
+            'chars' => $hasProjectDocs ? mb_strlen($projectDocs, 'UTF-8') : 0,
+        ]);
 
         if ($this->conversation->isCompleted()) {
             $this->generatingCard = false;
@@ -176,6 +196,7 @@ class ConversationChat extends Component
                 $this->conversation,
                 (string) $this->conversation->interview_summary,
                 $this->selectedModel,
+                $projectDocs,
             );
 
             Message::create([
@@ -209,6 +230,19 @@ class ConversationChat extends Component
         if ($this->conversation->card !== null) {
             $this->redirect(route('conversations.show', $this->conversation));
         }
+    }
+
+    private function projectDocsContextForCard(): ?string
+    {
+        $payload = ProjectDocsReview::get($this->conversation->id);
+
+        if (($payload['status'] ?? null) !== ProjectDocsResult::STATUS_OK) {
+            return null;
+        }
+
+        $content = trim((string) ($payload['content'] ?? ''));
+
+        return $content !== '' ? $content : null;
     }
 
     private function captureInterviewSummary(CardParserService $parser, string $response): void
@@ -261,7 +295,56 @@ class ConversationChat extends Component
             'current_step' => 'card_generation',
         ]);
 
+        $this->reviewProjectDocs();
+
         $this->dispatch('interview-ready');
+    }
+
+    private function reviewProjectDocs(?ProjectDocsGateway $gateway = null): void
+    {
+        $project = ProjectDocsReview::currentProject();
+
+        if ($project === null) {
+            return;
+        }
+
+        $retry = ProjectDocsReview::canRetry($this->conversation->id);
+
+        Log::info($retry ? 'Retry da revisão de /docs' : 'Revisão de /docs disparada', [
+            'conversation_id' => $this->conversation->id,
+            'project_id' => $project->id,
+            'repository' => $project->repository,
+            'ref' => $project->branch,
+        ]);
+
+        try {
+            $result = ($gateway ?? app(ProjectDocsGateway::class))
+                ->readProjectDocs((string) $project->repository, (string) $project->branch);
+        } catch (Throwable $exception) {
+            Log::error('Falha inesperada na revisão de /docs', [
+                'conversation_id' => $this->conversation->id,
+                'project_id' => $project->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            $result = ProjectDocsResult::failed(ProjectDocsResult::ERROR_MCP);
+        }
+
+        ProjectDocsReview::store($this->conversation->id, $project, $result);
+
+        Log::info('Revisão de /docs concluída', [
+            'conversation_id' => $this->conversation->id,
+            'project_id' => $project->id,
+            'repository' => $project->repository,
+            'ref' => $project->branch,
+            'status' => $result->status,
+        ]);
+
+        Message::create([
+            'conversation_id' => $this->conversation->id,
+            'role' => 'assistant',
+            'content' => ProjectDocsReview::assistantMessage($result),
+        ]);
     }
 
     private function persistScopeTooBroad(): void
@@ -344,6 +427,8 @@ class ConversationChat extends Component
             'showGenerateCardButton' => $this->conversation->isInterviewComplete()
                 && ! $this->conversation->isCompleted()
                 && ! $this->conversation->isScopeTooBroad(),
+            'showRetryProjectDocsReview' => ProjectDocsReview::canRetry($this->conversation->id)
+                && ! $this->conversation->isCompleted(),
             'selectedModelMeta' => $selected ?? [
                 'id' => $this->selectedModel,
                 'name' => $this->selectedModel,

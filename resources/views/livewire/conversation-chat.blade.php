@@ -56,7 +56,7 @@
         @endif
 
         {{-- Indicador de digitação enquanto a OpenRouter responde --}}
-        <div wire:loading.flex wire:target="sendMessage,generateCard" class="justify-start">
+        <div wire:loading.flex wire:target="sendMessage,generateCard,retryProjectDocsReview" class="justify-start">
             <div class="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center shrink-0 mr-2 mt-1">
                 <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -82,13 +82,35 @@
             </div>
             <form id="new-conv-form" method="POST" action="{{ route('conversations.store') }}" class="hidden">@csrf</form>
         @else
+            @if ($showRetryProjectDocsReview)
+                <div class="max-w-3xl mx-auto mb-3" wire:key="retry-project-docs">
+                    <button
+                        type="button"
+                        wire:click="retryProjectDocsReview"
+                        wire:loading.attr="disabled"
+                        wire:target="retryProjectDocsReview,sendMessage,generateCard"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <svg wire:loading.remove wire:target="retryProjectDocsReview" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        <svg wire:loading wire:target="retryProjectDocsReview" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                        </svg>
+                        <span wire:loading.remove wire:target="retryProjectDocsReview">Tentar revisão novamente</span>
+                        <span wire:loading wire:target="retryProjectDocsReview">Lendo /docs...</span>
+                    </button>
+                </div>
+            @endif
+
             @if ($showGenerateCardButton)
                 <div class="max-w-3xl mx-auto mb-3" wire:key="generate-card-cta">
                     <button
                         type="button"
                         wire:click="generateCard"
                         wire:loading.attr="disabled"
-                        wire:target="generateCard,sendMessage"
+                        wire:target="generateCard,sendMessage,retryProjectDocsReview"
                         class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <svg wire:loading.remove wire:target="generateCard" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -157,7 +179,7 @@
                         wire:model="input"
                         wire:keydown.enter.exact.prevent="sendMessage"
                         wire:loading.attr="disabled"
-                        wire:target="sendMessage"
+                        wire:target="sendMessage,retryProjectDocsReview"
                         x-ref="input"
                         @input="onDraftInput($event)"
                         @keydown.escape="showModels = false"
@@ -229,7 +251,7 @@
                             <button
                                 type="submit"
                                 wire:loading.attr="disabled"
-                                wire:target="sendMessage"
+                                wire:target="sendMessage,retryProjectDocsReview"
                                 title="Enviar (Enter)"
                                 class="rounded-lg bg-indigo-600 p-1.5 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >

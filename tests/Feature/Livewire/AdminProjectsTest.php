@@ -65,10 +65,12 @@ class AdminProjectsTest extends TestCase
             ->call('startCreate')
             ->set('name', 'App mobile')
             ->set('repository', 'octocat/hello-world')
+            ->set('branch', 'develop')
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('App mobile')
             ->assertSee('octocat/hello-world')
+            ->assertSee('develop')
             ->assertSee('Projeto cadastrado.')
             ->assertDontSee('Nenhum projeto ativo.');
 
@@ -76,6 +78,7 @@ class AdminProjectsTest extends TestCase
 
         $this->assertNotNull($project);
         $this->assertSame('App mobile', $project->name);
+        $this->assertSame('develop', $project->branch);
         $this->assertNull($project->deleted_at);
 
         Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($admin, $project): bool {
@@ -99,6 +102,7 @@ class AdminProjectsTest extends TestCase
             ->call('startCreate')
             ->set('name', 'App mobile')
             ->set('repository', 'https://github.com/octocat/hello-world.git')
+            ->set('branch', 'refs/heads/main')
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('App mobile')
@@ -109,6 +113,7 @@ class AdminProjectsTest extends TestCase
         $this->assertDatabaseHas('projects', [
             'name' => 'App mobile',
             'repository' => 'octocat/hello-world',
+            'branch' => 'main',
             'deleted_at' => null,
         ]);
         $this->assertSame(1, Project::query()->count());
@@ -123,6 +128,7 @@ class AdminProjectsTest extends TestCase
             ->call('startCreate')
             ->set('name', 'App mobile')
             ->set('repository', 'https://gitlab.com/org/repo')
+            ->set('branch', 'main')
             ->call('save')
             ->assertHasErrors(['repository'])
             ->assertSee('O repository deve ser owner/repo ou uma URL do github.com.');
@@ -131,6 +137,23 @@ class AdminProjectsTest extends TestCase
             'name' => 'App mobile',
         ]);
         $this->assertSame(0, Project::withTrashed()->count());
+    }
+
+    public function test_admin_rejects_invalid_branch_and_does_not_persist(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->call('startCreate')
+            ->set('name', 'App mobile')
+            ->set('repository', 'octocat/hello-world')
+            ->set('branch', 'feat*')
+            ->call('save')
+            ->assertHasErrors(['branch'])
+            ->assertSee('A branch deve ser o nome da branch no GitHub');
+
+        $this->assertSame(0, Project::query()->count());
     }
 
     public function test_admin_edits_the_friendly_name(): void
@@ -148,7 +171,9 @@ class AdminProjectsTest extends TestCase
             ->call('startEdit', $project->id)
             ->assertSet('name', 'Nome antigo')
             ->assertSet('repository', 'octocat/hello-world')
+            ->assertSet('branch', 'main')
             ->set('name', 'App mobile')
+            ->set('branch', 'release-1.0')
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('App mobile')
@@ -159,6 +184,7 @@ class AdminProjectsTest extends TestCase
             'id' => $project->id,
             'name' => 'App mobile',
             'repository' => 'octocat/hello-world',
+            'branch' => 'release-1.0',
             'deleted_at' => null,
         ]);
 
@@ -218,6 +244,7 @@ class AdminProjectsTest extends TestCase
             ->call('startCreate')
             ->set('name', 'Outro app')
             ->set('repository', 'octocat/hello-world')
+            ->set('branch', 'main')
             ->call('save')
             ->assertHasErrors(['repository']);
 
@@ -230,6 +257,7 @@ class AdminProjectsTest extends TestCase
             ->call('startCreate')
             ->set('name', 'App recriado')
             ->set('repository', 'octocat/hello-world')
+            ->set('branch', 'main')
             ->call('save')
             ->assertHasErrors(['repository'])
             ->assertSee('Já existe um projeto com este repositório, inclusive desativado');

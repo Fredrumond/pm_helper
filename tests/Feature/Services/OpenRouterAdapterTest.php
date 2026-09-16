@@ -441,7 +441,7 @@ class OpenRouterAdapterTest extends TestCase
             'conversation_id' => $conversation->id,
             'generation_id' => 'gen-card-1',
             'step' => 'card_generation',
-            'prompt_version' => 'v2',
+            'prompt_version' => 'v3',
         ]);
 
         Http::assertSent(function (Request $request) {

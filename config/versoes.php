@@ -104,6 +104,17 @@ return [
                     'stakeholders: lista de nomes de pessoas; lista vazia se o resumo não trouxer nomes',
                 ],
             ],
+            [
+                'versao' => 'v3',
+                'data' => '2026-09-16',
+                'release' => '0.6.17',
+                'resumo' => 'Quando a geração recebe um bloco de regras do projeto (/docs), o card deve se alinhar a elas. O resumo da entrevista continua a fonte dos fatos; não inventar escopo só com base em /docs. Sem o bloco, o comportamento permanece equivalente ao v2.',
+                'mudancas' => [
+                    'Instrução para alinhar o card às regras do projeto quando o bloco /docs estiver presente',
+                    'Resumo da entrevista permanece a única fonte dos fatos do card',
+                    'Sem bloco de regras, geração equivalente ao v2',
+                ],
+            ],
         ],
 
         'discovery' => [
@@ -119,6 +130,157 @@ return [
     ],
 
     'releases' => [
+
+        [
+            'versao' => '0.6.21',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Fluxo do README inclui a leitura de /docs',
+            'resumo' => 'O fluxograma completo mostra a leitura de /docs via MCP no encerramento da entrevista, antes do botão Gerar Card, e a geração usa o resumo mais /docs quando a revisão ok.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'Nó de /docs no fluxo completo do README', 'estado' => 'development', 'nota' => 'Entre interview_summary e o botão Gerar Card; sem ramificar empty/failed/retry'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.20',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'ADR da leitura de /docs via MCP GitHub',
+            'resumo' => 'Registra a decisão de ler a pasta /docs pelo MCP oficial (port ProjectDocsGateway, token efêmero, payload na sessão) em vez da REST ou de cache local.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Arquitetura',
+                    'itens' => [
+                        ['titulo' => 'ADR 0004 — Ler /docs via MCP GitHub', 'estado' => 'development', 'nota' => 'docs/adr/0004-ler-docs-via-mcp-github.md'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.19',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Retry de /docs vazio e pasta docs',
+            'resumo' => 'A leitura de regras do projeto passa a usar a pasta /docs. Quando a revisão vier vazia, o PM vê o botão Tentar revisão novamente — o mesmo já existia só em falha de GitHub.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Chat',
+                    'itens' => [
+                        ['titulo' => 'Botão Tentar revisão novamente também no status empty', 'estado' => 'development', 'nota' => 'too_large e ok continuam sem retry'],
+                        ['titulo' => 'Mensagens, prompt v3 e adapters passam a citar /docs', 'estado' => 'development'],
+                    ],
+                ],
+                [
+                    'nome' => 'MCP',
+                    'itens' => [
+                        ['titulo' => 'docs_path padrão docs em vez de doc', 'estado' => 'development', 'nota' => 'config/mcp.php'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.18',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Branch do projeto na leitura de /doc',
+            'resumo' => 'O cadastro de projeto passa a exigir a branch de onde a pasta /doc será lida. Essa branch vai como ref no get_file_contents do MCP; sem o campo o cliente omite ref e o GitHub usa a branch default do repositório.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Projetos',
+                    'itens' => [
+                        ['titulo' => 'Campo branch no cadastro e na listagem admin', 'estado' => 'development', 'nota' => 'Obrigatório; default main nos registros existentes'],
+                        ['titulo' => 'Validação GitHubBranch (nome curto, sem refs/ ou caracteres inseguros)', 'estado' => 'development'],
+                    ],
+                ],
+                [
+                    'nome' => 'MCP',
+                    'itens' => [
+                        ['titulo' => 'get_file_contents envia ref quando a branch do projeto está preenchida', 'estado' => 'development', 'nota' => 'Vazio: omite ref e o MCP usa a default do repo'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.17',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Geração de card com contexto de /doc',
+            'resumo' => 'Novas gerações usam card_generation@v3. Com revisão ok na sessão, o texto de /doc vai para a LLM junto com o resumo; nos demais status o card sai sem esse contexto e sem reler o GitHub.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Chat',
+                    'itens' => [
+                        ['titulo' => 'generateCard lê project_docs da sessão e envia /doc só se status=ok', 'estado' => 'development', 'nota' => 'empty/too_large/failed/ausente: sem bloco; não persiste no banco'],
+                        ['titulo' => 'Log de geração com has_project_docs e chars, sem o texto', 'estado' => 'development'],
+                    ],
+                ],
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'LlmGateway::generateCard aceita contexto opcional de /doc', 'estado' => 'development', 'nota' => 'LlmRouter, OpenRouterAdapter e OpenAiAdapter'],
+                        ['titulo' => 'Prompt card_generation@v3', 'estado' => 'development', 'nota' => 'CHAT_CARD_PROMPT_VERSION=v3; v2 intacto'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.16',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Revisão de /doc ao encerrar a entrevista',
+            'resumo' => 'Com projeto selecionado, o encerramento da entrevista lê a pasta doc via ProjectDocsGateway, avisa o PM no chat e guarda o resultado na sessão. Falha oferece retry só da leitura; a geração do card ainda não usa esse texto.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Chat',
+                    'itens' => [
+                        ['titulo' => 'Leitura de /doc em markInterviewReady quando há projeto na sessão', 'estado' => 'development', 'nota' => 'Sem projeto: nenhuma chamada nem mensagem extra'],
+                        ['titulo' => 'Mensagens de status ok, empty, too_large e failed no chat', 'estado' => 'development', 'nota' => 'failed mostra Tentar revisão novamente'],
+                        ['titulo' => 'Payload efêmero project_docs.{conversationId} para a geração do card', 'estado' => 'development', 'nota' => 'Sessão, não MySQL; content só em ok'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.15',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'Cliente MCP GitHub para ler a pasta doc',
+            'resumo' => 'Port ProjectDocsGateway lê a pasta doc do repositório via MCP Streamable HTTP, autenticado com installation token da GitHub App. O token fica só em memória; sem credenciais o gateway devolve failed sem HTTP outbound. Chat e geração de card não mudam.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'MCP',
+                    'itens' => [
+                        ['titulo' => 'Port ProjectDocsGateway + ProjectDocsResult (ok, empty, too_large, failed)', 'estado' => 'development', 'nota' => 'app/Contracts/ProjectDocsGateway.php'],
+                        ['titulo' => 'Mint do installation token da GitHub App (JWT → access_tokens)', 'estado' => 'development', 'nota' => 'Token efêmero; nunca persistido nem logado'],
+                        ['titulo' => 'Adapter MCP Streamable HTTP + get_file_contents recursivo em doc', 'estado' => 'development', 'nota' => 'Pula não-texto/não-UTF-8; aborta sem truncar acima de max_chars'],
+                    ],
+                ],
+                [
+                    'nome' => 'Configuração',
+                    'itens' => [
+                        ['titulo' => 'config/mcp.php com URL, timeout e max_chars', 'estado' => 'development', 'nota' => 'GITHUB_MCP_URL, GITHUB_MCP_TIMEOUT, GITHUB_MCP_MAX_CHARS'],
+                    ],
+                ],
+            ],
+        ],
 
         [
             'versao' => '0.6.14',

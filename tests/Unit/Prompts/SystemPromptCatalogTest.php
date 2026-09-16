@@ -31,6 +31,7 @@ class SystemPromptCatalogTest extends TestCase
         $this->assertContains('v4', $catalog->versions('interview'));
         $this->assertContains('v1', $catalog->versions('card_generation'));
         $this->assertContains('v2', $catalog->versions('card_generation'));
+        $this->assertContains('v3', $catalog->versions('card_generation'));
     }
 
     public function test_loads_the_configured_interview_prompt(): void
@@ -65,9 +66,10 @@ class SystemPromptCatalogTest extends TestCase
         $prompt = (new SystemPromptCatalog)->current('card_generation');
 
         $this->assertSame('card_generation', $prompt->name);
-        $this->assertSame('card_generation@v2', $prompt->identifier());
+        $this->assertSame('card_generation@v3', $prompt->identifier());
         $this->assertStringContainsString('<CARD_JSON>', $prompt->content);
         $this->assertStringContainsString('"objetivo"', $prompt->content);
+        $this->assertStringContainsString('Regras do projeto (/docs)', $prompt->content);
     }
 
     public function test_throws_when_version_is_missing(): void

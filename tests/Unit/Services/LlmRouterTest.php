@@ -69,7 +69,7 @@ class FakeLlmGateway implements LlmGateway
         return "{$this->name}:chat";
     }
 
-    public function generateCard(Conversation $conversation, string $summary, ?string $model = null): string
+    public function generateCard(Conversation $conversation, string $summary, ?string $model = null, ?string $projectDocs = null): string
     {
         $this->lastConversation = $conversation;
         $this->lastSummary = $summary;

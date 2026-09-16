@@ -25,7 +25,7 @@ class OpenAiAdapter implements LlmGateway
         private readonly SystemPromptCatalog $prompts = new SystemPromptCatalog,
     ) {
         $this->apiKey = trim((string) config('services.openai.api_key'));
-        $this->model  = (string) config('services.openai.model', 'gpt-4o-mini');
+        $this->model = (string) config('services.openai.model', 'gpt-4o-mini');
 
         if ($this->apiKey === '') {
             throw new \RuntimeException(
@@ -39,7 +39,7 @@ class OpenAiAdapter implements LlmGateway
      */
     public function chat(Conversation $conversation, ?string $model = null): string
     {
-        $model  = $this->resolveModel($model);
+        $model = $this->resolveModel($model);
         $prompt = $this->resolvePrompt($conversation);
 
         $messages = array_merge(
@@ -53,17 +53,42 @@ class OpenAiAdapter implements LlmGateway
     /**
      * Gera o card a partir do resumo da entrevista, sem reenviar o histórico completo.
      */
-    public function generateCard(Conversation $conversation, string $summary, ?string $model = null): string
+    public function generateCard(Conversation $conversation, string $summary, ?string $model = null, ?string $projectDocs = null): string
     {
-        $model  = $this->resolveModel($model);
+        $model = $this->resolveModel($model);
         $prompt = $this->prompts->current('card_generation');
 
+        return $this->complete(
+            $conversation,
+            $this->cardMessages($prompt->content, $summary, $projectDocs),
+            $model,
+            $prompt,
+            'card_generation',
+        );
+    }
+
+    /**
+     * @return list<array{role: string, content: string}>
+     */
+    private function cardMessages(string $prompt, string $summary, ?string $projectDocs): array
+    {
         $messages = [
-            ['role' => 'system', 'content' => $prompt->content],
-            ['role' => 'user', 'content' => "Resumo da entrevista:\n\n{$summary}"],
+            ['role' => 'system', 'content' => $prompt],
         ];
 
-        return $this->complete($conversation, $messages, $model, $prompt, 'card_generation');
+        if (is_string($projectDocs) && trim($projectDocs) !== '') {
+            $messages[] = [
+                'role' => 'user',
+                'content' => "Regras do projeto (/docs):\n\n{$projectDocs}",
+            ];
+        }
+
+        $messages[] = [
+            'role' => 'user',
+            'content' => "Resumo da entrevista:\n\n{$summary}",
+        ];
+
+        return $messages;
     }
 
     /**
@@ -82,9 +107,9 @@ class OpenAiAdapter implements LlmGateway
             Log::warning('OpenAI rate limited', [
                 'conversation_id' => $conversation->id,
                 'status' => $response->status(),
-                'body'   => $response->body(),
-                'model'  => $model,
-                'step'   => $step,
+                'body' => $response->body(),
+                'model' => $model,
+                'step' => $step,
             ]);
 
             throw new LlmTemporarilyUnavailableException(
@@ -94,15 +119,15 @@ class OpenAiAdapter implements LlmGateway
 
         if ($response->failed()) {
             $payload = $response->json();
-            $detail  = is_array($payload)
+            $detail = is_array($payload)
                 ? ($payload['error']['message'] ?? $response->body())
                 : $response->body();
 
             Log::error('OpenAI API error', [
                 'status' => $response->status(),
-                'body'   => $response->body(),
-                'model'  => $model,
-                'step'   => $step,
+                'body' => $response->body(),
+                'model' => $model,
+                'step' => $step,
             ]);
 
             throw new \RuntimeException(
@@ -114,14 +139,14 @@ class OpenAiAdapter implements LlmGateway
 
         Log::info('OpenAI API response', [
             'conversation_id' => $conversation->id,
-            'status'          => $response->status(),
-            'prompt'          => $prompt->identifier(),
-            'prompt_hash'     => $prompt->hash,
-            'step'            => $step,
-            'model'           => is_array($data) ? ($data['model'] ?? $model) : $model,
-            'id'              => is_array($data) ? ($data['id'] ?? null) : null,
-            'usage'           => is_array($data) ? ($data['usage'] ?? null) : null,
-            'finish_reason'   => is_array($data) ? ($data['choices'][0]['finish_reason'] ?? null) : null,
+            'status' => $response->status(),
+            'prompt' => $prompt->identifier(),
+            'prompt_hash' => $prompt->hash,
+            'step' => $step,
+            'model' => is_array($data) ? ($data['model'] ?? $model) : $model,
+            'id' => is_array($data) ? ($data['id'] ?? null) : null,
+            'usage' => is_array($data) ? ($data['usage'] ?? null) : null,
+            'finish_reason' => is_array($data) ? ($data['choices'][0]['finish_reason'] ?? null) : null,
         ]);
 
         $content = is_array($data) ? ($data['choices'][0]['message']['content'] ?? '') : '';
@@ -147,10 +172,10 @@ class OpenAiAdapter implements LlmGateway
             ->connectTimeout(10)
             ->timeout(120)
             ->post("{$this->baseUrl}/chat/completions", [
-                'model'       => $model,
-                'messages'    => $messages,
+                'model' => $model,
+                'messages' => $messages,
                 'temperature' => 0.7,
-                'max_tokens'  => 4096,
+                'max_tokens' => 4096,
             ]);
     }
 
@@ -180,7 +205,7 @@ class OpenAiAdapter implements LlmGateway
         $prompt = $this->prompts->current($this->activeMode());
 
         $conversation->update([
-            'prompt_name'  => $prompt->name,
+            'prompt_name' => $prompt->name,
             'prompt_version' => $prompt->version,
             'current_step' => $prompt->name === 'discovery' ? 'discovery' : 'interview',
         ]);

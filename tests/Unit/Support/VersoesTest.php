@@ -11,10 +11,10 @@ class VersoesTest extends TestCase
     {
         $versoes = array_column(Versoes::todas(), 'versao');
 
-        $this->assertSame('0.6.14', $versoes[0]);
+        $this->assertSame('0.6.21', $versoes[0]);
         $this->assertContains('0.1.0', $versoes);
-        $this->assertSame('0.6.14', Versoes::numeroAtual());
-        $this->assertSame('Papel tipado e seleção de projeto reutilizável', Versoes::atual()['titulo']);
+        $this->assertSame('0.6.21', Versoes::numeroAtual());
+        $this->assertSame('Fluxo do README inclui a leitura de /docs', Versoes::atual()['titulo']);
         $this->assertGreaterThan(0, Versoes::totalEntregas());
         $this->assertSame(['stable', 'development', 'test', 'bug'], array_keys(Versoes::contagemPorEstado()));
     }

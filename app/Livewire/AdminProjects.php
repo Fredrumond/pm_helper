@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Project;
+use App\Rules\GitHubBranch;
 use App\Rules\GitHubRepository;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +21,8 @@ class AdminProjects extends Component
     public string $name = '';
 
     public string $repository = '';
+
+    public string $branch = 'main';
 
     public ?int $editingId = null;
 
@@ -49,6 +52,7 @@ class AdminProjects extends Component
         $this->editingId = $project->id;
         $this->name = $project->name;
         $this->repository = $project->repository;
+        $this->branch = (string) $project->branch;
         $this->statusMessage = null;
         $this->showForm = true;
         $this->resetValidation();
@@ -66,6 +70,7 @@ class AdminProjects extends Component
 
         $this->name = trim($this->name);
         $this->repository = GitHubRepository::normalize($this->repository);
+        $this->branch = GitHubBranch::normalize($this->branch);
 
         $validated = $this->validate($this->rules(), $this->messages());
 
@@ -139,6 +144,7 @@ class AdminProjects extends Component
                 new GitHubRepository,
                 Rule::unique('projects', 'repository')->ignore($this->editingId),
             ],
+            'branch' => ['required', 'string', 'max:255', new GitHubBranch],
         ];
     }
 
@@ -151,6 +157,7 @@ class AdminProjects extends Component
             'name.required' => 'O nome é obrigatório.',
             'repository.required' => 'O repositório é obrigatório.',
             'repository.unique' => $this->repositoryConflictMessage(),
+            'branch.required' => 'A branch é obrigatória.',
         ];
     }
 
@@ -161,7 +168,8 @@ class AdminProjects extends Component
 
     private function resetForm(): void
     {
-        $this->reset('name', 'repository', 'editingId', 'showForm');
+        $this->reset('name', 'repository', 'branch', 'editingId', 'showForm');
+        $this->branch = 'main';
         $this->resetValidation();
     }
 

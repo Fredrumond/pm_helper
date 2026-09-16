@@ -20,9 +20,9 @@ class LlmRouter implements LlmGateway
         return $this->resolve($model)->chat($conversation, $model);
     }
 
-    public function generateCard(Conversation $conversation, string $summary, ?string $model = null): string
+    public function generateCard(Conversation $conversation, string $summary, ?string $model = null, ?string $projectDocs = null): string
     {
-        return $this->resolve($model)->generateCard($conversation, $summary, $model);
+        return $this->resolve($model)->generateCard($conversation, $summary, $model, $projectDocs);
     }
 
     private function resolve(?string $model): LlmGateway

@@ -53,17 +53,42 @@ class OpenRouterAdapter implements LlmGateway
     /**
      * Gera o card a partir do resumo da entrevista, sem reenviar o histórico completo.
      */
-    public function generateCard(Conversation $conversation, string $summary, ?string $model = null): string
+    public function generateCard(Conversation $conversation, string $summary, ?string $model = null, ?string $projectDocs = null): string
     {
         $model = $this->resolveModel($model);
         $prompt = $this->prompts->current('card_generation');
 
+        return $this->complete(
+            $conversation,
+            $this->cardMessages($prompt->content, $summary, $projectDocs),
+            $model,
+            $prompt,
+            'card_generation',
+        );
+    }
+
+    /**
+     * @return list<array{role: string, content: string}>
+     */
+    private function cardMessages(string $prompt, string $summary, ?string $projectDocs): array
+    {
         $messages = [
-            ['role' => 'system', 'content' => $prompt->content],
-            ['role' => 'user', 'content' => "Resumo da entrevista:\n\n{$summary}"],
+            ['role' => 'system', 'content' => $prompt],
         ];
 
-        return $this->complete($conversation, $messages, $model, $prompt, 'card_generation');
+        if (is_string($projectDocs) && trim($projectDocs) !== '') {
+            $messages[] = [
+                'role' => 'user',
+                'content' => "Regras do projeto (/docs):\n\n{$projectDocs}",
+            ];
+        }
+
+        $messages[] = [
+            'role' => 'user',
+            'content' => "Resumo da entrevista:\n\n{$summary}",
+        ];
+
+        return $messages;
     }
 
     /**

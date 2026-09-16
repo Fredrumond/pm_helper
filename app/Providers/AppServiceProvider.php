@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Contracts\LlmGateway;
+use App\Contracts\ProjectDocsGateway;
 use App\Models\User;
+use App\Services\Adapters\GitHubMcpProjectDocsGateway;
 use App\Services\Adapters\OpenAiAdapter;
 use App\Services\Adapters\OpenRouterAdapter;
 use App\Services\LlmRouter;
@@ -23,10 +25,10 @@ class AppServiceProvider extends ServiceProvider
 
             if (trim((string) config('services.openai.api_key')) !== '') {
                 $openAiAdapter = $app->make(OpenAiAdapter::class);
-                $adapters['gpt-']  = $openAiAdapter;
-                $adapters['o1']    = $openAiAdapter;
-                $adapters['o3']    = $openAiAdapter;
-                $adapters['o4']    = $openAiAdapter;
+                $adapters['gpt-'] = $openAiAdapter;
+                $adapters['o1'] = $openAiAdapter;
+                $adapters['o3'] = $openAiAdapter;
+                $adapters['o4'] = $openAiAdapter;
             }
 
             return new LlmRouter(
@@ -34,6 +36,8 @@ class AppServiceProvider extends ServiceProvider
                 adapters: $adapters,
             );
         });
+
+        $this->app->bind(ProjectDocsGateway::class, GitHubMcpProjectDocsGateway::class);
     }
 
     /**

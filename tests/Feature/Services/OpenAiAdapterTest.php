@@ -23,19 +23,19 @@ class OpenAiAdapterTest extends TestCase
     {
         config([
             'services.openai.api_key' => 'sk-test-key',
-            'services.openai.model'   => 'gpt-4o-mini',
+            'services.openai.model' => 'gpt-4o-mini',
         ]);
 
         Event::fake([MessageLogged::class]);
         Http::preventStrayRequests();
         Http::fake([
             'https://api.openai.com/v1/chat/completions' => Http::response([
-                'id'      => 'chatcmpl-test-1',
-                'model'   => 'gpt-4o-mini-2024-07-18',
-                'usage'   => [
-                    'prompt_tokens'     => 10,
+                'id' => 'chatcmpl-test-1',
+                'model' => 'gpt-4o-mini-2024-07-18',
+                'usage' => [
+                    'prompt_tokens' => 10,
                     'completion_tokens' => 4,
-                    'total_tokens'      => 14,
+                    'total_tokens' => 14,
                     'prompt_tokens_details' => [
                         'cached_tokens' => 3,
                     ],
@@ -43,19 +43,19 @@ class OpenAiAdapterTest extends TestCase
                 'choices' => [
                     [
                         'finish_reason' => 'stop',
-                        'message'       => ['content' => 'Olá!'],
+                        'message' => ['content' => 'Olá!'],
                     ],
                 ],
             ], 200),
         ]);
 
-        $user         = User::factory()->create();
+        $user = User::factory()->create();
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
-            'title'   => 'Teste',
+            'title' => 'Teste',
         ]);
         $conversation->messages()->create([
-            'role'    => 'user',
+            'role' => 'user',
             'content' => 'Quero um card',
         ]);
         $conversation->load('messages');
@@ -65,17 +65,17 @@ class OpenAiAdapterTest extends TestCase
         $this->assertSame('Olá!', $content);
 
         $this->assertDatabaseHas('llm_usages', [
-            'conversation_id'   => $conversation->id,
-            'generation_id'     => 'chatcmpl-test-1',
-            'model'             => 'gpt-4o-mini-2024-07-18',
-            'step'              => 'interview',
-            'prompt_version'    => 'v4',
-            'provider'          => 'openai',
-            'prompt_tokens'     => 10,
+            'conversation_id' => $conversation->id,
+            'generation_id' => 'chatcmpl-test-1',
+            'model' => 'gpt-4o-mini-2024-07-18',
+            'step' => 'interview',
+            'prompt_version' => 'v4',
+            'provider' => 'openai',
+            'prompt_tokens' => 10,
             'completion_tokens' => 4,
-            'total_tokens'      => 14,
-            'cached_tokens'     => 3,
-            'finish_reason'     => 'stop',
+            'total_tokens' => 14,
+            'cached_tokens' => 3,
+            'finish_reason' => 'stop',
         ]);
         $this->assertEqualsWithDelta(0.00000368, (float) LlmUsage::query()->first()->cost, 0.00000001);
         $this->assertSame('v4', $conversation->fresh()->prompt_version);
@@ -104,7 +104,7 @@ class OpenAiAdapterTest extends TestCase
     {
         config([
             'services.openai.api_key' => 'sk-test-key',
-            'services.openai.model'   => 'gpt-4o-mini',
+            'services.openai.model' => 'gpt-4o-mini',
         ]);
 
         Http::preventStrayRequests();
@@ -137,7 +137,7 @@ class OpenAiAdapterTest extends TestCase
     {
         config([
             'services.openai.api_key' => 'sk-test-key',
-            'services.openai.model'   => 'gpt-4o-mini',
+            'services.openai.model' => 'gpt-4o-mini',
         ]);
 
         Http::preventStrayRequests();
@@ -145,8 +145,8 @@ class OpenAiAdapterTest extends TestCase
             'https://api.openai.com/v1/chat/completions' => Http::response([
                 'error' => [
                     'message' => 'Incorrect API key provided',
-                    'type'    => 'invalid_request_error',
-                    'code'    => 'invalid_api_key',
+                    'type' => 'invalid_request_error',
+                    'code' => 'invalid_api_key',
                 ],
             ], 401),
         ]);
@@ -167,7 +167,7 @@ class OpenAiAdapterTest extends TestCase
     {
         config([
             'services.openai.api_key' => 'sk-test-key',
-            'services.openai.model'   => 'gpt-4o-mini',
+            'services.openai.model' => 'gpt-4o-mini',
         ]);
 
         Http::preventStrayRequests();
@@ -175,8 +175,8 @@ class OpenAiAdapterTest extends TestCase
             'https://api.openai.com/v1/chat/completions' => Http::response([
                 'error' => [
                     'message' => 'Rate limit exceeded',
-                    'type'    => 'requests',
-                    'code'    => 'rate_limit_exceeded',
+                    'type' => 'requests',
+                    'code' => 'rate_limit_exceeded',
                 ],
             ], 429),
         ]);
@@ -195,7 +195,7 @@ class OpenAiAdapterTest extends TestCase
     {
         config([
             'services.openai.api_key' => 'sk-test-key',
-            'services.openai.model'   => 'gpt-4o-mini',
+            'services.openai.model' => 'gpt-4o-mini',
             'chat.models' => [
                 ['id' => 'gpt-4o', 'name' => 'GPT-4o', 'tier' => 'OpenAI'],
             ],
@@ -218,7 +218,7 @@ class OpenAiAdapterTest extends TestCase
     {
         config([
             'services.openai.api_key' => 'sk-test-key',
-            'services.openai.model'   => 'gpt-4o-mini',
+            'services.openai.model' => 'gpt-4o-mini',
         ]);
 
         Http::preventStrayRequests();
@@ -238,7 +238,7 @@ class OpenAiAdapterTest extends TestCase
     {
         config([
             'services.openai.api_key' => 'sk-test-key',
-            'services.openai.model'   => 'gpt-4o-mini',
+            'services.openai.model' => 'gpt-4o-mini',
         ]);
 
         Http::preventStrayRequests();
@@ -252,11 +252,11 @@ class OpenAiAdapterTest extends TestCase
         (new OpenAiAdapter)->chat($conversation);
 
         $this->assertDatabaseHas('llm_usages', [
-            'conversation_id'   => $conversation->id,
-            'prompt_tokens'     => 0,
+            'conversation_id' => $conversation->id,
+            'prompt_tokens' => 0,
             'completion_tokens' => 0,
-            'total_tokens'      => 0,
-            'cached_tokens'     => 0,
+            'total_tokens' => 0,
+            'cached_tokens' => 0,
         ]);
     }
 
@@ -264,29 +264,29 @@ class OpenAiAdapterTest extends TestCase
     {
         config([
             'services.openai.api_key' => 'sk-test-key',
-            'services.openai.model'   => 'gpt-4o-mini',
+            'services.openai.model' => 'gpt-4o-mini',
         ]);
 
         Http::preventStrayRequests();
         Http::fake([
             'https://api.openai.com/v1/chat/completions' => Http::response([
-                'id'      => 'chatcmpl-card-1',
+                'id' => 'chatcmpl-card-1',
                 'choices' => [
                     ['message' => ['content' => '<CARD_JSON>{"title":"Checkout"}</CARD_JSON>']],
                 ],
             ], 200),
         ]);
 
-        $user         = User::factory()->create();
+        $user = User::factory()->create();
         $conversation = Conversation::query()->create([
-            'user_id'          => $user->id,
-            'title'            => 'Checkout',
-            'prompt_name'      => 'interview',
-            'prompt_version'   => 'v1',
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'prompt_name' => 'interview',
+            'prompt_version' => 'v1',
             'interview_summary' => 'Problema: checkout sem pagamento',
         ]);
         $conversation->messages()->create([
-            'role'    => 'user',
+            'role' => 'user',
             'content' => 'Quero um checkout',
         ]);
 
@@ -298,9 +298,9 @@ class OpenAiAdapterTest extends TestCase
         $this->assertStringContainsString('<CARD_JSON>', $content);
         $this->assertDatabaseHas('llm_usages', [
             'conversation_id' => $conversation->id,
-            'generation_id'   => 'chatcmpl-card-1',
-            'step'            => 'card_generation',
-            'prompt_version'  => 'v2',
+            'generation_id' => 'chatcmpl-card-1',
+            'step' => 'card_generation',
+            'prompt_version' => 'v3',
         ]);
 
         Http::assertSent(function (Request $request) {
@@ -314,13 +314,13 @@ class OpenAiAdapterTest extends TestCase
 
     private function conversationWithUserMessage(): Conversation
     {
-        $user         = User::factory()->create();
+        $user = User::factory()->create();
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
-            'title'   => 'Teste',
+            'title' => 'Teste',
         ]);
         $conversation->messages()->create([
-            'role'    => 'user',
+            'role' => 'user',
             'content' => 'Quero um card',
         ]);
         $conversation->load('messages');

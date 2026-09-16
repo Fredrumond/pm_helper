@@ -23,6 +23,7 @@ class ProjectFactory extends Factory
                 'acme/%s',
                 fake()->unique()->regexify('[a-z]{5}-[a-z]{5}'),
             ),
+            'branch' => 'main',
         ];
     }
 }

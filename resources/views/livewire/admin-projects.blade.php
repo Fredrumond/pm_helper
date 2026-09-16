@@ -2,7 +2,7 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Projetos</h1>
-            <p class="text-sm text-gray-500 mt-1">Nome amigável e repositório GitHub no formato owner/repo. Só administradores gerenciam esta lista.</p>
+            <p class="text-sm text-gray-500 mt-1">Nome amigável, repositório GitHub (owner/repo) e branch de onde a pasta /docs será lida. Só administradores gerenciam esta lista.</p>
         </div>
         @unless ($showForm)
             <button type="button"
@@ -28,7 +28,7 @@
                 {{ $editingId ? 'Editar projeto' : 'Novo projeto' }}
             </h2>
             <p class="mt-1 text-sm text-gray-500">
-                Use <span class="font-mono text-gray-700">owner/repo</span> ou cole a URL do GitHub.
+                Use <span class="font-mono text-gray-700">owner/repo</span> ou cole a URL do GitHub. A branch é enviada como <span class="font-mono text-gray-700">ref</span> ao MCP.
             </p>
 
             <form wire:submit.prevent="save" class="mt-6 space-y-5">
@@ -56,6 +56,20 @@
                         required
                     />
                     <x-input-error class="mt-2" :messages="$errors->get('repository')" />
+                </div>
+
+                <div>
+                    <x-input-label for="project-branch" value="Branch" />
+                    <x-text-input
+                        wire:model="branch"
+                        id="project-branch"
+                        class="mt-1 block w-full font-mono"
+                        type="text"
+                        placeholder="main"
+                        required
+                    />
+                    <p class="mt-1 text-xs text-gray-500">Pasta /docs desta branch. Ex.: main, develop, feature/docs.</p>
+                    <x-input-error class="mt-2" :messages="$errors->get('branch')" />
                 </div>
 
                 <div class="flex items-center gap-3">
@@ -86,7 +100,7 @@
                     <div class="flex items-start justify-between gap-4">
                         <div class="min-w-0">
                             <p class="font-medium text-gray-900 truncate">{{ $project->name }}</p>
-                            <p class="text-xs font-mono text-gray-500 mt-1 truncate">{{ $project->repository }}</p>
+                            <p class="text-xs font-mono text-gray-500 mt-1 truncate">{{ $project->repository }} @ {{ $project->branch }}</p>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             <button type="button"

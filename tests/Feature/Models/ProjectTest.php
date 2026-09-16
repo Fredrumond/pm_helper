@@ -11,17 +11,19 @@ class ProjectTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_factory_persists_name_and_repository(): void
+    public function test_factory_persists_name_repository_and_branch(): void
     {
         $project = Project::factory()->create([
             'name' => 'App mobile',
             'repository' => 'octocat/hello-world',
+            'branch' => 'develop',
         ]);
 
         $this->assertDatabaseHas('projects', [
             'id' => $project->id,
             'name' => 'App mobile',
             'repository' => 'octocat/hello-world',
+            'branch' => 'develop',
             'deleted_at' => null,
         ]);
     }
