@@ -21,7 +21,7 @@ Adotar Ports & Adapters:
 - **Adapter padrão:** `App\Services\Adapters\OpenRouterAdapter`.
 - **Binding:** `AppServiceProvider` injeta `LlmGateway` → `LlmRouter` com `OpenRouterAdapter` como default e `adapters: []` até existir outro provedor.
 
-O catálogo de modelos (`config/chat.php`) e o fallback de rate limit (`OPENROUTER_FALLBACK_MODELS`) continuam responsabilidade do adapter OpenRouter, não do router.
+O catálogo de modelos (`config/chat.php`) e o fallback de rate limit ou resposta vazia (`OPENROUTER_FALLBACK_MODELS`) continuam responsabilidade do adapter OpenRouter, não do router.
 
 ## Justificativa
 
@@ -43,7 +43,7 @@ O prefixo do id já distingue o provedor. O Livewire não precisa saber quem ate
 ### Débitos técnicos
 
 - O mapa `adapters` ainda está vazio; o router só exerce o default.
-- Resolução de prompt, usage e fallback de rate limit continuam dentro do `OpenRouterAdapter`.
+- Resolução de prompt, usage e fallback de rate limit / resposta vazia continuam dentro do `OpenRouterAdapter`.
 
 ### Próximos passos
 

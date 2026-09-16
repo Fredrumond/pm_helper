@@ -62,7 +62,7 @@ tests/
 - Sem a chave, o modelo cai no `OpenRouterAdapter`. Ids nativos da OpenAI (`gpt-4o-mini`) não são slugs da OpenRouter (`openai/gpt-4o-mini`) — a chamada tende a falhar.
 - Colocar o modelo no catálogo (`config/chat.php`) e, se a API não devolver `usage.cost`, cadastrar preço em `config/llm.php` (`input` / `cached` / `output` em USD por 1M tokens). Sem isso o custo fica 0 e as métricas mentem.
 - A OpenRouter já manda `cost`; esse valor prevalece sobre a tabela — inclusive `0` nos modelos free.
-- Fallback de rate limit é responsabilidade do `OpenRouterAdapter` (`OPENROUTER_FALLBACK_MODELS`). O `OpenAiAdapter` só relança a mensagem de “tente de novo”.
+- Fallback de rate limit **e de resposta vazia** é responsabilidade do `OpenRouterAdapter` (`OPENROUTER_FALLBACK_MODELS`). O `OpenAiAdapter` só relança a mensagem de “tente de novo”.
 - Decisões: `docs/adr/0001`, `0002`, `0003`.
 
 ### Testes

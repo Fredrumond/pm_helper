@@ -38,7 +38,7 @@ class VersoesTest extends TestCase
     {
         $releases = Versoes::filtrar('bug');
 
-        $this->assertSame(['0.6.12', '0.6.11', '0.5.8', '0.5.6'], array_column($releases, 'versao'));
+        $this->assertSame(['0.6.12', '0.6.11', '0.6.6', '0.5.8', '0.5.6'], array_column($releases, 'versao'));
         $this->assertSame('@livewireStyles e @livewireScriptConfig nos layouts app e guest', $releases[0]['modulos'][0]['itens'][0]['titulo']);
         $this->assertCount(1, $releases[0]['modulos'][0]['itens']);
 

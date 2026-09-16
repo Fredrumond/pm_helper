@@ -1,6 +1,6 @@
 # PM Helper — Guia de Lançamento do MVP
 
-> **Versão de referência:** 0.6.4  
+> **Versão de referência:** 0.6.6  
 > **Data:** 08/09/2026  
 > **Público-alvo deste documento:** Liderança de produto e PMs que vão testar o PM Helper
 
@@ -58,7 +58,7 @@ Quando a entrevista encerra:
 - Seletor de modelo de IA (o PM pode escolher o modelo para a conversa)
 - Dois provedores no mesmo seletor: modelos **free** via OpenRouter e modelos **OpenAI** (GPT-4o Mini, GPT-4o, GPT-4.1, o4 Mini) em chamada direta
 - Custo da OpenAI é **estimado** pela tabela interna de preços (a API não devolve o valor gasto). Custo da OpenRouter vem da própria API — inclusive `0` nos modelos grátis
-- Fallback automático para modelo secundário quando há rate limit — **só nos modelos OpenRouter**. Em rate limit da OpenAI, o chat pede para tentar de novo em instantes
+- Fallback automático para modelo secundário quando há rate limit ou resposta vazia — **só nos modelos OpenRouter**. Em rate limit da OpenAI, o chat pede para tentar de novo em instantes
 
 ### 6. Página de métricas
 
@@ -86,7 +86,7 @@ Quando a entrevista encerra:
 | Rastreio de tokens | ✅ Estável | Custo e consumo por chamada |
 | Métricas | ✅ Estável (UI) / 🔧 Dev (comparação) | Página acessível, filtros em refinamento |
 | Histórico de versões | 🔧 Development | Funcional, base para controle de evolução |
-| Fallback de LLM | ✅ Estável | Troca automática em rate limit (só OpenRouter) |
+| Fallback de LLM | ✅ Estável | Troca automática em rate limit ou resposta vazia (só OpenRouter) |
 | Adapter OpenAI | ✅ Estável | Ativo só com `OPENAI_API_KEY`; ids `gpt-*` / `o4*` |
 
 **Leitura:** "Development" aqui significa que a feature está funcionando, mas ainda vai passar por iterações com base no uso real — não que está quebrada.
@@ -202,9 +202,10 @@ Isso alimenta diretamente as próximas iterações.
 07/09 — v0.5.4  Parser tolerante, selo de escopo atualiza em tempo real
 08/09 — v0.6.0  Modelos OpenAI no seletor (chamada direta à API)
 08/09 — v0.6.3  Custo estimado nas métricas para chamadas OpenAI
-08/09 — v0.6.4  ← atual: docs alinhadas ao adapter OpenAI (README e guia de launch)
+08/09 — v0.6.4  Docs alinhadas ao adapter OpenAI (README e guia de launch)
+08/09 — v0.6.6  ← atual: fallback OpenRouter também em resposta vazia
 ```
 
 ---
 
-*Documento gerado em 08/09/2026 com base no código e changelog do PM Helper v0.6.4.*
+*Documento gerado em 08/09/2026 com base no código e changelog do PM Helper v0.6.6.*

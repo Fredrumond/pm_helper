@@ -148,6 +148,52 @@ class ConversationChatTest extends TestCase
         ]);
     }
 
+    public function test_uses_fallback_model_silently_when_primary_returns_empty_response(): void
+    {
+        config([
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+            ],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push([
+                    'id' => 'gen-empty-1',
+                    'model' => 'test/model',
+                    'provider' => null,
+                    'usage' => null,
+                    'choices' => [],
+                ], 200)
+                ->push([
+                    'choices' => [
+                        ['message' => ['content' => 'Qual o impacto disso?']],
+                    ],
+                ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Qual o impacto disso?')
+            ->assertDontSee('Erro LLM')
+            ->assertDontSee('resposta vazia');
+
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Qual o impacto disso?',
+        ]);
+    }
+
     public function test_does_not_expose_rate_limit_when_fallbacks_are_exhausted(): void
     {
         config([

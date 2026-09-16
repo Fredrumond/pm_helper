@@ -585,6 +585,180 @@ class OpenRouterAdapterTest extends TestCase
         }
     }
 
+    public function test_retries_fallback_and_logs_switch_when_primary_returns_empty_response(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+                'poolside/laguna-s-2.1:free',
+            ],
+        ]);
+
+        Event::fake([MessageLogged::class]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push([
+                    'id' => 'gen-empty-1',
+                    'model' => 'test/model',
+                    'provider' => null,
+                    'usage' => null,
+                    'choices' => [],
+                ], 200)
+                ->push([
+                    'id' => 'gen-fallback-empty-1',
+                    'model' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
+                    'choices' => [
+                        ['message' => ['content' => 'Resposta do fallback']],
+                    ],
+                ], 200),
+        ]);
+
+        $conversation = $this->conversationWithUserMessage();
+
+        $content = (new OpenRouterAdapter)->chat($conversation);
+
+        $this->assertSame('Resposta do fallback', $content);
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'generation_id' => 'gen-fallback-empty-1',
+            'model' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        ]);
+        $this->assertDatabaseMissing('llm_usages', [
+            'generation_id' => 'gen-empty-1',
+        ]);
+
+        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($conversation) {
+            return $log->level === 'warning'
+                && $log->message === 'OpenRouter empty response, switching to fallback'
+                && $log->context['conversation_id'] === $conversation->id
+                && $log->context['status'] === 200
+                && $log->context['model'] === 'test/model'
+                && $log->context['id'] === 'gen-empty-1'
+                && $log->context['fallback'] === 'nvidia/nemotron-3-ultra-550b-a55b:free';
+        });
+
+        Http::assertSentCount(2);
+        Http::assertSent(fn (Request $request) => $request['model'] === 'nvidia/nemotron-3-ultra-550b-a55b:free');
+    }
+
+    public function test_walks_fallback_chain_when_first_fallback_also_returns_empty_response(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+                'poolside/laguna-s-2.1:free',
+            ],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push(['id' => 'gen-empty-1', 'choices' => []], 200)
+                ->push(['id' => 'gen-empty-2', 'choices' => [['message' => ['content' => '   ']]]], 200)
+                ->push([
+                    'choices' => [
+                        ['message' => ['content' => 'Resposta da segunda fallback']],
+                    ],
+                ], 200),
+        ]);
+
+        $content = (new OpenRouterAdapter)->chat($this->conversationWithUserMessage());
+
+        $this->assertSame('Resposta da segunda fallback', $content);
+        Http::assertSentCount(3);
+        Http::assertSent(fn (Request $request) => $request['model'] === 'poolside/laguna-s-2.1:free');
+    }
+
+    public function test_throws_when_all_models_return_empty_response(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+            ],
+        ]);
+
+        Event::fake([MessageLogged::class]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push(['id' => 'gen-empty-1', 'choices' => []], 200)
+                ->push(['id' => 'gen-empty-2', 'choices' => []], 200),
+        ]);
+
+        $conversation = $this->conversationWithUserMessage();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('A LLM retornou uma resposta vazia.');
+
+        try {
+            (new OpenRouterAdapter)->chat($conversation);
+        } finally {
+            $this->assertDatabaseCount('llm_usages', 0);
+
+            Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($conversation) {
+                return $log->level === 'warning'
+                    && $log->message === 'OpenRouter empty response, switching to fallback'
+                    && $log->context['model'] === 'test/model'
+                    && $log->context['fallback'] === 'nvidia/nemotron-3-ultra-550b-a55b:free'
+                    && $log->context['conversation_id'] === $conversation->id;
+            });
+
+            Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($conversation) {
+                return $log->level === 'warning'
+                    && $log->message === 'OpenRouter empty response'
+                    && $log->context['model'] === 'nvidia/nemotron-3-ultra-550b-a55b:free'
+                    && $log->context['fallback'] === null
+                    && $log->context['conversation_id'] === $conversation->id;
+            });
+        }
+    }
+
+    public function test_generate_card_retries_fallback_when_primary_returns_empty_response(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+            'services.openrouter.fallback_models' => [
+                'nvidia/nemotron-3-ultra-550b-a55b:free',
+            ],
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push(['id' => 'gen-empty-card', 'choices' => []], 200)
+                ->push([
+                    'choices' => [
+                        ['message' => ['content' => '<CARD_JSON>{"title":"Checkout"}</CARD_JSON>']],
+                    ],
+                ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'prompt_name' => 'interview',
+            'prompt_version' => 'v1',
+            'interview_summary' => 'Problema: checkout sem pagamento',
+        ]);
+
+        $content = (new OpenRouterAdapter)->generateCard(
+            $conversation,
+            'Problema: checkout sem pagamento',
+        );
+
+        $this->assertStringContainsString('<CARD_JSON>', $content);
+        Http::assertSent(fn (Request $request) => $request['model'] === 'nvidia/nemotron-3-ultra-550b-a55b:free');
+    }
+
     public function test_generate_card_retries_fallback_when_rate_limited(): void
     {
         config([

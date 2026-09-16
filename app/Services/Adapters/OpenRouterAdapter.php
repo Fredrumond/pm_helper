@@ -135,9 +135,26 @@ class OpenRouterAdapter implements LlmGateway
                 'finish_reason' => is_array($data) ? ($data['choices'][0]['finish_reason'] ?? null) : null,
             ]);
 
-            $content = is_array($data) ? ($data['choices'][0]['message']['content'] ?? '') : '';
+            $content = is_array($data) ? trim((string) ($data['choices'][0]['message']['content'] ?? '')) : '';
 
-            if (empty($content)) {
+            if ($content === '') {
+                $fallback = $candidates[$index + 1] ?? null;
+
+                Log::warning($fallback !== null
+                    ? 'OpenRouter empty response, switching to fallback'
+                    : 'OpenRouter empty response', [
+                        'conversation_id' => $conversation->id,
+                        'status' => $response->status(),
+                        'model' => $candidate,
+                        'step' => $step,
+                        'id' => is_array($data) ? ($data['id'] ?? null) : null,
+                        'fallback' => $fallback,
+                    ]);
+
+                if ($fallback !== null) {
+                    continue;
+                }
+
                 throw new \RuntimeException('A LLM retornou uma resposta vazia.');
             }
 

@@ -2,7 +2,7 @@
 
 Assistente de discovery para Product Managers. Conduz uma entrevista guiada e gera um card estruturado no framework do time.
 
-**Versão atual:** 0.6.4 (development)
+**Versão atual:** 0.6.6 (bug)
 
 ## LLM (OpenRouter + OpenAI)
 
@@ -23,7 +23,7 @@ flowchart TD
 
 - **OpenRouter** (obrigatório para os modelos free do catálogo): `OPENROUTER_API_KEY` ([obter aqui](https://openrouter.ai/keys))
 - Modelo padrão OpenRouter: `OPENROUTER_MODEL` (hoje `nvidia/nemotron-3-ultra-550b-a55b:free`)
-- Fallback em rate limit (só OpenRouter): `OPENROUTER_FALLBACK_MODELS`
+- Fallback em rate limit ou resposta vazia (só OpenRouter): `OPENROUTER_FALLBACK_MODELS`
 - **OpenAI** (opcional): `OPENAI_API_KEY` ([obter aqui](https://platform.openai.com/api-keys)) e `OPENAI_MODEL` (padrão `gpt-4o-mini`)
 - Com a chave OpenAI, ids `gpt-*`, `o1*`, `o3*` e `o4*` vão direto para `api.openai.com`. Sem a chave, esses ids caem no OpenRouter e tendem a falhar (o slug da OpenRouter é `openai/gpt-4o-mini`, não `gpt-4o-mini`)
 - Custo: a OpenRouter manda `usage.cost`; a OpenAI não. Nesse caso o `LlmUsage` estima pela tabela em `config/llm.php` (USD / 1M tokens). Sem entrada na tabela o custo fica 0 e as métricas mentem
