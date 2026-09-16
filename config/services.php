@@ -56,4 +56,19 @@ return [
         'model'   => env('OPENAI_MODEL', 'gpt-4o-mini'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | GitHub App
+    |--------------------------------------------------------------------------
+    |
+    | Credenciais da instalação única do sistema. Opcionais: a aplicação
+    | sobe com os valores vazios. A Private Key nunca deve ir para o banco.
+    |
+    */
+    'github_app' => [
+        'app_id' => env('GITHUB_APP_ID', ''),
+        'private_key' => env('GITHUB_APP_PRIVATE_KEY', ''),
+        'installation_id' => env('GITHUB_APP_INSTALLATION_ID', ''),
+    ],
+
 ];

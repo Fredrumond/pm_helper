@@ -19,9 +19,28 @@ class VersoesPageTest extends TestCase
             ->assertRedirect(route('login'));
     }
 
+    public function test_product_manager_cannot_access_versoes_or_see_the_nav_link(): void
+    {
+        $productManager = User::factory()->create();
+
+        $this->actingAs($productManager)
+            ->get(route('versoes.index'))
+            ->assertForbidden();
+
+        Livewire::actingAs($productManager)
+            ->test(VersoesIndex::class)
+            ->assertForbidden();
+
+        $this->actingAs($productManager)
+            ->get(route('conversations.index'))
+            ->assertOk()
+            ->assertDontSee('href="'.route('versoes.index').'"', false)
+            ->assertDontSee('href="'.route('metrics.index').'"', false);
+    }
+
     public function test_authenticated_user_sees_the_full_changelog(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $this->actingAs($user)
             ->get(route('versoes.index'))
@@ -39,7 +58,7 @@ class VersoesPageTest extends TestCase
 
     public function test_search_reduces_the_history_to_matching_releases(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         Livewire::actingAs($user)
             ->test(VersoesIndex::class)
@@ -54,7 +73,7 @@ class VersoesPageTest extends TestCase
 
     public function test_estado_filter_toggles_and_clears(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         Livewire::actingAs($user)
             ->test(VersoesIndex::class)

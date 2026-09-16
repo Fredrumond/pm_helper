@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Support\Versoes;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -14,6 +15,11 @@ class VersoesIndex extends Component
 
     #[Url]
     public string $estado = '';
+
+    public function mount(): void
+    {
+        abort_unless(Auth::user()?->can('admin'), 403);
+    }
 
     public function filtrarPor(string $estado): void
     {

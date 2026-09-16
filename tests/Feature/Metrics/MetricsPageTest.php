@@ -18,9 +18,37 @@ class MetricsPageTest extends TestCase
             ->assertRedirect(route('login'));
     }
 
+    public function test_product_manager_cannot_access_metrics_or_see_the_nav_link(): void
+    {
+        $productManager = User::factory()->create();
+
+        $this->actingAs($productManager)
+            ->get(route('metrics.index'))
+            ->assertForbidden();
+
+        $this->actingAs($productManager)
+            ->get(route('conversations.index'))
+            ->assertOk()
+            ->assertDontSee('href="'.route('metrics.index').'"', false)
+            ->assertDontSee('href="'.route('versoes.index').'"', false);
+    }
+
+    public function test_admin_sees_metrics_and_versoes_in_the_user_dropdown(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('conversations.index'))
+            ->assertOk()
+            ->assertSee('href="'.route('metrics.index').'"', false)
+            ->assertSee('href="'.route('versoes.index').'"', false)
+            ->assertSee('Métricas')
+            ->assertSee('Versões');
+    }
+
     public function test_shows_empty_metrics_dashboard_for_authenticated_user(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $this->actingAs($user)
             ->get(route('metrics.index'))
@@ -36,7 +64,7 @@ class MetricsPageTest extends TestCase
 
     public function test_shows_consumption_and_prompt_metrics_only_for_the_authenticated_user(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $other = User::factory()->create();
 
         $conversation = Conversation::query()->create([
@@ -90,7 +118,7 @@ class MetricsPageTest extends TestCase
 
     public function test_shows_estimated_openai_cost_and_pricing_table_note(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Fazer minha LP de ebook vender mais',

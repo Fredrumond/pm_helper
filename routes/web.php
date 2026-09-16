@@ -5,6 +5,8 @@ use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\MetricsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\VersoesController;
+use App\Livewire\AdminProjects;
+use App\Livewire\SelectProjects;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('conversations.index'));
@@ -29,11 +31,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/cards', [CardController::class, 'index'])->name('cards.index');
     Route::get('/cards/{card}', [CardController::class, 'show'])->name('cards.show');
 
-    // Métricas
-    Route::get('/metrics', [MetricsController::class, 'index'])->name('metrics.index');
+    Route::get('/projetos', SelectProjects::class)->name('projects.index');
 
-    // Versões
-    Route::get('/versoes', [VersoesController::class, 'index'])->name('versoes.index');
+    Route::middleware('admin')->group(function () {
+        Route::get('/metrics', [MetricsController::class, 'index'])->name('metrics.index');
+        Route::get('/versoes', [VersoesController::class, 'index'])->name('versoes.index');
+        Route::get('/admin/projetos', AdminProjects::class)->name('admin.projects.index');
+    });
 
 });
 

@@ -18,13 +18,14 @@
                     <x-nav-link :href="route('cards.index')" :active="request()->routeIs('cards.*')">
                         Cards
                     </x-nav-link>
-                    <x-nav-link :href="route('metrics.index')" :active="request()->routeIs('metrics.*')">
-                        Métricas
+                    <x-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
+                        Projetos
                     </x-nav-link>
-                    <x-nav-link :href="route('versoes.index')" :active="request()->routeIs('versoes.*')">
-                        Versões
-                        <span class="ms-1.5 font-mono text-[11px] text-gray-400">{{ \App\Support\Versoes::numeroAtual() }}</span>
-                    </x-nav-link>
+                    @if (Auth::user()->can('admin'))
+                        <x-nav-link :href="route('admin.projects.index')" :active="request()->routeIs('admin.projects.*')">
+                            Gerenciar Projetos
+                        </x-nav-link>
+                    @endif
                 </div>
             </div>
 
@@ -44,6 +45,16 @@
                     </x-slot>
 
                     <x-slot name="content">
+                        @if (Auth::user()->can('admin'))
+                            <x-dropdown-link :href="route('metrics.index')">
+                                Métricas
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('versoes.index')">
+                                Versões
+                                <span class="ms-1.5 font-mono text-[11px] text-gray-400">{{ \App\Support\Versoes::numeroAtual() }}</span>
+                            </x-dropdown-link>
+                        @endif
+
                         <x-dropdown-link :href="route('profile.edit')">
                             {{ __('Profile') }}
                         </x-dropdown-link>
@@ -83,13 +94,14 @@
             <x-responsive-nav-link :href="route('cards.index')" :active="request()->routeIs('cards.*')">
                 Cards
             </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('metrics.index')" :active="request()->routeIs('metrics.*')">
-                Métricas
+            <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
+                Projetos
             </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('versoes.index')" :active="request()->routeIs('versoes.*')">
-                Versões
-                <span class="ms-1 font-mono text-[11px] text-gray-400">{{ \App\Support\Versoes::numeroAtual() }}</span>
-            </x-responsive-nav-link>
+            @if (Auth::user()->can('admin'))
+                <x-responsive-nav-link :href="route('admin.projects.index')" :active="request()->routeIs('admin.projects.*')">
+                    Gerenciar Projetos
+                </x-responsive-nav-link>
+            @endif
         </div>
 
         <!-- Responsive Settings Options -->
@@ -100,6 +112,16 @@
             </div>
 
             <div class="mt-3 space-y-1">
+                @if (Auth::user()->can('admin'))
+                    <x-responsive-nav-link :href="route('metrics.index')" :active="request()->routeIs('metrics.*')">
+                        Métricas
+                    </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('versoes.index')" :active="request()->routeIs('versoes.*')">
+                        Versões
+                        <span class="ms-1 font-mono text-[11px] text-gray-400">{{ \App\Support\Versoes::numeroAtual() }}</span>
+                    </x-responsive-nav-link>
+                @endif
+
                 <x-responsive-nav-link :href="route('profile.edit')">
                     {{ __('Profile') }}
                 </x-responsive-nav-link>

@@ -121,6 +121,221 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.6.14',
+            'data' => '2026-09-15',
+            'estado' => 'stable',
+            'titulo' => 'Papel tipado e seleção de projeto reutilizável',
+            'resumo' => 'O papel do usuário passa a ser um enum PHP com cast (admin | product_manager), o CRUD admin reforça a autorização no render e a seleção de projeto da sessão ganha um ponto único (CurrentProject) para o MCP validar se o projeto ainda está ativo.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Autorização',
+                    'itens' => [
+                        ['titulo' => 'UserRole enum + cast no User; valores inválidos não hidratam', 'estado' => 'stable'],
+                        ['titulo' => 'AdminProjects::render() exige can(admin)', 'estado' => 'stable'],
+                    ],
+                ],
+                [
+                    'nome' => 'Projetos',
+                    'itens' => [
+                        ['titulo' => 'CurrentProject higieniza current_project_id fora da listagem', 'estado' => 'development', 'nota' => 'SelectProjects e futuros consumidores (MCP) leem CurrentProject::id()'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'UserRoleTest rejeita papel inválido; CurrentProjectTest cobre sessão stale', 'estado' => 'test'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.13',
+            'data' => '2026-09-15',
+            'estado' => 'stable',
+            'titulo' => 'Métricas e versões só no menu do admin',
+            'resumo' => 'Métricas e Versões saem da barra principal e passam a ficar no dropdown do usuário, visíveis e acessíveis apenas para admin. Product managers continuam vendo Conversas, Cards, Projetos e o perfil.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Navegação',
+                    'itens' => [
+                        ['titulo' => 'Métricas e Versões no dropdown do usuário, só para admin', 'estado' => 'stable'],
+                    ],
+                ],
+                [
+                    'nome' => 'Autorização',
+                    'itens' => [
+                        ['titulo' => 'Rotas /metrics e /versoes protegidas pelo middleware admin', 'estado' => 'stable'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'PM não vê os links nem acessa as páginas; admin vê no dropdown', 'estado' => 'test'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.12',
+            'data' => '2026-09-15',
+            'estado' => 'bug',
+            'titulo' => 'Livewire inicia uma vez só e o save de projeto volta a persistir',
+            'resumo' => 'O Alpine/Livewire era iniciado duas vezes (bundle ESM + auto-start), o que quebrava o $persist no browser e impedia o wire:submit de cadastrar o projeto. Os layouts passam a emitir @livewireScriptConfig para o start único do app.js.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Frontend',
+                    'itens' => [
+                        ['titulo' => '@livewireStyles e @livewireScriptConfig nos layouts app e guest', 'estado' => 'bug', 'nota' => 'Evita inject de livewire.js junto com livewire.esm.js; Livewire.start() no app.js fica único'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'Página admin de projetos e login expõem script config e não o livewire.js injetado', 'estado' => 'test'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.11',
+            'data' => '2026-09-15',
+            'estado' => 'bug',
+            'titulo' => 'Cadastro de projeto aceita URL do GitHub',
+            'resumo' => 'O formulário admin de projetos recusava https://github.com/owner/repo e o clone SSH, então o cadastro parecia não salvar. Agora a URL é convertida para owner/repo antes de persistir; hosts que não sejam github.com continuam recusados.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Projetos',
+                    'itens' => [
+                        ['titulo' => 'Normalizar URL/SSH do github.com para owner/repo no save', 'estado' => 'bug', 'nota' => 'GitHubRepository::normalize(); mensagem de sucesso após cadastrar/editar'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'AdminProjects e GitHubRepository cobrem URL, .git e host estranho', 'estado' => 'test'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.10',
+            'data' => '2026-09-15',
+            'estado' => 'development',
+            'titulo' => 'Listagem e seleção de projeto pelo PM',
+            'resumo' => 'Todo usuário autenticado lista projetos ativos em /projetos e escolhe um pelo nome amigável. A escolha fica só na sessão (current_project_id); o chat ainda não consome essa seleção. Soft-deleted e ids inexistentes não entram na sessão.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Projetos',
+                    'itens' => [
+                        ['titulo' => 'Rota /projetos autenticada e verificada, sem middleware admin', 'estado' => 'development'],
+                        ['titulo' => 'Livewire SelectProjects — listar ativos, selecionar e limpar', 'estado' => 'development', 'nota' => 'Sessão current_project_id só com projeto ativo; PM não vê owner/repo'],
+                        ['titulo' => 'Link Projetos na navigation para todos os autenticados', 'estado' => 'development', 'nota' => 'Desktop e menu mobile; admin continua com Gerenciar Projetos no CRUD'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'SelectProjectsTest — guest, visibilidade, sessão e CRUD admin intacto', 'estado' => 'test', 'nota' => 'tests/Feature/Livewire/SelectProjectsTest.php'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.9',
+            'data' => '2026-09-15',
+            'estado' => 'development',
+            'titulo' => 'UI admin para cadastrar, editar e desativar projetos',
+            'resumo' => 'Administradores passam a gerenciar projetos GitHub em /admin/projetos (criar, editar nome/repositório e desativar com soft delete). Product managers recebem 403 e não veem o link. Repositório inválido ou duplicado (inclusive desativado) não persiste; o chat permanece inalterado.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Admin',
+                    'itens' => [
+                        ['titulo' => 'Rotas /admin/projetos com auth, verified e middleware admin', 'estado' => 'development'],
+                        ['titulo' => 'Livewire AdminProjects — listar ativos, criar, editar e desativar', 'estado' => 'development', 'nota' => 'Desativar usa delete() (SoftDeletes), sem forceDelete nem undelete'],
+                        ['titulo' => 'Link Projetos na navigation só se can(admin)', 'estado' => 'development', 'nota' => 'Desktop e menu mobile'],
+                        ['titulo' => 'Log de auditoria criar/editar/desativar com user_id e project_id', 'estado' => 'development', 'nota' => 'Sem dump de request nem Private Key'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'AdminProjectsTest — guest, PM 403, CRUD e unique', 'estado' => 'test', 'nota' => 'tests/Feature/Livewire/AdminProjectsTest.php'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.8',
+            'data' => '2026-09-15',
+            'estado' => 'development',
+            'titulo' => 'Persistência de projetos GitHub e config da GitHub App',
+            'resumo' => 'Projetos globais (nome amigável + owner/repo) com soft delete e unicidade de repository. Credenciais da GitHub App entram só em env/config; a app sobe com as chaves vazias e não faz HTTP ao GitHub.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Projetos',
+                    'itens' => [
+                        ['titulo' => 'Tabela projects (name, repository único, soft delete)', 'estado' => 'development'],
+                        ['titulo' => 'Model Project com factory', 'estado' => 'development', 'nota' => 'Sem dono: projetos não pertencem a usuário'],
+                        ['titulo' => 'Rule GitHubRepository (formato owner/repo)', 'estado' => 'development', 'nota' => 'Recusa URL, IP, esquema, host, .., espaços e barras extras'],
+                    ],
+                ],
+                [
+                    'nome' => 'Configuração',
+                    'itens' => [
+                        ['titulo' => 'services.github_app lê GITHUB_APP_ID, PRIVATE_KEY e INSTALLATION_ID', 'estado' => 'development', 'nota' => 'Vazias por padrão; Private Key nunca vai para o banco'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'ProjectTest — factory, unique e soft delete', 'estado' => 'test', 'nota' => 'tests/Feature/Models/ProjectTest.php'],
+                        ['titulo' => 'GitHubRepositoryTest — casos válidos e inválidos', 'estado' => 'test', 'nota' => 'tests/Unit/Rules/GitHubRepositoryTest.php'],
+                        ['titulo' => 'GitHubAppConfigTest — env sem HTTP outbound', 'estado' => 'test', 'nota' => 'tests/Feature/Config/GitHubAppConfigTest.php'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
+            'versao' => '0.6.7',
+            'data' => '2026-09-15',
+            'estado' => 'development',
+            'titulo' => 'Papéis admin e product_manager com Gate e middleware',
+            'resumo' => 'Usuários passam a ter papel admin ou product_manager (default). O primeiro admin entra pelo seed (test@example.com); em produção, o comando user:promote-admin promove um e-mail já cadastrado. Rotas futuras de configuração usam o alias de middleware admin.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Autenticação',
+                    'itens' => [
+                        ['titulo' => 'Coluna users.role (admin | product_manager)', 'estado' => 'development', 'nota' => 'Default product_manager; usuários existentes não são elevados'],
+                        ['titulo' => 'Gate admin e middleware alias admin', 'estado' => 'development'],
+                        ['titulo' => 'Seed promove test@example.com a admin', 'estado' => 'development'],
+                        ['titulo' => 'Comando artisan user:promote-admin {email}', 'estado' => 'development', 'nota' => 'Loga só id e e-mail; e-mail inexistente falha sem criar usuário'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'UserRoleTest — factory, Gate, middleware, seed e comando', 'estado' => 'test', 'nota' => 'tests/Feature/Auth/UserRoleTest.php'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.6.5',
             'data' => '2026-09-08',
             'estado' => 'development',
