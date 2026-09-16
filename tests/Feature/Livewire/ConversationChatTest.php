@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\Livewire;
 
+use App\Contracts\LlmGateway;
 use App\Contracts\ProjectDocsGateway;
 use App\Livewire\ConversationChat;
 use App\Models\Conversation;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\ProjectDocsPathsResult;
 use App\Services\ProjectDocsResult;
 use App\Support\ChatComposer;
 use App\Support\CurrentProject;
@@ -15,6 +17,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use RuntimeException;
+use Tests\Support\FakeLlmGateway;
 use Tests\Support\FakeProjectDocsGateway;
 use Tests\TestCase;
 
@@ -1174,6 +1178,147 @@ TXT;
         });
     }
 
+    public function test_closing_interview_retrieves_filtered_docs_via_two_turns(): void
+    {
+        $project = Project::factory()->create([
+            'repository' => 'acme/checkout',
+            'branch' => 'develop',
+        ]);
+        $docs = $this->bindFakeProjectDocsGateway();
+        $docs->queuePaths(ProjectDocsPathsResult::ok([
+            'docs/regras/pagamento.md',
+            'docs/adr/0001.md',
+        ]));
+        $filtered = ProjectDocsResult::ok('# Pagamento obrigatório', 1, 0);
+        $docs->queueReadByPaths($filtered);
+
+        $llm = $this->bindFakeLlmGateway();
+        $llm->queueChat($this->interviewCompleteReply());
+        $llm->queueComplete('{"paths": ["docs/regras/pagamento.md"]}');
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        $this->session([CurrentProject::SESSION_KEY => $project->id]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card')
+            ->assertSee(ProjectDocsReview::assistantMessage($filtered))
+            ->assertDontSee('Tentar revisão novamente')
+            ->assertDontSee('# Pagamento obrigatório');
+
+        $this->assertSame([], $docs->calls);
+        $this->assertSame([
+            ['repository' => 'acme/checkout', 'branch' => 'develop'],
+        ], $docs->listPathsCalls);
+        $this->assertSame([
+            [
+                'repository' => 'acme/checkout',
+                'paths' => ['docs/regras/pagamento.md'],
+                'branch' => 'develop',
+            ],
+        ], $docs->readByPathsCalls);
+        $this->assertCount(1, $llm->completeCalls);
+        $this->assertSame('docs_retrieval', $llm->completeCalls[0]['step']);
+        $this->assertSame($conversation->id, $llm->completeCalls[0]['conversation']?->id);
+        $this->assertSame(3, $conversation->messages()->count());
+        $this->assertSame('ok', ProjectDocsReview::get($conversation->id)['status']);
+        $this->assertSame('# Pagamento obrigatório', ProjectDocsReview::get($conversation->id)['content']);
+    }
+
+    public function test_docs_retrieval_falls_back_to_full_dump_when_llm_fails(): void
+    {
+        $project = Project::factory()->create(['repository' => 'acme/checkout']);
+        $fallback = ProjectDocsResult::ok('# Dump completo', 4, 0);
+        $docs = $this->bindFakeProjectDocsGateway($fallback);
+        $docs->queuePaths(ProjectDocsPathsResult::ok(['docs/regras/pagamento.md']));
+
+        $llm = $this->bindFakeLlmGateway();
+        $llm->queueChat($this->interviewCompleteReply());
+        $llm->queueComplete(new RuntimeException('LLM fora do ar'));
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        $this->session([CurrentProject::SESSION_KEY => $project->id]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card')
+            ->assertSee(ProjectDocsReview::assistantMessage($fallback))
+            ->assertDontSee('# Dump completo');
+
+        $this->assertSame([
+            ['repository' => 'acme/checkout', 'branch' => 'main'],
+        ], $docs->calls);
+        $this->assertSame([], $docs->readByPathsCalls);
+        $this->assertSame('ok', ProjectDocsReview::get($conversation->id)['status']);
+        $this->assertSame('# Dump completo', ProjectDocsReview::get($conversation->id)['content']);
+        $this->assertSame(3, $conversation->messages()->count());
+        $this->assertCount(1, $llm->completeCalls);
+        $this->assertSame('docs_retrieval', $llm->completeCalls[0]['step']);
+    }
+
+    public function test_retry_uses_docs_retrieval_and_keeps_assistant_message(): void
+    {
+        $project = Project::factory()->create(['repository' => 'acme/checkout']);
+        $empty = ProjectDocsResult::empty();
+        $ok = ProjectDocsResult::ok('# Regras', 1, 0);
+        $docs = $this->bindFakeProjectDocsGateway();
+        $docs->queuePaths(ProjectDocsPathsResult::ok(['docs/regras/pagamento.md']));
+        $docs->queueReadByPaths($empty);
+        $docs->queuePaths(ProjectDocsPathsResult::ok(['docs/regras/pagamento.md']));
+        $docs->queueReadByPaths($ok);
+
+        $llm = $this->bindFakeLlmGateway();
+        $llm->queueChat($this->interviewCompleteReply());
+        $llm->queueComplete('{"paths": ["docs/regras/pagamento.md"]}');
+        $llm->queueComplete('{"paths": ["docs/regras/pagamento.md"]}');
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        $this->session([CurrentProject::SESSION_KEY => $project->id]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card')
+            ->assertSee(ProjectDocsReview::assistantMessage($empty))
+            ->assertSee('Tentar revisão novamente');
+
+        $component
+            ->call('retryProjectDocsReview')
+            ->assertNoRedirect()
+            ->assertSee(ProjectDocsReview::assistantMessage($ok))
+            ->assertDontSee('Tentar revisão novamente')
+            ->assertSee('Gerar Card');
+
+        $this->assertSame([], $docs->calls);
+        $this->assertCount(2, $docs->listPathsCalls);
+        $this->assertCount(2, $docs->readByPathsCalls);
+        $this->assertSame('ok', ProjectDocsReview::get($conversation->id)['status']);
+        $this->assertSame('# Regras', ProjectDocsReview::get($conversation->id)['content']);
+        $this->assertDatabaseMissing('cards', [
+            'conversation_id' => $conversation->id,
+        ]);
+    }
+
     private function bindFakeProjectDocsGateway(ProjectDocsResult ...$results): FakeProjectDocsGateway
     {
         $fake = new FakeProjectDocsGateway;
@@ -1187,9 +1332,17 @@ TXT;
         return $fake;
     }
 
-    private function fakeInterviewCompleteReply(): void
+    private function bindFakeLlmGateway(): FakeLlmGateway
     {
-        $reply = <<<'TXT'
+        $fake = new FakeLlmGateway;
+        $this->app->instance(LlmGateway::class, $fake);
+
+        return $fake;
+    }
+
+    private function interviewCompleteReply(): string
+    {
+        return <<<'TXT'
 Entendi. Podemos gerar o card.
 
 <INTERVIEW_COMPLETE>
@@ -1199,12 +1352,15 @@ Persona: comprador
 </INTERVIEW_SUMMARY>
 </INTERVIEW_COMPLETE>
 TXT;
+    }
 
+    private function fakeInterviewCompleteReply(): void
+    {
         Http::preventStrayRequests();
         Http::fake([
             'https://openrouter.ai/api/v1/chat/completions' => Http::response([
                 'choices' => [
-                    ['message' => ['content' => $reply]],
+                    ['message' => ['content' => $this->interviewCompleteReply()]],
                 ],
             ], 200),
         ]);

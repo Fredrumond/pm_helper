@@ -87,6 +87,10 @@ return [
         'card_generation' => [
             'version' => env('CHAT_CARD_PROMPT_VERSION', 'v3'),
         ],
+        'docs_retrieval' => [
+            'version' => env('CHAT_DOCS_RETRIEVAL_PROMPT_VERSION', 'v1'),
+            'model' => env('CHAT_DOCS_RETRIEVAL_MODEL'),
+        ],
     ],
 
     /*

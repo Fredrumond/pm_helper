@@ -25,6 +25,15 @@ class LlmRouter implements LlmGateway
         return $this->resolve($model)->generateCard($conversation, $summary, $model, $projectDocs);
     }
 
+    public function completePrompt(
+        array $messages,
+        ?string $model = null,
+        string $step = 'docs_retrieval',
+        ?Conversation $conversation = null,
+    ): string {
+        return $this->resolve($model)->completePrompt($messages, $model, $step, $conversation);
+    }
+
     private function resolve(?string $model): LlmGateway
     {
         foreach ($this->adapters as $prefix => $adapter) {

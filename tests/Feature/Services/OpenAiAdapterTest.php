@@ -6,6 +6,7 @@ use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Conversation;
 use App\Models\LlmUsage;
 use App\Models\User;
+use App\Prompts\SystemPromptCatalog;
 use App\Services\Adapters\OpenAiAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -310,6 +311,83 @@ class OpenAiAdapterTest extends TestCase
                 && str_contains((string) $request['messages'][1]['content'], 'Problema: checkout sem pagamento')
                 && count($request['messages']) === 2;
         });
+    }
+
+    public function test_complete_prompt_uses_docs_retrieval_step_by_default(): void
+    {
+        config([
+            'services.openai.api_key' => 'sk-test-key',
+            'services.openai.model' => 'gpt-4o-mini',
+        ]);
+
+        Event::fake([MessageLogged::class]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.openai.com/v1/chat/completions' => Http::response([
+                'id' => 'chatcmpl-retrieval-1',
+                'choices' => [
+                    ['message' => ['content' => '{"paths": []}']],
+                ],
+            ], 200),
+        ]);
+
+        $content = (new OpenAiAdapter)->completePrompt([
+            ['role' => 'user', 'content' => 'índice'],
+        ], 'gpt-4o-mini');
+
+        $this->assertSame('{"paths": []}', $content);
+        $this->assertDatabaseCount('llm_usages', 0);
+
+        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log): bool {
+            return $log->level === 'info'
+                && $log->message === 'OpenAI API response'
+                && ($log->context['step'] ?? null) === 'docs_retrieval'
+                && ($log->context['prompt'] ?? null) === 'docs_retrieval@v1';
+        });
+    }
+
+    public function test_complete_prompt_records_docs_retrieval_usage_when_conversation_is_present(): void
+    {
+        config([
+            'services.openai.api_key' => 'sk-test-key',
+            'services.openai.model' => 'gpt-4o-mini',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.openai.com/v1/chat/completions' => Http::response([
+                'id' => 'chatcmpl-retrieval-1',
+                'model' => 'gpt-4o-mini',
+                'usage' => [
+                    'prompt_tokens' => 20,
+                    'completion_tokens' => 5,
+                    'total_tokens' => 25,
+                ],
+                'choices' => [
+                    ['message' => ['content' => '{"paths": ["docs/regras/pagamento.md"]}']],
+                ],
+            ], 200),
+        ]);
+
+        $conversation = $this->conversationWithUserMessage();
+        $prompt = (new SystemPromptCatalog)->current('docs_retrieval');
+
+        $content = (new OpenAiAdapter)->completePrompt(
+            [['role' => 'user', 'content' => 'índice']],
+            'gpt-4o-mini',
+            'docs_retrieval',
+            $conversation,
+        );
+
+        $this->assertSame('{"paths": ["docs/regras/pagamento.md"]}', $content);
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'generation_id' => 'chatcmpl-retrieval-1',
+            'step' => 'docs_retrieval',
+            'prompt_version' => 'v1',
+            'prompt_hash' => $prompt->hash,
+            'total_tokens' => 25,
+        ]);
     }
 
     private function conversationWithUserMessage(): Conversation

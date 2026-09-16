@@ -58,6 +58,7 @@ class MetricsPageTest extends TestCase
             ->assertSee('Cards')
             ->assertSee('interview@v4')
             ->assertSee('Pipeline por step')
+            ->assertSee('docs_retrieval')
             ->assertSee('Nenhuma conversa com versão de prompt registrada ainda.')
             ->assertSee('Nenhuma chamada registrada ainda.');
     }
@@ -141,5 +142,32 @@ class MetricsPageTest extends TestCase
             ->assertSee('tabela de preços')
             ->assertSee('gpt-4o-mini-2024-07-18')
             ->assertSee('$0.0002418');
+    }
+
+    public function test_shows_docs_retrieval_in_the_pipeline(): void
+    {
+        $user = User::factory()->admin()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'prompt_version' => 'v4',
+        ]);
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'model' => 'test/model',
+            'step' => 'docs_retrieval',
+            'prompt_version' => 'v1',
+            'prompt_tokens' => 20,
+            'completion_tokens' => 5,
+            'total_tokens' => 25,
+            'cost' => 0.002,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('metrics.index'))
+            ->assertOk()
+            ->assertSee('docs_retrieval')
+            ->assertSee('$0.002')
+            ->assertSee('25');
     }
 }

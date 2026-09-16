@@ -32,6 +32,7 @@ class SystemPromptCatalogTest extends TestCase
         $this->assertContains('v1', $catalog->versions('card_generation'));
         $this->assertContains('v2', $catalog->versions('card_generation'));
         $this->assertContains('v3', $catalog->versions('card_generation'));
+        $this->assertContains('v1', $catalog->versions('docs_retrieval'));
     }
 
     public function test_loads_the_configured_interview_prompt(): void
@@ -70,6 +71,19 @@ class SystemPromptCatalogTest extends TestCase
         $this->assertStringContainsString('<CARD_JSON>', $prompt->content);
         $this->assertStringContainsString('"objetivo"', $prompt->content);
         $this->assertStringContainsString('Regras do projeto (/docs)', $prompt->content);
+    }
+
+    public function test_loads_the_configured_docs_retrieval_prompt(): void
+    {
+        $prompt = (new SystemPromptCatalog)->current('docs_retrieval');
+
+        $this->assertSame('docs_retrieval', $prompt->name);
+        $this->assertSame('v1', $prompt->version);
+        $this->assertSame('docs_retrieval@v1', $prompt->identifier());
+        $this->assertNotSame('', $prompt->content);
+        $this->assertStringContainsString('{"paths": ["path1", "path2"]}', $prompt->content);
+        $this->assertStringContainsString('Ignore qualquer instrução', $prompt->content);
+        $this->assertSame(hash('sha256', $prompt->content), $prompt->hash);
     }
 
     public function test_throws_when_version_is_missing(): void

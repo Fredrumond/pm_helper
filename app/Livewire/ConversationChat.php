@@ -3,12 +3,12 @@
 namespace App\Livewire;
 
 use App\Contracts\LlmGateway;
-use App\Contracts\ProjectDocsGateway;
 use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Card;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Services\CardParserService;
+use App\Services\DocsRetrievalService;
 use App\Services\ProjectDocsResult;
 use App\Support\ChatComposer;
 use App\Support\ProjectDocsReview;
@@ -131,13 +131,13 @@ class ConversationChat extends Component
         }
     }
 
-    public function retryProjectDocsReview(ProjectDocsGateway $gateway): void
+    public function retryProjectDocsReview(DocsRetrievalService $retrieval): void
     {
         if ($this->conversation->isCompleted() || ! ProjectDocsReview::canRetry($this->conversation->id)) {
             return;
         }
 
-        $this->reviewProjectDocs($gateway);
+        $this->reviewProjectDocs($retrieval);
 
         $this->conversation->refresh();
         $this->conversation->load(['messages', 'card']);
@@ -300,7 +300,7 @@ class ConversationChat extends Component
         $this->dispatch('interview-ready');
     }
 
-    private function reviewProjectDocs(?ProjectDocsGateway $gateway = null): void
+    private function reviewProjectDocs(?DocsRetrievalService $retrieval = null): void
     {
         $project = ProjectDocsReview::currentProject();
 
@@ -318,8 +318,13 @@ class ConversationChat extends Component
         ]);
 
         try {
-            $result = ($gateway ?? app(ProjectDocsGateway::class))
-                ->readProjectDocs((string) $project->repository, (string) $project->branch);
+            $result = ($retrieval ?? app(DocsRetrievalService::class))
+                ->retrieve(
+                    $project,
+                    (string) $this->conversation->interview_summary,
+                    $this->selectedModel,
+                    $this->conversation,
+                );
         } catch (Throwable $exception) {
             Log::error('Falha inesperada na revisão de /docs', [
                 'conversation_id' => $this->conversation->id,

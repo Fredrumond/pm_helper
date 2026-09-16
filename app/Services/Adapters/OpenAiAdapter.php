@@ -67,6 +67,17 @@ class OpenAiAdapter implements LlmGateway
         );
     }
 
+    public function completePrompt(
+        array $messages,
+        ?string $model = null,
+        string $step = 'docs_retrieval',
+        ?Conversation $conversation = null,
+    ): string {
+        $model = $this->resolveModel($model);
+
+        return $this->complete($conversation, $messages, $model, $this->prompts->current($step), $step);
+    }
+
     /**
      * @return list<array{role: string, content: string}>
      */
@@ -95,17 +106,17 @@ class OpenAiAdapter implements LlmGateway
      * @param  list<array{role: string, content: string}>  $messages
      */
     private function complete(
-        Conversation $conversation,
+        ?Conversation $conversation,
         array $messages,
         string $model,
-        SystemPrompt $prompt,
+        ?SystemPrompt $prompt,
         string $step,
     ): string {
         $response = $this->requestChatCompletion($messages, $model);
 
         if ($this->isRateLimited($response)) {
             Log::warning('OpenAI rate limited', [
-                'conversation_id' => $conversation->id,
+                'conversation_id' => $conversation?->id,
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'model' => $model,
@@ -138,10 +149,10 @@ class OpenAiAdapter implements LlmGateway
         $data = $response->json();
 
         Log::info('OpenAI API response', [
-            'conversation_id' => $conversation->id,
+            'conversation_id' => $conversation?->id,
             'status' => $response->status(),
-            'prompt' => $prompt->identifier(),
-            'prompt_hash' => $prompt->hash,
+            'prompt' => $prompt?->identifier(),
+            'prompt_hash' => $prompt?->hash,
             'step' => $step,
             'model' => is_array($data) ? ($data['model'] ?? $model) : $model,
             'id' => is_array($data) ? ($data['id'] ?? null) : null,
@@ -155,7 +166,7 @@ class OpenAiAdapter implements LlmGateway
             throw new \RuntimeException('A LLM retornou uma resposta vazia.');
         }
 
-        if (is_array($data)) {
+        if (is_array($data) && $conversation !== null && $conversation->id) {
             LlmUsage::recordFromResponse($conversation, $data, $model, $prompt, $step);
         }
 

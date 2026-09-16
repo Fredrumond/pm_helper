@@ -67,6 +67,17 @@ class OpenRouterAdapter implements LlmGateway
         );
     }
 
+    public function completePrompt(
+        array $messages,
+        ?string $model = null,
+        string $step = 'docs_retrieval',
+        ?Conversation $conversation = null,
+    ): string {
+        $model = $this->resolveModel($model);
+
+        return $this->complete($conversation, $messages, $model, $this->prompts->current($step), $step);
+    }
+
     /**
      * @return list<array{role: string, content: string}>
      */
@@ -95,10 +106,10 @@ class OpenRouterAdapter implements LlmGateway
      * @param  list<array{role: string, content: string}>  $messages
      */
     private function complete(
-        Conversation $conversation,
+        ?Conversation $conversation,
         array $messages,
         string $model,
-        SystemPrompt $prompt,
+        ?SystemPrompt $prompt,
         string $step,
     ): string {
         $candidates = $this->modelsToTry($model);
@@ -110,7 +121,7 @@ class OpenRouterAdapter implements LlmGateway
                 $fallback = $candidates[$index + 1] ?? null;
 
                 Log::warning('OpenRouter rate limited', [
-                    'conversation_id' => $conversation->id,
+                    'conversation_id' => $conversation?->id,
                     'status' => $response->status(),
                     'body' => $response->body(),
                     'model' => $candidate,
@@ -148,10 +159,10 @@ class OpenRouterAdapter implements LlmGateway
             $data = $response->json();
 
             Log::info('OpenRouter API response', [
-                'conversation_id' => $conversation->id,
+                'conversation_id' => $conversation?->id,
                 'status' => $response->status(),
-                'prompt' => $prompt->identifier(),
-                'prompt_hash' => $prompt->hash,
+                'prompt' => $prompt?->identifier(),
+                'prompt_hash' => $prompt?->hash,
                 'step' => $step,
                 'model' => is_array($data) ? ($data['model'] ?? $candidate) : $candidate,
                 'id' => is_array($data) ? ($data['id'] ?? null) : null,
@@ -168,7 +179,7 @@ class OpenRouterAdapter implements LlmGateway
                 Log::warning($fallback !== null
                     ? 'OpenRouter empty response, switching to fallback'
                     : 'OpenRouter empty response', [
-                        'conversation_id' => $conversation->id,
+                        'conversation_id' => $conversation?->id,
                         'status' => $response->status(),
                         'model' => $candidate,
                         'step' => $step,
@@ -183,7 +194,7 @@ class OpenRouterAdapter implements LlmGateway
                 throw new \RuntimeException('A LLM retornou uma resposta vazia.');
             }
 
-            if (is_array($data)) {
+            if (is_array($data) && $conversation !== null && $conversation->id) {
                 LlmUsage::recordFromResponse($conversation, $data, $candidate, $prompt, $step);
             }
 

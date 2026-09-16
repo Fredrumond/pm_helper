@@ -49,6 +49,23 @@ class LlmRouterTest extends TestCase
         $this->assertSame('resumo', $default->lastSummary);
         $this->assertSame('openai/gpt-4o', $default->lastModel);
     }
+
+    public function test_complete_prompt_delegates_to_matching_adapter(): void
+    {
+        $default = new FakeLlmGateway('default');
+        $anthropic = new FakeLlmGateway('anthropic');
+        $router = new LlmRouter($default, ['anthropic/' => $anthropic]);
+        $messages = [['role' => 'user', 'content' => 'índice']];
+
+        $conversation = new Conversation;
+
+        $this->assertSame('anthropic:complete', $router->completePrompt($messages, 'anthropic/claude', 'docs_retrieval', $conversation));
+        $this->assertSame($messages, $anthropic->lastMessages);
+        $this->assertSame('anthropic/claude', $anthropic->lastModel);
+        $this->assertSame('docs_retrieval', $anthropic->lastStep);
+        $this->assertSame($conversation, $anthropic->lastConversation);
+        $this->assertNull($default->lastMessages);
+    }
 }
 
 class FakeLlmGateway implements LlmGateway
@@ -58,6 +75,11 @@ class FakeLlmGateway implements LlmGateway
     public ?string $lastModel = null;
 
     public ?string $lastSummary = null;
+
+    /** @var list<array{role: string, content: string}>|null */
+    public ?array $lastMessages = null;
+
+    public ?string $lastStep = null;
 
     public function __construct(private readonly string $name) {}
 
@@ -76,5 +98,19 @@ class FakeLlmGateway implements LlmGateway
         $this->lastModel = $model;
 
         return "{$this->name}:card";
+    }
+
+    public function completePrompt(
+        array $messages,
+        ?string $model = null,
+        string $step = 'docs_retrieval',
+        ?Conversation $conversation = null,
+    ): string {
+        $this->lastMessages = $messages;
+        $this->lastModel = $model;
+        $this->lastStep = $step;
+        $this->lastConversation = $conversation;
+
+        return "{$this->name}:complete";
     }
 }
