@@ -350,6 +350,14 @@ class ConversationChat extends Component
             'role' => 'assistant',
             'content' => ProjectDocsReview::assistantMessage($result),
         ]);
+
+        if (is_string($result->briefing) && trim($result->briefing) !== '') {
+            Message::create([
+                'conversation_id' => $this->conversation->id,
+                'role' => 'assistant',
+                'content' => $result->briefing,
+            ]);
+        }
     }
 
     private function persistScopeTooBroad(): void

@@ -534,6 +534,88 @@ class OpenRouterAdapterTest extends TestCase
         $this->assertSame(0.002, (float) LlmUsage::query()->first()->cost);
     }
 
+    public function test_complete_prompt_propagates_docs_briefing_step(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+        ]);
+
+        Event::fake([MessageLogged::class]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'id' => 'gen-briefing-1',
+                'model' => 'test/model',
+                'choices' => [
+                    ['message' => ['content' => 'A documentação confirma o pagamento.']],
+                ],
+            ], 200),
+        ]);
+
+        $content = (new OpenRouterAdapter)->completePrompt(
+            [['role' => 'user', 'content' => 'docs']],
+            'test/model',
+            'docs_briefing',
+        );
+
+        $this->assertSame('A documentação confirma o pagamento.', $content);
+        $this->assertDatabaseCount('llm_usages', 0);
+
+        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log): bool {
+            return $log->level === 'info'
+                && $log->message === 'OpenRouter API response'
+                && ($log->context['step'] ?? null) === 'docs_briefing'
+                && ($log->context['prompt'] ?? null) === 'docs_briefing@v1';
+        });
+    }
+
+    public function test_complete_prompt_records_docs_briefing_usage_when_conversation_is_present(): void
+    {
+        config([
+            'services.openrouter.api_key' => 'test-key',
+            'services.openrouter.model' => 'test/model',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'id' => 'gen-briefing-1',
+                'model' => 'test/model',
+                'usage' => [
+                    'prompt_tokens' => 40,
+                    'completion_tokens' => 12,
+                    'total_tokens' => 52,
+                    'cost' => 0.004,
+                ],
+                'choices' => [
+                    ['message' => ['content' => 'A documentação confirma o pagamento.']],
+                ],
+            ], 200),
+        ]);
+
+        $conversation = $this->conversationWithUserMessage();
+        $prompt = (new SystemPromptCatalog)->current('docs_briefing');
+
+        $content = (new OpenRouterAdapter)->completePrompt(
+            [['role' => 'user', 'content' => 'docs']],
+            'test/model',
+            'docs_briefing',
+            $conversation,
+        );
+
+        $this->assertSame('A documentação confirma o pagamento.', $content);
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'generation_id' => 'gen-briefing-1',
+            'step' => 'docs_briefing',
+            'prompt_version' => 'v1',
+            'prompt_hash' => $prompt->hash,
+            'total_tokens' => 52,
+        ]);
+        $this->assertSame(0.004, (float) LlmUsage::query()->first()->cost);
+    }
+
     public function test_retries_same_context_on_next_fallback_when_rate_limited(): void
     {
         config([

@@ -91,6 +91,10 @@ return [
             'version' => env('CHAT_DOCS_RETRIEVAL_PROMPT_VERSION', 'v1'),
             'model' => env('CHAT_DOCS_RETRIEVAL_MODEL'),
         ],
+        'docs_briefing' => [
+            'version' => env('CHAT_DOCS_BRIEFING_PROMPT_VERSION', 'v1'),
+            'model' => env('CHAT_DOCS_BRIEFING_MODEL'),
+        ],
     ],
 
     /*

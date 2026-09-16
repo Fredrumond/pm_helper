@@ -59,6 +59,7 @@ class MetricsPageTest extends TestCase
             ->assertSee('interview@v4')
             ->assertSee('Pipeline por step')
             ->assertSee('docs_retrieval')
+            ->assertSee('docs_briefing')
             ->assertSee('Nenhuma conversa com versão de prompt registrada ainda.')
             ->assertSee('Nenhuma chamada registrada ainda.');
     }
@@ -144,7 +145,7 @@ class MetricsPageTest extends TestCase
             ->assertSee('$0.0002418');
     }
 
-    public function test_shows_docs_retrieval_in_the_pipeline(): void
+    public function test_shows_docs_retrieval_and_docs_briefing_in_the_pipeline(): void
     {
         $user = User::factory()->admin()->create();
         $conversation = Conversation::query()->create([
@@ -162,12 +163,25 @@ class MetricsPageTest extends TestCase
             'total_tokens' => 25,
             'cost' => 0.002,
         ]);
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'model' => 'test/model',
+            'step' => 'docs_briefing',
+            'prompt_version' => 'v1',
+            'prompt_tokens' => 40,
+            'completion_tokens' => 12,
+            'total_tokens' => 52,
+            'cost' => 0.004,
+        ]);
 
         $this->actingAs($user)
             ->get(route('metrics.index'))
             ->assertOk()
             ->assertSee('docs_retrieval')
+            ->assertSee('docs_briefing')
             ->assertSee('$0.002')
-            ->assertSee('25');
+            ->assertSee('$0.004')
+            ->assertSee('25')
+            ->assertSee('52');
     }
 }

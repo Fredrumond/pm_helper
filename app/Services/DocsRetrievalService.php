@@ -29,7 +29,7 @@ class DocsRetrievalService
         try {
             return $this->retrieveOrFallback($project, $interviewSummary, $model, $conversation);
         } catch (Throwable) {
-            return $this->fallback($project, [], []);
+            return $this->fallback($project, [], [], $interviewSummary, $model, $conversation);
         }
     }
 
@@ -42,7 +42,7 @@ class DocsRetrievalService
         $index = $this->listIndex($project);
 
         if ($index === null || $index === []) {
-            return $this->fallback($project, [], $index ?? []);
+            return $this->fallback($project, [], $index ?? [], $interviewSummary, $model, $conversation);
         }
 
         try {
@@ -53,19 +53,19 @@ class DocsRetrievalService
                 $conversation,
             );
         } catch (Throwable) {
-            return $this->fallback($project, [], $index);
+            return $this->fallback($project, [], $index, $interviewSummary, $model, $conversation);
         }
 
         $parsed = $this->parsePaths($raw);
 
         if ($parsed === null || $parsed === []) {
-            return $this->fallback($project, [], $index);
+            return $this->fallback($project, [], $index, $interviewSummary, $model, $conversation);
         }
 
         [$selected, $discarded] = $this->filterPaths($parsed, $index);
 
         if ($selected === []) {
-            return $this->fallback($project, [], $discarded);
+            return $this->fallback($project, [], $discarded, $interviewSummary, $model, $conversation);
         }
 
         try {
@@ -75,10 +75,10 @@ class DocsRetrievalService
                 $project->branch,
             );
         } catch (Throwable) {
-            return $this->fallback($project, $selected, $discarded);
+            return $this->fallback($project, $selected, $discarded, $interviewSummary, $model, $conversation);
         }
 
-        return $this->logged($result, $selected, $discarded);
+        return $this->finalize($result, $selected, $discarded, $interviewSummary, $model, $conversation);
     }
 
     /**
@@ -238,12 +238,43 @@ class DocsRetrievalService
         return is_string($configured) && $configured !== '' ? $configured : $fallback;
     }
 
+    private function briefingModel(string $fallback): string
+    {
+        $configured = config('chat.prompts.docs_briefing.model');
+
+        return is_string($configured) && $configured !== '' ? $configured : $fallback;
+    }
+
+    /**
+     * @return list<array{role: string, content: string}>
+     */
+    private function briefingMessages(string $docsContent, string $interviewSummary): array
+    {
+        $prompt = $this->prompts->current('docs_briefing');
+
+        return [
+            ['role' => 'system', 'content' => $prompt->content],
+            ['role' => 'user', 'content' => $this->briefingUserContent($docsContent, $interviewSummary)],
+        ];
+    }
+
+    private function briefingUserContent(string $docsContent, string $interviewSummary): string
+    {
+        return "Documentação de /docs:\n\n{$docsContent}\n\nResumo da entrevista:\n\n{$interviewSummary}";
+    }
+
     /**
      * @param  list<string>  $selected
      * @param  list<string>  $discarded
      */
-    private function fallback(Project $project, array $selected, array $discarded): ProjectDocsResult
-    {
+    private function fallback(
+        Project $project,
+        array $selected,
+        array $discarded,
+        string $interviewSummary,
+        string $model,
+        Conversation $conversation,
+    ): ProjectDocsResult {
         try {
             $result = $this->docs->readProjectDocs(
                 (string) $project->repository,
@@ -253,7 +284,28 @@ class DocsRetrievalService
             $result = ProjectDocsResult::failed(ProjectDocsResult::ERROR_MCP);
         }
 
-        return $this->logged($result, $selected, $discarded);
+        return $this->finalize($result, $selected, $discarded, $interviewSummary, $model, $conversation);
+    }
+
+    /**
+     * @param  list<string>  $selected
+     * @param  list<string>  $discarded
+     */
+    private function finalize(
+        ProjectDocsResult $result,
+        array $selected,
+        array $discarded,
+        string $interviewSummary,
+        string $model,
+        Conversation $conversation,
+    ): ProjectDocsResult {
+        $result = $this->logged($result, $selected, $discarded);
+
+        if ($result->status !== ProjectDocsResult::STATUS_OK) {
+            return $result;
+        }
+
+        return $this->attachBriefing($result, $interviewSummary, $model, $conversation);
     }
 
     /**
@@ -269,5 +321,51 @@ class DocsRetrievalService
         ]);
 
         return $result;
+    }
+
+    private function attachBriefing(
+        ProjectDocsResult $result,
+        string $interviewSummary,
+        string $model,
+        Conversation $conversation,
+    ): ProjectDocsResult {
+        $charsInput = mb_strlen(
+            $this->briefingUserContent($result->content, $interviewSummary),
+            'UTF-8',
+        );
+
+        try {
+            $raw = $this->llm->completePrompt(
+                $this->briefingMessages($result->content, $interviewSummary),
+                $this->briefingModel($model),
+                'docs_briefing',
+                $conversation,
+            );
+        } catch (Throwable) {
+            $this->logBriefing('failed', $charsInput, 0);
+
+            return $result;
+        }
+
+        $briefing = trim($raw);
+
+        if ($briefing === '') {
+            $this->logBriefing('empty', $charsInput, 0);
+
+            return $result;
+        }
+
+        $this->logBriefing('ok', $charsInput, mb_strlen($briefing, 'UTF-8'));
+
+        return $result->withBriefing($briefing);
+    }
+
+    private function logBriefing(string $status, int $charsInput, int $charsOutput): void
+    {
+        Log::info('project_docs.briefing', [
+            'status' => $status,
+            'chars_input' => $charsInput,
+            'chars_output' => $charsOutput,
+        ]);
     }
 }

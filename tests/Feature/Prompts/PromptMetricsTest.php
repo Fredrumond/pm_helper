@@ -148,6 +148,14 @@ class PromptMetricsTest extends TestCase
             'total_tokens' => 30,
             'cost' => 0.02,
         ]);
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'model' => 'test/model',
+            'step' => 'docs_briefing',
+            'prompt_version' => 'v1',
+            'total_tokens' => 50,
+            'cost' => 0.03,
+        ]);
 
         $other = Conversation::query()->create([
             'user_id' => $user->id,
@@ -176,5 +184,8 @@ class PromptMetricsTest extends TestCase
         $this->assertSame(1, $metrics['docs_retrieval']['conversations']);
         $this->assertSame(1, $metrics['docs_retrieval']['calls']);
         $this->assertSame(30.0, $metrics['docs_retrieval']['avg_tokens']);
+        $this->assertSame(1, $metrics['docs_briefing']['conversations']);
+        $this->assertSame(1, $metrics['docs_briefing']['calls']);
+        $this->assertSame(50.0, $metrics['docs_briefing']['avg_tokens']);
     }
 }

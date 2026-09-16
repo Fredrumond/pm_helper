@@ -927,11 +927,12 @@ TXT;
             'repository' => 'acme/checkout',
             'branch' => 'develop',
         ]);
-        $fake = $this->bindFakeProjectDocsGateway(
-            ProjectDocsResult::ok("# Regras secretas\nPagamento obrigatório.", 3, 1),
-        );
-
-        $this->fakeInterviewCompleteReply();
+        $ok = ProjectDocsResult::ok("# Regras secretas\nPagamento obrigatório.", 3, 1);
+        $fake = $this->bindFakeProjectDocsGateway($ok);
+        $briefing = 'A documentação descreve o checkout existente e não há conflito com a entrevista.';
+        $llm = $this->bindFakeLlmGateway();
+        $llm->queueChat($this->interviewCompleteReply());
+        $llm->queueComplete($briefing);
 
         $user = User::factory()->create();
         $conversation = Conversation::query()->create([
@@ -947,6 +948,7 @@ TXT;
             ->call('sendMessage')
             ->assertSee('Gerar Card')
             ->assertSee('Revisão carregada (3 arquivos). Você já pode gerar o card.')
+            ->assertSee($briefing)
             ->assertDontSee('Tentar revisão novamente')
             ->assertDontSee('Regras secretas')
             ->assertDontSee('Pagamento obrigatório');
@@ -954,7 +956,8 @@ TXT;
         $this->assertSame([
             ['repository' => 'acme/checkout', 'branch' => 'develop'],
         ], $fake->calls);
-        $this->assertSame(3, $conversation->messages()->count());
+        $this->assertSame(4, $conversation->messages()->count());
+        $this->assertReviewThenBriefing($conversation, $ok, $briefing);
         $this->assertSame([
             'status' => 'ok',
             'content' => "# Regras secretas\nPagamento obrigatório.",
@@ -965,16 +968,54 @@ TXT;
             'skipped_non_text' => 1,
             'chars' => mb_strlen("# Regras secretas\nPagamento obrigatório.", 'UTF-8'),
         ], ProjectDocsReview::get($conversation->id));
+        $this->assertArrayNotHasKey('briefing', ProjectDocsReview::get($conversation->id));
+    }
+
+    public function test_ok_review_with_null_briefing_shows_only_the_review_phrase(): void
+    {
+        $project = Project::factory()->create(['repository' => 'acme/checkout']);
+        $ok = ProjectDocsResult::ok('# Regras', 1, 0);
+        $this->bindFakeProjectDocsGateway($ok);
+        $llm = $this->bindFakeLlmGateway();
+        $llm->queueChat($this->interviewCompleteReply());
+        $llm->queueComplete(new RuntimeException('timeout no briefing'));
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        $this->session([CurrentProject::SESSION_KEY => $project->id]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Gerar Card')
+            ->assertSee(ProjectDocsReview::assistantMessage($ok))
+            ->assertDontSee('timeout no briefing')
+            ->assertDontSee('Erro LLM')
+            ->assertDontSee('Não foi possível realizar a revisão final');
+
+        $this->assertSame(3, $conversation->messages()->count());
+        $assistant = $conversation->messages()->where('role', 'assistant')->orderBy('id')->get();
+        $this->assertCount(2, $assistant);
+        $this->assertSame(ProjectDocsReview::assistantMessage($ok), $assistant->last()->content);
+        $this->assertArrayNotHasKey('briefing', ProjectDocsReview::get($conversation->id));
+        $this->assertSame('ok', ProjectDocsReview::get($conversation->id)['status']);
     }
 
     public function test_empty_review_shows_retry_and_retry_rereads_without_generating_card(): void
     {
         $project = Project::factory()->create(['repository' => 'acme/checkout']);
-        $fake = $this->bindFakeProjectDocsGateway(
-            ProjectDocsResult::empty(),
-            ProjectDocsResult::ok('# Regras', 1, 0),
-        );
-        $this->fakeInterviewCompleteReply();
+        $empty = ProjectDocsResult::empty();
+        $ok = ProjectDocsResult::ok('# Regras', 1, 0);
+        $fake = $this->bindFakeProjectDocsGateway($empty, $ok);
+        $briefing = 'A documentação confirma as regras do checkout após o retry.';
+        $llm = $this->bindFakeLlmGateway();
+        $llm->queueChat($this->interviewCompleteReply());
+        $llm->queueComplete($briefing);
 
         $user = User::factory()->create();
         $conversation = Conversation::query()->create([
@@ -990,16 +1031,19 @@ TXT;
             ->call('sendMessage')
             ->assertSee('Gerar Card')
             ->assertSee('Não há informações adicionais em /docs')
-            ->assertSee('Tentar revisão novamente');
+            ->assertSee('Tentar revisão novamente')
+            ->assertDontSee($briefing);
 
         $this->assertSame('empty', ProjectDocsReview::get($conversation->id)['status']);
         $this->assertNull(ProjectDocsReview::get($conversation->id)['content']);
-        Http::assertSentCount(1);
+        $this->assertSame(3, $conversation->messages()->count());
+        $this->assertCount(0, $llm->completeCalls);
 
         $component
             ->call('retryProjectDocsReview')
             ->assertNoRedirect()
             ->assertSee('Revisão carregada (1 arquivo)')
+            ->assertSee($briefing)
             ->assertDontSee('Tentar revisão novamente')
             ->assertSee('Gerar Card');
 
@@ -1009,10 +1053,13 @@ TXT;
         ], $fake->calls);
         $this->assertSame('ok', ProjectDocsReview::get($conversation->id)['status']);
         $this->assertSame('# Regras', ProjectDocsReview::get($conversation->id)['content']);
+        $this->assertArrayNotHasKey('briefing', ProjectDocsReview::get($conversation->id));
+        $this->assertReviewThenBriefing($conversation, $ok, $briefing);
         $this->assertDatabaseMissing('cards', [
             'conversation_id' => $conversation->id,
         ]);
-        Http::assertSentCount(1);
+        $this->assertCount(1, $llm->completeCalls);
+        $this->assertSame('docs_briefing', $llm->completeCalls[0]['step']);
     }
 
     public function test_too_large_review_notifies_without_retry(): void
@@ -1042,6 +1089,8 @@ TXT;
         ], $tooLarge->calls);
         $this->assertSame('too_large', ProjectDocsReview::get($conversation->id)['status']);
         $this->assertNull(ProjectDocsReview::get($conversation->id)['content']);
+        $this->assertSame(3, $conversation->messages()->count());
+        $this->assertArrayNotHasKey('briefing', ProjectDocsReview::get($conversation->id));
     }
 
     public function test_failed_review_shows_retry_and_retry_rereads_without_generating_card(): void
@@ -1072,6 +1121,7 @@ TXT;
 
         $this->assertSame('failed', ProjectDocsReview::get($conversation->id)['status']);
         $this->assertNull(ProjectDocsReview::get($conversation->id)['content']);
+        $this->assertSame(3, $conversation->messages()->count());
         Http::assertSentCount(1);
 
         $component
@@ -1090,7 +1140,7 @@ TXT;
         $this->assertDatabaseMissing('cards', [
             'conversation_id' => $conversation->id,
         ]);
-        Http::assertSentCount(1);
+        Http::assertSentCount(2);
     }
 
     public function test_retry_is_ignored_when_session_status_is_ok(): void
@@ -1195,6 +1245,7 @@ TXT;
         $llm = $this->bindFakeLlmGateway();
         $llm->queueChat($this->interviewCompleteReply());
         $llm->queueComplete('{"paths": ["docs/regras/pagamento.md"]}');
+        $llm->queueComplete('A documentação confirma pagamento obrigatório no checkout.');
 
         $user = User::factory()->create();
         $conversation = Conversation::query()->create([
@@ -1210,6 +1261,7 @@ TXT;
             ->call('sendMessage')
             ->assertSee('Gerar Card')
             ->assertSee(ProjectDocsReview::assistantMessage($filtered))
+            ->assertSee('A documentação confirma pagamento obrigatório no checkout.')
             ->assertDontSee('Tentar revisão novamente')
             ->assertDontSee('# Pagamento obrigatório');
 
@@ -1224,12 +1276,20 @@ TXT;
                 'branch' => 'develop',
             ],
         ], $docs->readByPathsCalls);
-        $this->assertCount(1, $llm->completeCalls);
+        $this->assertCount(2, $llm->completeCalls);
         $this->assertSame('docs_retrieval', $llm->completeCalls[0]['step']);
+        $this->assertSame('docs_briefing', $llm->completeCalls[1]['step']);
         $this->assertSame($conversation->id, $llm->completeCalls[0]['conversation']?->id);
-        $this->assertSame(3, $conversation->messages()->count());
+        $this->assertSame($conversation->id, $llm->completeCalls[1]['conversation']?->id);
+        $this->assertSame(4, $conversation->messages()->count());
+        $this->assertReviewThenBriefing(
+            $conversation,
+            $filtered,
+            'A documentação confirma pagamento obrigatório no checkout.',
+        );
         $this->assertSame('ok', ProjectDocsReview::get($conversation->id)['status']);
         $this->assertSame('# Pagamento obrigatório', ProjectDocsReview::get($conversation->id)['content']);
+        $this->assertArrayNotHasKey('briefing', ProjectDocsReview::get($conversation->id));
     }
 
     public function test_docs_retrieval_falls_back_to_full_dump_when_llm_fails(): void
@@ -1242,6 +1302,7 @@ TXT;
         $llm = $this->bindFakeLlmGateway();
         $llm->queueChat($this->interviewCompleteReply());
         $llm->queueComplete(new RuntimeException('LLM fora do ar'));
+        $llm->queueComplete('A documentação resume o dump completo.');
 
         $user = User::factory()->create();
         $conversation = Conversation::query()->create([
@@ -1257,6 +1318,7 @@ TXT;
             ->call('sendMessage')
             ->assertSee('Gerar Card')
             ->assertSee(ProjectDocsReview::assistantMessage($fallback))
+            ->assertSee('A documentação resume o dump completo.')
             ->assertDontSee('# Dump completo');
 
         $this->assertSame([
@@ -1265,9 +1327,15 @@ TXT;
         $this->assertSame([], $docs->readByPathsCalls);
         $this->assertSame('ok', ProjectDocsReview::get($conversation->id)['status']);
         $this->assertSame('# Dump completo', ProjectDocsReview::get($conversation->id)['content']);
-        $this->assertSame(3, $conversation->messages()->count());
-        $this->assertCount(1, $llm->completeCalls);
-        $this->assertSame('docs_retrieval', $llm->completeCalls[0]['step']);
+        $this->assertArrayNotHasKey('briefing', ProjectDocsReview::get($conversation->id));
+        $this->assertSame(4, $conversation->messages()->count());
+        $this->assertReviewThenBriefing(
+            $conversation,
+            $fallback,
+            'A documentação resume o dump completo.',
+        );
+        $this->assertCount(2, $llm->completeCalls);
+        $this->assertSame('docs_briefing', $llm->completeCalls[1]['step']);
     }
 
     public function test_retry_uses_docs_retrieval_and_keeps_assistant_message(): void
@@ -1285,6 +1353,7 @@ TXT;
         $llm->queueChat($this->interviewCompleteReply());
         $llm->queueComplete('{"paths": ["docs/regras/pagamento.md"]}');
         $llm->queueComplete('{"paths": ["docs/regras/pagamento.md"]}');
+        $llm->queueComplete('A documentação confirma as regras do checkout.');
 
         $user = User::factory()->create();
         $conversation = Conversation::query()->create([
@@ -1300,12 +1369,14 @@ TXT;
             ->call('sendMessage')
             ->assertSee('Gerar Card')
             ->assertSee(ProjectDocsReview::assistantMessage($empty))
-            ->assertSee('Tentar revisão novamente');
+            ->assertSee('Tentar revisão novamente')
+            ->assertDontSee('A documentação confirma as regras do checkout.');
 
         $component
             ->call('retryProjectDocsReview')
             ->assertNoRedirect()
             ->assertSee(ProjectDocsReview::assistantMessage($ok))
+            ->assertSee('A documentação confirma as regras do checkout.')
             ->assertDontSee('Tentar revisão novamente')
             ->assertSee('Gerar Card');
 
@@ -1314,9 +1385,27 @@ TXT;
         $this->assertCount(2, $docs->readByPathsCalls);
         $this->assertSame('ok', ProjectDocsReview::get($conversation->id)['status']);
         $this->assertSame('# Regras', ProjectDocsReview::get($conversation->id)['content']);
+        $this->assertArrayNotHasKey('briefing', ProjectDocsReview::get($conversation->id));
+        $this->assertReviewThenBriefing(
+            $conversation,
+            $ok,
+            'A documentação confirma as regras do checkout.',
+        );
         $this->assertDatabaseMissing('cards', [
             'conversation_id' => $conversation->id,
         ]);
+    }
+
+    private function assertReviewThenBriefing(
+        Conversation $conversation,
+        ProjectDocsResult $review,
+        string $briefing,
+    ): void {
+        $assistant = $conversation->messages()->where('role', 'assistant')->orderBy('id')->get();
+
+        $this->assertGreaterThanOrEqual(3, $assistant->count());
+        $this->assertSame(ProjectDocsReview::assistantMessage($review), $assistant[$assistant->count() - 2]->content);
+        $this->assertSame($briefing, $assistant->last()->content);
     }
 
     private function bindFakeProjectDocsGateway(ProjectDocsResult ...$results): FakeProjectDocsGateway

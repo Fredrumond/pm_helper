@@ -33,6 +33,7 @@ final readonly class ProjectDocsResult
         public int $skippedNonText,
         public int $chars,
         public ?string $errorCode,
+        public ?string $briefing = null,
     ) {}
 
     public static function ok(string $content, int $filesRead, int $skippedNonText): self
@@ -84,6 +85,19 @@ final readonly class ProjectDocsResult
             skippedNonText: $skippedNonText,
             chars: $chars,
             errorCode: $errorCode,
+        );
+    }
+
+    public function withBriefing(?string $briefing): self
+    {
+        return new self(
+            status: $this->status,
+            content: $this->content,
+            filesRead: $this->filesRead,
+            skippedNonText: $this->skippedNonText,
+            chars: $this->chars,
+            errorCode: $this->errorCode,
+            briefing: $briefing,
         );
     }
 }

@@ -66,6 +66,20 @@ class LlmRouterTest extends TestCase
         $this->assertSame($conversation, $anthropic->lastConversation);
         $this->assertNull($default->lastMessages);
     }
+
+    public function test_complete_prompt_propagates_docs_briefing_step(): void
+    {
+        $default = new FakeLlmGateway('default');
+        $router = new LlmRouter($default, ['anthropic/' => new FakeLlmGateway('anthropic')]);
+        $messages = [['role' => 'user', 'content' => 'docs']];
+
+        $conversation = new Conversation;
+
+        $this->assertSame('default:complete', $router->completePrompt($messages, 'openai/gpt-4o', 'docs_briefing', $conversation));
+        $this->assertSame('docs_briefing', $default->lastStep);
+        $this->assertSame($messages, $default->lastMessages);
+        $this->assertSame($conversation, $default->lastConversation);
+    }
 }
 
 class FakeLlmGateway implements LlmGateway

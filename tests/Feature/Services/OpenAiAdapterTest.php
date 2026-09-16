@@ -390,6 +390,85 @@ class OpenAiAdapterTest extends TestCase
         ]);
     }
 
+    public function test_complete_prompt_propagates_docs_briefing_step(): void
+    {
+        config([
+            'services.openai.api_key' => 'sk-test-key',
+            'services.openai.model' => 'gpt-4o-mini',
+        ]);
+
+        Event::fake([MessageLogged::class]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.openai.com/v1/chat/completions' => Http::response([
+                'id' => 'chatcmpl-briefing-1',
+                'choices' => [
+                    ['message' => ['content' => 'A documentação confirma o pagamento.']],
+                ],
+            ], 200),
+        ]);
+
+        $content = (new OpenAiAdapter)->completePrompt(
+            [['role' => 'user', 'content' => 'docs']],
+            'gpt-4o-mini',
+            'docs_briefing',
+        );
+
+        $this->assertSame('A documentação confirma o pagamento.', $content);
+        $this->assertDatabaseCount('llm_usages', 0);
+
+        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log): bool {
+            return $log->level === 'info'
+                && $log->message === 'OpenAI API response'
+                && ($log->context['step'] ?? null) === 'docs_briefing'
+                && ($log->context['prompt'] ?? null) === 'docs_briefing@v1';
+        });
+    }
+
+    public function test_complete_prompt_records_docs_briefing_usage_when_conversation_is_present(): void
+    {
+        config([
+            'services.openai.api_key' => 'sk-test-key',
+            'services.openai.model' => 'gpt-4o-mini',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.openai.com/v1/chat/completions' => Http::response([
+                'id' => 'chatcmpl-briefing-1',
+                'model' => 'gpt-4o-mini',
+                'usage' => [
+                    'prompt_tokens' => 40,
+                    'completion_tokens' => 12,
+                    'total_tokens' => 52,
+                ],
+                'choices' => [
+                    ['message' => ['content' => 'A documentação confirma o pagamento.']],
+                ],
+            ], 200),
+        ]);
+
+        $conversation = $this->conversationWithUserMessage();
+        $prompt = (new SystemPromptCatalog)->current('docs_briefing');
+
+        $content = (new OpenAiAdapter)->completePrompt(
+            [['role' => 'user', 'content' => 'docs']],
+            'gpt-4o-mini',
+            'docs_briefing',
+            $conversation,
+        );
+
+        $this->assertSame('A documentação confirma o pagamento.', $content);
+        $this->assertDatabaseHas('llm_usages', [
+            'conversation_id' => $conversation->id,
+            'generation_id' => 'chatcmpl-briefing-1',
+            'step' => 'docs_briefing',
+            'prompt_version' => 'v1',
+            'prompt_hash' => $prompt->hash,
+            'total_tokens' => 52,
+        ]);
+    }
+
     private function conversationWithUserMessage(): Conversation
     {
         $user = User::factory()->create();

@@ -100,7 +100,7 @@
             <div class="px-5 py-4 border-b border-gray-100">
                 <h2 class="text-sm font-semibold text-gray-900">Pipeline por step</h2>
                 <p class="text-xs text-gray-400 mt-1">
-                    Consumo de cada etapa (interview, card_generation, docs_retrieval, discovery) para achar gargalos.
+                    Consumo de cada etapa (interview, card_generation, docs_retrieval, docs_briefing, discovery) para achar gargalos.
                 </p>
             </div>
 
