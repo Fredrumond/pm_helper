@@ -152,6 +152,23 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.7.1',
+            'data' => '2026-09-16',
+            'estado' => 'development',
+            'titulo' => 'README: alinhamento com skills-metodologia',
+            'resumo' => 'O README passa a deixar explícito que o PM Helper tem a ideia de absorver as etapas de qualificação (problem-qualify) e discovery da metodologia em evolução no repositório skills-metodologia.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'README referencia skills-metodologia (qualify + discovery)', 'estado' => 'development', 'nota' => 'https://github.com/Fredrumond/skills-metodologia'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.7.0',
             'data' => '2026-09-16',
             'estado' => 'development',

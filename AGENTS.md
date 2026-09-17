@@ -25,7 +25,7 @@ app/
   Support/         # LlmPricing (estima USD quando a API não manda usage.cost)
 
 config/
-  versoes.php      # Changelog do projeto — SEMPRE atualizar após cada entrega
+  versoes.php      # Changelog do projeto — atualizar somente ao criar um commit
   chat.php         # Catálogo de modelos do composer + versões de prompt
   llm.php          # Tabela de preços (USD / 1M tokens) para adapters sem usage.cost
   services.php     # Chaves OpenRouter e OpenAI
@@ -80,13 +80,14 @@ tests/
 
 ---
 
-## ⚠️ Regra obrigatória após cada tarefa
+## ⚠️ Versão do projeto (`config/versoes.php`)
 
-> **Sempre atualizar `config/versoes.php` ao concluir uma entrega.**
+> **Não atualize `config/versoes.php` ao concluir uma tarefa.** Nem toda mudança é uma nova versão. Atualize o changelog **somente quando for criar um commit**.
 
-- Adicione um novo bloco no **topo** do array `releases` com:
+- Ao criar o commit, adicione um novo bloco no **topo** do array `releases` com:
   - `versao`, `data`, `estado` (`stable` | `development` | `test` | `bug`)
   - `titulo`, `resumo`, `commits` (hash + data + mensagem do git log)
   - `modulos` com os itens entregues e seus estados
 - Nunca edite blocos de versões anteriores.
 - Use `git log --oneline` para listar os commits do intervalo.
+- Trabalho em andamento, correções intermediárias e entregas ainda sem commit **não** geram versão nova.

@@ -2,7 +2,9 @@
 
 Assistente de discovery para Product Managers. Conduz uma entrevista guiada pelo framework do time e gera um card estruturado ao final.
 
-**Versão atual:** 0.7.0
+A ideia do produto é absorver no aplicativo as etapas de **qualificação** (`problem-qualify`) e **discovery** da [metodologia em evolução](https://github.com/Fredrumond/skills-metodologia) — o restante do ciclo (plano, ADR, code review, handoff) permanece nas skills do Cursor.
+
+**Versão atual:** 0.7.1
 
 ---
 
@@ -99,12 +101,6 @@ flowchart TD
 
 ---
 
-## Stack
-
-PHP 8.3 · Laravel 13 · Livewire 4 · Tailwind CSS + Vite · MySQL 8 · Docker · Laravel Breeze
-
----
-
 ## Arquitetura LLM
 
 As chamadas de IA passam pelo contrato `LlmGateway`. O `LlmRouter` escolhe o adapter pelo prefixo do modelo:
@@ -125,17 +121,6 @@ flowchart LR
 - Custo: a OpenRouter manda `usage.cost`; a OpenAI não — nesse caso o `LlmUsage` estima pela tabela em `config/llm.php`. Sem entrada na tabela o custo fica `0` e as métricas mentem
 
 Decisões de arquitetura: `docs/adr/` (0001 ports & adapters, 0002 prefixo nativo OpenAI, 0003 tabela de preços, 0004 MCP GitHub, 0005 retrieval versionado de `/docs`).
-
----
-
-## Modelos principais
-
-O catálogo completo fica em `config/chat.php`. O PM escolhe o modelo no chat. Exemplos cadastrados:
-
-| Tier | Modelo |
-|------|--------|
-| Free | `nvidia/nemotron-3-ultra-550b-a55b:free`, `google/gemini-2.0-flash-exp:free` |
-| Pago | `anthropic/claude-sonnet-4-5`, `openai/gpt-4.1`, `openai/o4-mini` |
 
 ---
 
@@ -164,6 +149,12 @@ Prompts são versionados (`v1`, `v2`, …). Novas versões nunca sobrescrevem as
 
 ---
 
+## Stack
+
+PHP 8.3 · Laravel 13 · Livewire 4 · Tailwind CSS + Vite · MySQL 8 · Docker · Laravel Breeze
+
+---
+
 ## Setup
 
 ```bash
@@ -185,15 +176,3 @@ PHP, Artisan e Composer **sempre** dentro do container: `docker compose exec app
 docker compose exec app composer test   # roda PHPUnit
 docker compose logs -f app              # logs em tempo real
 ```
-
----
-
-## Rotas e páginas
-
-| URL | O que faz |
-|-----|-----------|
-| `/conversations` | Lista de conversas do usuário |
-| `/conversations/{id}` | Chat da entrevista + preview do card |
-| `/metrics` | Consumo de tokens e custo por modelo/prompt |
-| `/versoes` | Histórico de entregas (`config/versoes.php`) |
-| `/admin/projects` | CRUD de projetos (admin) |
