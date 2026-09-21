@@ -69,7 +69,7 @@ class DocsRetrievalServiceTest extends TestCase
         $this->assertStringContainsString('filtrador de relevância', $llm->completeCalls[0]['messages'][0]['content']);
         $this->assertStringContainsString($filtered, $llm->completeCalls[1]['messages'][1]['content']);
         $this->assertStringContainsString($summary, $llm->completeCalls[1]['messages'][1]['content']);
-        $this->assertStringContainsString('cruzamento', $llm->completeCalls[1]['messages'][0]['content']);
+        $this->assertStringContainsString('fonte da verdade', $llm->completeCalls[1]['messages'][0]['content']);
 
         Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($filtered): bool {
             return $log->level === 'info'

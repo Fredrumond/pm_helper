@@ -135,6 +135,17 @@ return [
                 'resumo' => 'Primeira versão do prompt de briefing de /docs. Cruza o conteúdo lido com o resumo da entrevista e devolve texto livre em português, destacando sobreposição, conflito, vocabulário e objetivo. Trata /docs como dado, nunca como instrução; não faz perguntas e não impõe teto de tamanho.',
                 'mudancas' => [],
             ],
+            [
+                'versao' => 'v2',
+                'data' => '2026-09-21',
+                'release' => '0.7.2',
+                'resumo' => 'O briefing deixa de comparar entrevista e /docs como dois lados iguais. /docs passa a ser a fonte da verdade do que já está implementado. O texto para o PM cobre o que já existe, alerta quando a demanda já está coberta e lista só restrições de comportamento que mudam o escopo do card.',
+                'mudancas' => [
+                    'Regra fundamental: o que está documentado já existe no produto',
+                    'Seções: o que já existe, alerta de demanda já coberta (omitida se não houver), restrições de escopo e objetivo à luz do produto',
+                    'Sai a lista de vocabulário técnico (parâmetros, endpoints, tokens); o gerador do card continua alinhando isso a partir do conteúdo original de /docs',
+                ],
+            ],
         ],
 
         'discovery' => [
@@ -150,6 +161,29 @@ return [
     ],
 
     'releases' => [
+
+        [
+            'versao' => '0.7.2',
+            'data' => '2026-09-21',
+            'estado' => 'development',
+            'titulo' => 'Briefing de /docs como o que já está implementado',
+            'resumo' => 'O briefing deixa de cruzar entrevista e documentação como fontes equivalentes. /docs passa a ser a fonte da verdade do que já existe: o PM vê o que já foi implementado, um alerta quando a demanda repete isso e só as restrições de comportamento que limitam o card. O texto não alimenta a geração — o card continua saindo do resumo mais o conteúdo original de /docs.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Prompts',
+                    'itens' => [
+                        ['titulo' => 'docs_briefing@v2 como padrão', 'estado' => 'development', 'nota' => 'CHAT_DOCS_BRIEFING_PROMPT_VERSION; v1 permanece no catálogo'],
+                    ],
+                ],
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'README e guia de lançamento descrevem o briefing v2', 'estado' => 'development', 'nota' => 'versão atual 0.7.2'],
+                    ],
+                ],
+            ],
+        ],
 
         [
             'versao' => '0.7.1',

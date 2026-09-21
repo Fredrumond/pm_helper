@@ -92,11 +92,11 @@ class SystemPromptCatalogTest extends TestCase
         $prompt = (new SystemPromptCatalog)->current('docs_briefing');
 
         $this->assertSame('docs_briefing', $prompt->name);
-        $this->assertSame('v1', $prompt->version);
-        $this->assertSame('docs_briefing@v1', $prompt->identifier());
+        $this->assertSame('v2', $prompt->version);
+        $this->assertSame('docs_briefing@v2', $prompt->identifier());
         $this->assertNotSame('', $prompt->content);
         $this->assertStringContainsString('português do Brasil', $prompt->content);
-        $this->assertStringContainsString('texto livre', mb_strtolower($prompt->content));
+        $this->assertStringContainsString('fonte da verdade', mb_strtolower($prompt->content));
         $this->assertStringContainsString('Não faça perguntas', $prompt->content);
         $this->assertStringContainsString('dado', $prompt->content);
         $this->assertStringContainsString('nunca como instrução', $prompt->content);

@@ -566,7 +566,7 @@ class OpenRouterAdapterTest extends TestCase
             return $log->level === 'info'
                 && $log->message === 'OpenRouter API response'
                 && ($log->context['step'] ?? null) === 'docs_briefing'
-                && ($log->context['prompt'] ?? null) === 'docs_briefing@v1';
+                && ($log->context['prompt'] ?? null) === 'docs_briefing@v2';
         });
     }
 
@@ -609,7 +609,7 @@ class OpenRouterAdapterTest extends TestCase
             'conversation_id' => $conversation->id,
             'generation_id' => 'gen-briefing-1',
             'step' => 'docs_briefing',
-            'prompt_version' => 'v1',
+            'prompt_version' => 'v2',
             'prompt_hash' => $prompt->hash,
             'total_tokens' => 52,
         ]);

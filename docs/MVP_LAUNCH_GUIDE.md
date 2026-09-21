@@ -1,6 +1,6 @@
 # PM Helper — Guia de Lançamento do MVP
 
-> **Versão:** 0.7.1 · **Data:** 16/09/2026  
+> **Versão:** 0.7.2 · **Data:** 21/09/2026  
 > **Público:** PMs que vão testar o PM Helper
 
 ---
@@ -41,7 +41,7 @@ O PM Helper não substitui o ciclo inteiro — ele resolve a parte mais trabalho
 
 ### Contexto do projeto via `/docs`
 - PM seleciona um projeto (repositório GitHub cadastrado pelo admin)
-- Ao fechar a entrevista, o PM Helper lê a pasta `/docs` do repositório: escolhe os arquivos mais relevantes via prompt e gera um briefing cruzando o conteúdo com o resumo — tudo antes de gerar o card
+- Ao fechar a entrevista, o PM Helper lê a pasta `/docs` do repositório: escolhe os arquivos mais relevantes via prompt e gera um briefing do que já está implementado — incluindo alerta se a demanda repetir algo existente — antes de gerar o card
 - O card é gerado com esse contexto quando disponível
 
 ### Geração e visualização de cards
@@ -70,7 +70,7 @@ O PM Helper não substitui o ciclo inteiro — ele resolve a parte mais trabalho
 3. Clique em **"Nova conversa"**
 4. Descreva o card em linguagem livre, ex: _"Preciso de um card para adicionar validação de CPF no checkout antes de finalizar a compra"_
 5. Responda as perguntas do assistente — ele guia fase a fase, sem sobrecarregar
-6. Quando o assistente fechar o resumo e o briefing de `/docs` aparecer, clique em **"Gerar Card"**
+6. Quando o assistente fechar o resumo, leia o briefing de `/docs` (o que já existe e o que limita o card) e clique em **"Gerar Card"**
 7. Revise o card gerado com todas as seções do framework
 
 ### Dicas

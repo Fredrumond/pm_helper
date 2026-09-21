@@ -4,7 +4,7 @@ Assistente de discovery para Product Managers. Conduz uma entrevista guiada pelo
 
 A ideia do produto é absorver no aplicativo as etapas de **qualificação** (`problem-qualify`) e **discovery** da [metodologia em evolução](https://github.com/Fredrumond/skills-metodologia) — o restante do ciclo (plano, ADR, code review, handoff) permanece nas skills do Cursor.
 
-**Versão atual:** 0.7.1
+**Versão atual:** 0.7.2
 
 ---
 
@@ -95,7 +95,7 @@ flowchart TD
 ```
 
 - **Retrieval** (`docs_retrieval@v1`): recebe o índice de paths + o `interview_summary`; devolve JSON `{"paths": [...]}`. Paths inventados ou fora de `/docs` são descartados. Falha, lista vazia ou parse inválido volta ao dump completo.
-- **Briefing** (`docs_briefing@v1`): só com status `ok`. Cruza o conteúdo lido com o resumo e gera texto livre em português (sobreposição, conflito, vocabulário). Falha ou vazio: só a frase de revisão, sem erro na UI.
+- **Briefing** (`docs_briefing@v2`): só com status `ok`. Trata `/docs` como o que já está implementado e escreve um texto curto para o PM: o que já existe, alerta se a demanda já está coberta e restrições de comportamento que limitam o card. Falha ou vazio: só a frase de revisão, sem erro na UI. O texto não entra na geração do card — `generateCard` continua usando o conteúdo original de `/docs`.
 - O teto `GITHUB_MCP_MAX_CHARS` vale sobre o conteúdo **já filtrado**, não sobre a árvore inteira.
 - `generateCard` não relê o GitHub: usa o payload da sessão.
 
@@ -130,7 +130,7 @@ Decisões de arquitetura: `docs/adr/` (0001 ports & adapters, 0002 prefixo nativ
 |-------|--------|-----------|
 | `interview` / `discovery` | `resources/prompts/interview/v*.md` | Conduz a entrevista (Objetivo · Como funciona hoje · Regras · Onde · Aceite · O que não fazer · Stakeholders · Como validar) |
 | `docs_retrieval` | `resources/prompts/docs_retrieval/v*.md` | Escolhe até 10 paths de `/docs` a partir do índice + resumo |
-| `docs_briefing` | `resources/prompts/docs_briefing/v*.md` | Humaniza o cruzamento `/docs` × entrevista na conversa |
+| `docs_briefing` | `resources/prompts/docs_briefing/v*.md` | Diz ao PM o que `/docs` já confirma como implementado, alerta demanda já coberta e lista restrições de escopo |
 | `card_generation` | `resources/prompts/card_generation/v*.md` | Monta o JSON do card a partir do `interview_summary` (+ `/docs` se a revisão ok) |
 
 Prompts são versionados (`v1`, `v2`, …). Novas versões nunca sobrescrevem as anteriores — registrar em `SystemPromptCatalog`.

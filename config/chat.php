@@ -92,7 +92,7 @@ return [
             'model' => env('CHAT_DOCS_RETRIEVAL_MODEL'),
         ],
         'docs_briefing' => [
-            'version' => env('CHAT_DOCS_BRIEFING_PROMPT_VERSION', 'v1'),
+            'version' => env('CHAT_DOCS_BRIEFING_PROMPT_VERSION', 'v2'),
             'model' => env('CHAT_DOCS_BRIEFING_MODEL'),
         ],
     ],
