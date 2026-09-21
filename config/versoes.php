@@ -163,6 +163,26 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.7.3',
+            'data' => '2026-09-21',
+            'estado' => 'development',
+            'titulo' => 'Projeto aberto sob licença MIT',
+            'resumo' => 'O repositório passa a poder ser usado, copiado e modificado: licença MIT, código de conduta, guia de contribuição e política de segurança. O composer.json deixa de se identificar como o skeleton do Laravel.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'Licença MIT', 'estado' => 'stable', 'nota' => 'LICENSE; copyright 2026 Frederico'],
+                        ['titulo' => 'CONTRIBUTING, código de conduta e política de segurança', 'estado' => 'stable', 'nota' => 'Contributor Covenant 2.1; vulnerabilidade por e-mail, sem issue pública'],
+                        ['titulo' => 'Modelos de issue e pull request', 'estado' => 'stable', 'nota' => '.github/'],
+                        ['titulo' => 'Pacote identificado como fredrumond/pm-helper', 'estado' => 'stable', 'nota' => 'nome, descrição, autor e keywords no composer.json'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.7.2',
             'data' => '2026-09-21',
             'estado' => 'development',

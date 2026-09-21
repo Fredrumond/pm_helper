@@ -4,7 +4,7 @@ Assistente de discovery para Product Managers. Conduz uma entrevista guiada pelo
 
 A ideia do produto é absorver no aplicativo as etapas de **qualificação** (`problem-qualify`) e **discovery** da [metodologia em evolução](https://github.com/Fredrumond/skills-metodologia) — o restante do ciclo (plano, ADR, code review, handoff) permanece nas skills do Cursor.
 
-**Versão atual:** 0.7.2
+**Versão atual:** 0.7.3
 
 ---
 
@@ -176,3 +176,15 @@ PHP, Artisan e Composer **sempre** dentro do container: `docker compose exec app
 docker compose exec app composer test   # roda PHPUnit
 docker compose logs -f app              # logs em tempo real
 ```
+
+---
+
+## Contribuir
+
+Issues e pull requests são bem-vindos. O passo a passo está em [CONTRIBUTING.md](CONTRIBUTING.md). A participação segue o [Código de Conduta](CODE_OF_CONDUCT.md).
+
+Vulnerabilidades: veja [SECURITY.md](SECURITY.md) e reporte em privado.
+
+## Licença
+
+[MIT](LICENSE). Você pode usar, copiar, modificar e distribuir este software, desde que mantenha o aviso de copyright e o texto da licença.
