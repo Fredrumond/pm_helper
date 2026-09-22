@@ -14,6 +14,7 @@ class Conversation extends Model
 
     protected $fillable = [
         'user_id',
+        'project_id',
         'title',
         'status',
         'prompt_name',
@@ -29,6 +30,11 @@ class Conversation extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class)->withTrashed();
     }
 
     public function messages(): HasMany

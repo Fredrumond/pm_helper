@@ -20,6 +20,9 @@
                     } }}">
                     ↑ {{ $card->priorityLabel() }}
                 </span>
+                @if ($card->conversation?->project?->name)
+                    <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">{{ $card->conversation->project->name }}</span>
+                @endif
             </div>
             <h2 class="text-base font-bold text-gray-900 leading-tight">{{ $card->title }}</h2>
         </div>

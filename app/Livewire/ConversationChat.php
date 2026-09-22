@@ -7,6 +7,7 @@ use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Card;
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Models\Project;
 use App\Services\CardParserService;
 use App\Services\DocsRetrievalService;
 use App\Services\ProjectDocsResult;
@@ -15,6 +16,7 @@ use App\Support\ProjectDocsReview;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
 
@@ -26,12 +28,16 @@ class ConversationChat extends Component
 
     public string $selectedModel = '';
 
+    #[Locked]
+    public ?int $selectedProjectId = null;
+
     public bool $generatingCard = false;
 
     public function mount(Conversation $conversation): void
     {
         abort_if($conversation->user_id !== Auth::id(), 403);
         $this->conversation = $conversation;
+        $this->forgetInactiveProjectIfNotStarted();
 
         $stored = session('chat.selected_model');
         $this->selectedModel = is_string($stored) && ChatComposer::isAllowedModel($stored)
@@ -49,8 +55,33 @@ class ConversationChat extends Component
         session(['chat.selected_model' => $model]);
     }
 
+    public function selectProject(mixed $projectId): void
+    {
+        abort_if($this->conversation->user_id !== Auth::id(), 403);
+
+        if ($this->conversationHasStarted()) {
+            $this->hydrateSelectedProject();
+
+            return;
+        }
+
+        $projectId = $this->activeProjectId($projectId);
+
+        Conversation::query()
+            ->whereKey($this->conversation->id)
+            ->where('user_id', Auth::id())
+            ->whereDoesntHave('messages')
+            ->update(['project_id' => $projectId]);
+
+        $this->conversation->refresh();
+        $this->conversation->unsetRelation('project');
+        $this->hydrateSelectedProject();
+    }
+
     public function sendMessage(LlmGateway $llm, CardParserService $parser): void
     {
+        $this->forgetInactiveProjectIfNotStarted();
+
         if (trim($this->input) === '' || $this->conversation->isCompleted()) {
             return;
         }
@@ -302,7 +333,8 @@ class ConversationChat extends Component
 
     private function reviewProjectDocs(?DocsRetrievalService $retrieval = null): void
     {
-        $project = ProjectDocsReview::currentProject();
+        $this->conversation->unsetRelation('project');
+        $project = $this->conversation->project;
 
         if ($project === null) {
             return;
@@ -429,13 +461,18 @@ class ConversationChat extends Component
 
     public function render()
     {
+        $this->forgetInactiveProjectIfNotStarted();
+
         $selected = ChatComposer::findModel($this->selectedModel);
 
-        $this->conversation->load(['messages', 'card']);
+        $this->conversation->unsetRelation('project');
+        $this->conversation->load(['messages', 'card', 'project']);
 
         return view('livewire.conversation-chat', [
             'messages' => $this->conversation->messages,
             'card' => $this->conversation->card,
+            'projects' => Project::query()->orderBy('name')->get(['id', 'name']),
+            'selectedProjectName' => $this->conversation->project?->name,
             'models' => ChatComposer::models(),
             'showGenerateCardButton' => $this->conversation->isInterviewComplete()
                 && ! $this->conversation->isCompleted()
@@ -448,5 +485,60 @@ class ConversationChat extends Component
                 'tier' => '',
             ],
         ]);
+    }
+
+    private function hydrateSelectedProject(): void
+    {
+        $projectId = $this->conversation->project_id;
+
+        $this->selectedProjectId = $projectId !== null ? (int) $projectId : null;
+    }
+
+    private function conversationHasStarted(): bool
+    {
+        return $this->conversation->messages()->exists();
+    }
+
+    private function forgetInactiveProjectIfNotStarted(): void
+    {
+        if ($this->conversationHasStarted()) {
+            $this->hydrateSelectedProject();
+
+            return;
+        }
+
+        $projectId = $this->conversation->project_id;
+
+        if ($projectId !== null && ! Project::query()->whereKey($projectId)->exists()) {
+            Conversation::query()
+                ->whereKey($this->conversation->id)
+                ->where('user_id', Auth::id())
+                ->whereDoesntHave('messages')
+                ->update(['project_id' => null]);
+
+            $this->conversation->refresh();
+            $this->conversation->unsetRelation('project');
+        }
+
+        $this->hydrateSelectedProject();
+    }
+
+    private function activeProjectId(mixed $projectId): ?int
+    {
+        if ($projectId === null || $projectId === '') {
+            return null;
+        }
+
+        if (! is_int($projectId) && ! (is_string($projectId) && preg_match('/^\d+$/', $projectId) === 1)) {
+            return null;
+        }
+
+        $id = (int) $projectId;
+
+        if ($id < 1 || ! Project::query()->whereKey($id)->exists()) {
+            return null;
+        }
+
+        return $id;
     }
 }

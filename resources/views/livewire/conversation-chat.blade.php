@@ -189,7 +189,7 @@
                     ></textarea>
 
                     <div class="flex items-center justify-between gap-2 px-2.5 pb-2.5">
-                        <div class="flex items-center min-w-0">
+                        <div class="flex items-center min-w-0 gap-1">
                             <button
                                 type="button"
                                 @click="toggleModels()"
@@ -204,6 +204,70 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                 </svg>
                             </button>
+
+                            <div
+                                x-data="{ open: false }"
+                                @click.outside="open = false"
+                                @keydown.escape="open = false"
+                                class="relative min-w-0"
+                            >
+                                <div
+                                    x-show="open"
+                                    x-cloak
+                                    x-transition.opacity
+                                    class="absolute bottom-full left-0 mb-2 z-20 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+                                    role="listbox"
+                                    aria-label="Projetos"
+                                >
+                                    <ul class="max-h-56 overflow-y-auto py-1">
+                                        <li>
+                                            <button
+                                                type="button"
+                                                @click="$wire.selectProject(null); open = false"
+                                                class="w-full flex items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-indigo-50"
+                                            >
+                                                <span class="block text-sm text-gray-800">Sem projeto</span>
+                                                @if ($selectedProjectId === null)
+                                                    <svg class="w-4 h-4 shrink-0 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                    </svg>
+                                                @endif
+                                            </button>
+                                        </li>
+                                        @foreach ($projects as $project)
+                                            <li wire:key="project-option-{{ $project->id }}">
+                                                <button
+                                                    type="button"
+                                                    @click="$wire.selectProject({{ $project->id }}); open = false"
+                                                    class="w-full flex items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-indigo-50"
+                                                >
+                                                    <span class="block text-sm text-gray-800">{{ $project->name }}</span>
+                                                    @if ((int) $selectedProjectId === $project->id)
+                                                        <svg class="w-4 h-4 shrink-0 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                        </svg>
+                                                    @endif
+                                                </button>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    @click="open = ! open"
+                                    @disabled($messages->isNotEmpty())
+                                    aria-label="Projeto"
+                                    :aria-expanded="open.toString()"
+                                    title="{{ $messages->isNotEmpty() ? 'O projeto fica travado depois da primeira mensagem' : 'Vincular um projeto a esta conversa (opcional)' }}"
+                                    class="inline-flex items-center gap-1 max-w-full rounded-lg px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                                >
+                                    <span class="truncate">{{ $selectedProjectName ?? 'Sem projeto' }}</span>
+                                    <svg class="w-3 h-3 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
 
                         <div class="flex items-center gap-1">
@@ -263,6 +327,12 @@
                     </div>
                 </div>
             </form>
+
+            @if ($messages->isEmpty())
+                <p class="mt-1.5 max-w-3xl mx-auto text-center text-[11px] text-gray-400">
+                    Ao lado do modelo, você pode vincular um projeto a esta conversa (opcional). Depois da primeira mensagem, a escolha fica travada.
+                </p>
+            @endif
         @endif
     </div>
 </div>

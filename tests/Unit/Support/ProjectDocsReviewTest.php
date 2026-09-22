@@ -4,7 +4,6 @@ namespace Tests\Unit\Support;
 
 use App\Models\Project;
 use App\Services\ProjectDocsResult;
-use App\Support\CurrentProject;
 use App\Support\ProjectDocsReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -89,16 +88,6 @@ class ProjectDocsReviewTest extends TestCase
 
         $this->assertNull(ProjectDocsReview::get(42));
         $this->assertFalse(session()->has('project_docs.42'));
-    }
-
-    public function test_current_project_follows_the_session_selection(): void
-    {
-        $this->assertNull(ProjectDocsReview::currentProject());
-
-        $project = Project::factory()->create();
-        $this->session([CurrentProject::SESSION_KEY => $project->id]);
-
-        $this->assertTrue($project->is(ProjectDocsReview::currentProject()));
     }
 
     public function test_assistant_messages_match_review_status(): void

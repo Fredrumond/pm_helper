@@ -14,17 +14,6 @@ class ProjectDocsReview
         return self::SESSION_PREFIX.$conversationId;
     }
 
-    public static function currentProject(): ?Project
-    {
-        $projectId = CurrentProject::id();
-
-        if ($projectId === null) {
-            return null;
-        }
-
-        return Project::query()->find($projectId);
-    }
-
     /**
      * @return array{
      *     status: string,

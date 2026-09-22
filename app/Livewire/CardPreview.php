@@ -26,7 +26,10 @@ class CardPreview extends Component
 
     public function render()
     {
-        $this->card->loadMissing('conversation.llmUsages');
+        $this->card->loadMissing([
+            'conversation.llmUsages',
+            'conversation.project',
+        ]);
 
         return view('livewire.card-preview');
     }

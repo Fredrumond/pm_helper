@@ -1,29 +1,31 @@
 # PM Helper — Guia de Lançamento do MVP
 
-> **Versão:** 0.7.2 · **Data:** 21/09/2026  
+> **Versão:** 0.7.4 · **Data:** 22/09/2026  
 > **Público:** PMs que vão testar o PM Helper
 
 ---
 
 ## O que é
 
-Ferramenta interna que usa IA para conduzir entrevistas de discovery e gerar cards de produto alinhados ao framework do time. O PM conversa com o assistente, responde perguntas sobre a funcionalidade que precisa detalhar, e a ferramenta gera um card estruturado pronto para refinamento.
+Ferramenta interna que usa IA para o PM qualificar uma demanda e gerar um card de produto alinhado ao framework do time. O PM conversa com o assistente, responde perguntas sobre a funcionalidade que precisa detalhar, e a ferramenta gera um card estruturado pronto para refinamento.
 
 **Objetivo:** reduzir o tempo e o atrito entre "ideia de produto" e "card estimável pelo time técnico".
 
 ### Onde se encaixa na metodologia do time
 
-O PM Helper cobre as duas primeiras etapas do [ciclo de desenvolvimento](https://github.com/Fredrumond/skills-metodologia):
+O PM Helper entra no começo do [ciclo de desenvolvimento](https://github.com/Fredrumond/skills-metodologia). No MVP, ele cobre a **qualificação** (`problem-qualify`): a entrevista que organiza a demanda e o card que sai dela.
+
+A etapa de **discovery** da metodologia continua na skill `discovery` do Cursor. Ela será desenvolvida no PM Helper numa etapa futura. Plano, ADR, code review e handoff também permanecem nas skills do Cursor.
 
 | Etapa | Onde acontece |
 |---|---|
 | **Qualificação** (`problem-qualify`) | ✅ PM Helper |
-| **Discovery** (entrevista + card) | ✅ PM Helper |
+| **Discovery** | Skills do Cursor — prevista para o PM Helper |
 | Plano de implementação | Skills do Cursor |
 | ADR e decisões de arquitetura | Skills do Cursor |
 | Code review e handoff | Skills do Cursor |
 
-O PM Helper não substitui o ciclo inteiro — ele resolve a parte mais trabalhosa de qualificar e estruturar a demanda antes de chegar no time técnico.
+O PM Helper não substitui o ciclo inteiro. Hoje ele qualifica a demanda e entrega o card; o discovery e o restante do fluxo seguem nas skills do Cursor até entrarem no aplicativo.
 
 ---
 
@@ -40,7 +42,7 @@ O PM Helper não substitui o ciclo inteiro — ele resolve a parte mais trabalho
 - Resumo automático da entrevista extraído e salvo na conversa
 
 ### Contexto do projeto via `/docs`
-- PM seleciona um projeto (repositório GitHub cadastrado pelo admin)
+- No chat, antes da primeira mensagem, o PM pode vincular um projeto ativo (opcional). A escolha vale só para aquela conversa e não muda depois que ela começa
 - Ao fechar a entrevista, o PM Helper lê a pasta `/docs` do repositório: escolhe os arquivos mais relevantes via prompt e gera um briefing do que já está implementado — incluindo alerta se a demanda repetir algo existente — antes de gerar o card
 - O card é gerado com esse contexto quando disponível
 
@@ -48,6 +50,7 @@ O PM Helper não substitui o ciclo inteiro — ele resolve a parte mais trabalho
 - Botão **"Gerar Card"** aparece ao fim da entrevista
 - Card gerado em JSON estruturado com todos os campos do framework, salvo com `status = draft`
 - Lista de cards e visualização detalhada de cada um
+- Quando a conversa teve projeto, o card mostra o nome amigável junto da prioridade
 
 ### Rastreio de consumo e modelos
 - Tokens, cache e custo por chamada gravados e exibidos na sessão
@@ -66,8 +69,8 @@ O PM Helper não substitui o ciclo inteiro — ele resolve a parte mais trabalho
 **Pré-requisito:** ter um épico definido. O PM Helper trata um card por vez.
 
 1. Faça login com as credenciais que o time vai compartilhar
-2. Em **Projetos**, selecione o projeto ao qual o card pertence (opcional, mas recomendado)
-3. Clique em **"Nova conversa"**
+2. Clique em **"Nova conversa"**
+3. Se quiser, ao lado do modelo, vincule um projeto a esta conversa (opcional). Sem projeto, a entrevista segue. Depois da primeira mensagem, a escolha fica travada
 4. Descreva o card em linguagem livre, ex: _"Preciso de um card para adicionar validação de CPF no checkout antes de finalizar a compra"_
 5. Responda as perguntas do assistente — ele guia fase a fase, sem sobrecarregar
 6. Quando o assistente fechar o resumo, leia o briefing de `/docs` (o que já existe e o que limita o card) e clique em **"Gerar Card"**

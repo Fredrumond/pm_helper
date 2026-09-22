@@ -34,6 +34,9 @@
                                             'critical' => 'bg-red-50 text-red-700',
                                             default    => 'bg-gray-50 text-gray-500',
                                         } }}">{{ $card->priorityLabel() }}</span>
+                                    @if ($card->conversation?->project?->name)
+                                        <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-indigo-50 text-indigo-700">{{ $card->conversation->project->name }}</span>
+                                    @endif
                                     <span class="text-xs px-1.5 py-0.5 rounded font-medium
                                         {{ $card->isApproved() ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600' }}">
                                         {{ $card->isApproved() ? '✓ Aprovado' : 'Rascunho' }}

@@ -22,6 +22,10 @@
                             default    => 'bg-gray-100 text-gray-500',
                         } }}">Prioridade {{ $card->priorityLabel() }}</span>
 
+                    @if ($card->conversation?->project?->name)
+                        <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700">{{ $card->conversation->project->name }}</span>
+                    @endif
+
                     <span class="ml-auto text-xs font-medium px-2.5 py-1 rounded-full
                         {{ $card->isApproved() ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }}">
                         {{ $card->isApproved() ? '✓ Aprovado' : 'Rascunho' }}

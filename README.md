@@ -4,7 +4,7 @@ Assistente de discovery para Product Managers. Conduz uma entrevista guiada pelo
 
 A ideia do produto é absorver no aplicativo as etapas de **qualificação** (`problem-qualify`) e **discovery** da [metodologia em evolução](https://github.com/Fredrumond/skills-metodologia) — o restante do ciclo (plano, ADR, code review, handoff) permanece nas skills do Cursor.
 
-**Versão atual:** 0.7.3
+**Versão atual:** 0.7.4
 
 ---
 
@@ -14,9 +14,11 @@ A ideia do produto é absorver no aplicativo as etapas de **qualificação** (`p
 
 ```mermaid
 flowchart TD
-    START([PM faz login]) --> PROJ[Seleciona projeto]
-    PROJ --> NEW["💾 Conversation criada — status: in_progress"]
-    NEW --> SEND[PM digita e envia mensagem]
+    START([PM faz login]) --> NEW["💾 Conversation criada — status: in_progress\nsem projeto"]
+    NEW --> OPT{Vincular projeto\nantes da 1ª mensagem?}
+    OPT -->|sim| BIND["💾 Conversation.project_id\ntrava no primeiro envio"]
+    OPT -->|não| SEND[PM digita e envia mensagem]
+    BIND --> SEND
     SEND --> UMSG["💾 Message — role: user"]
     UMSG --> ROUTE{Tipo de\nmensagem?}
 

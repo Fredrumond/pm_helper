@@ -163,6 +163,37 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.7.4',
+            'data' => '2026-09-22',
+            'estado' => 'development',
+            'titulo' => 'Projeto opcional escolhido na conversa',
+            'resumo' => 'A tela Projetos sai do menu. O PM vincula um projeto ativo no chat, se quiser, antes da primeira mensagem. A escolha fica na conversa, não muda depois que ela começa, e o card mostra o nome amigável junto da prioridade. Sem projeto, a entrevista e o card seguem.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Chat',
+                    'itens' => [
+                        ['titulo' => 'Seletor de projeto no compositor, ao lado do modelo', 'estado' => 'development', 'nota' => 'Só projetos ativos; conversa nova começa sem projeto'],
+                        ['titulo' => 'Projeto travado depois da primeira mensagem', 'estado' => 'development', 'nota' => 'conversations.project_id; projeto desativado antes do início é liberado'],
+                    ],
+                ],
+                [
+                    'nome' => 'Cards',
+                    'itens' => [
+                        ['titulo' => 'Tag com o nome amigável do projeto junto da prioridade', 'estado' => 'development', 'nota' => 'Listagem, cabeçalho e preview; sem projeto, sem tag'],
+                    ],
+                ],
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'Discovery 0006 e ADR 0006', 'estado' => 'development', 'nota' => 'Origem do projeto deixa de ser a sessão; ADR 0004 segue para a leitura de /docs'],
+                        ['titulo' => 'Guia de lançamento descreve a escolha no chat', 'estado' => 'development', 'nota' => 'versão atual 0.7.4'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.7.3',
             'data' => '2026-09-21',
             'estado' => 'development',

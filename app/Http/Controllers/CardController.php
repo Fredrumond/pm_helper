@@ -12,7 +12,7 @@ class CardController extends Controller
     {
         $cards = Auth::user()
             ->cards()
-            ->with('conversation')
+            ->with('conversation.project')
             ->latest()
             ->paginate(20);
 
@@ -23,7 +23,10 @@ class CardController extends Controller
     {
         abort_if($card->user_id !== Auth::id(), 403);
 
-        $card->load('conversation.llmUsages');
+        $card->load([
+            'conversation.llmUsages',
+            'conversation.project',
+        ]);
 
         return view('cards.show', compact('card'));
     }

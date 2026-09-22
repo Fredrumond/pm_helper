@@ -36,7 +36,8 @@ class AdminProjectsTest extends TestCase
         $this->actingAs($productManager)
             ->get(route('conversations.index'))
             ->assertOk()
-            ->assertDontSee('href="'.route('admin.projects.index').'"', false);
+            ->assertDontSee('href="'.route('admin.projects.index').'"', false)
+            ->assertDontSee('href="'.url('/projetos').'"', false);
     }
 
     public function test_admin_accesses_creates_a_valid_project_and_sees_it_in_the_list(): void
@@ -49,6 +50,8 @@ class AdminProjectsTest extends TestCase
             ->get(route('conversations.index'))
             ->assertOk()
             ->assertSee('href="'.route('admin.projects.index').'"', false)
+            ->assertDontSee('href="'.url('/projetos').'"', false)
+            ->assertSee('Gerenciar Projetos')
             ->assertSee('Projetos');
 
         $this->actingAs($admin)

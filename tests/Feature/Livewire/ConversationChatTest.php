@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Services\ProjectDocsPathsResult;
 use App\Services\ProjectDocsResult;
 use App\Support\ChatComposer;
-use App\Support\CurrentProject;
 use App\Support\ProjectDocsReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -897,6 +896,7 @@ TXT;
 
     public function test_closing_interview_without_project_does_not_call_docs_gateway(): void
     {
+        $project = Project::factory()->create(['repository' => 'acme/ignored']);
         $fake = $this->bindFakeProjectDocsGateway();
 
         $this->fakeInterviewCompleteReply();
@@ -906,6 +906,8 @@ TXT;
             'user_id' => $user->id,
             'title' => 'Checkout',
         ]);
+
+        $this->session(['current_project_id' => $project->id]);
 
         Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
@@ -918,6 +920,7 @@ TXT;
 
         $this->assertSame([], $fake->calls);
         $this->assertNull(ProjectDocsReview::get($conversation->id));
+        $this->assertNull($conversation->fresh()->project_id);
         $this->assertSame(2, $conversation->messages()->count());
     }
 
@@ -938,9 +941,8 @@ TXT;
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Checkout',
+            'project_id' => $project->id,
         ]);
-
-        $this->session([CurrentProject::SESSION_KEY => $project->id]);
 
         Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
@@ -984,9 +986,8 @@ TXT;
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Checkout',
+            'project_id' => $project->id,
         ]);
-
-        $this->session([CurrentProject::SESSION_KEY => $project->id]);
 
         Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
@@ -1021,9 +1022,8 @@ TXT;
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Checkout',
+            'project_id' => $project->id,
         ]);
-
-        $this->session([CurrentProject::SESSION_KEY => $project->id]);
 
         $component = Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
@@ -1072,9 +1072,8 @@ TXT;
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Checkout',
+            'project_id' => $project->id,
         ]);
-
-        $this->session([CurrentProject::SESSION_KEY => $project->id]);
 
         Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
@@ -1107,9 +1106,8 @@ TXT;
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Checkout',
+            'project_id' => $project->id,
         ]);
-
-        $this->session([CurrentProject::SESSION_KEY => $project->id]);
 
         $component = Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
@@ -1154,12 +1152,12 @@ TXT;
             'title' => 'Checkout',
             'current_step' => 'card_generation',
             'interview_summary' => 'Problema: checkout',
+            'project_id' => $project->id,
         ]);
 
         $payload = ProjectDocsReview::payloadFrom($project, ProjectDocsResult::ok('doc', 1, 0));
 
         $this->session([
-            CurrentProject::SESSION_KEY => $project->id,
             ProjectDocsReview::sessionKey($conversation->id) => $payload,
         ]);
 
@@ -1201,10 +1199,10 @@ TXT;
             'prompt_version' => 'v1',
             'current_step' => 'card_generation',
             'interview_summary' => 'Problema: checkout sem pagamento',
+            'project_id' => $project->id,
         ]);
 
         $this->session([
-            CurrentProject::SESSION_KEY => $project->id,
             ProjectDocsReview::sessionKey($conversation->id) => ProjectDocsReview::payloadFrom(
                 $project,
                 ProjectDocsResult::ok('# Regras', 1, 0),
@@ -1251,9 +1249,8 @@ TXT;
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Checkout',
+            'project_id' => $project->id,
         ]);
-
-        $this->session([CurrentProject::SESSION_KEY => $project->id]);
 
         Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
@@ -1308,9 +1305,8 @@ TXT;
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Checkout',
+            'project_id' => $project->id,
         ]);
-
-        $this->session([CurrentProject::SESSION_KEY => $project->id]);
 
         Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
@@ -1359,9 +1355,8 @@ TXT;
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Checkout',
+            'project_id' => $project->id,
         ]);
-
-        $this->session([CurrentProject::SESSION_KEY => $project->id]);
 
         $component = Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
@@ -1394,6 +1389,319 @@ TXT;
         $this->assertDatabaseMissing('cards', [
             'conversation_id' => $conversation->id,
         ]);
+    }
+
+    public function test_guest_cannot_open_the_chat(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        $this->get(route('conversations.show', $conversation))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_new_conversation_starts_without_project_even_when_session_or_another_conversation_has_one(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['name' => 'Checkout']);
+
+        $existing = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Conversa anterior',
+            'project_id' => $project->id,
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_project_id' => $project->id])
+            ->post(route('conversations.store'))
+            ->assertRedirect();
+
+        $created = Conversation::query()
+            ->where('user_id', $user->id)
+            ->whereKeyNot($existing->id)
+            ->first();
+
+        $this->assertNotNull($created);
+        $this->assertNull($created->project_id);
+        $this->assertSame($project->id, $existing->fresh()->project_id);
+
+        $this->session(['current_project_id' => $project->id]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $created])
+            ->assertSet('selectedProjectId', null);
+    }
+
+    public function test_selecting_an_active_project_before_the_first_message_persists_and_survives_a_new_render(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['name' => 'Checkout']);
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->assertSet('selectedProjectId', null)
+            ->call('selectProject', $project->id)
+            ->assertSet('selectedProjectId', $project->id)
+            ->assertSee('Checkout');
+
+        $this->assertSame($project->id, $conversation->fresh()->project_id);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation->fresh()])
+            ->assertSet('selectedProjectId', $project->id)
+            ->assertSee('Checkout');
+    }
+
+    public function test_clearing_the_project_before_the_first_message_persists_null(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['name' => 'Checkout']);
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+            'project_id' => $project->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->assertSet('selectedProjectId', $project->id)
+            ->call('selectProject', '')
+            ->assertSet('selectedProjectId', null);
+
+        $this->assertNull($conversation->fresh()->project_id);
+
+        $conversation->update(['project_id' => $project->id]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation->fresh()])
+            ->call('selectProject', null)
+            ->assertSet('selectedProjectId', null);
+
+        $this->assertNull($conversation->fresh()->project_id);
+    }
+
+    public function test_soft_deleted_or_missing_project_id_is_not_stored(): void
+    {
+        $user = User::factory()->create();
+        $active = Project::factory()->create(['name' => 'Ativo']);
+        $deleted = Project::factory()->create([
+            'name' => 'Inativo',
+            'repository' => 'acme/gone-repo',
+        ]);
+        $deleted->delete();
+
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('selectProject', $deleted->id)
+            ->assertSet('selectedProjectId', null)
+            ->call('selectProject', 999_999)
+            ->assertSet('selectedProjectId', null);
+
+        $this->assertNull($conversation->fresh()->project_id);
+
+        $component
+            ->call('selectProject', $active->id)
+            ->call('selectProject', (string) $deleted->id);
+
+        $this->assertNull($conversation->fresh()->project_id);
+        $this->assertNotSame($deleted->id, $conversation->fresh()->project_id);
+    }
+
+    public function test_project_list_shows_active_names_in_order_and_hides_the_repository(): void
+    {
+        $user = User::factory()->create();
+        Project::factory()->create([
+            'name' => 'Zebra',
+            'repository' => 'acme/zebra-repo',
+        ]);
+        Project::factory()->create([
+            'name' => 'Alpha',
+            'repository' => 'acme/alpha-repo',
+        ]);
+        $deleted = Project::factory()->create([
+            'name' => 'Inativo',
+            'repository' => 'acme/gone-repo',
+        ]);
+        $deleted->delete();
+
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->assertSeeInOrder(['Alpha', 'Zebra'])
+            ->assertDontSee('acme/zebra-repo')
+            ->assertDontSee('acme/alpha-repo')
+            ->assertDontSee('acme/gone-repo')
+            ->assertDontSee('Inativo');
+
+        $this->assertFalse($this->projectPickerIsDisabled($component->html()));
+        $this->assertMatchesRegularExpression(
+            '/<button\b[^>]*aria-label="Projeto"[^>]*>\s*<span[^>]*>Sem projeto<\/span>/s',
+            $component->html(),
+        );
+    }
+
+    public function test_project_cannot_change_after_the_first_message(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Qual problema você quer resolver?']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $selected = Project::factory()->create(['name' => 'Checkout']);
+        $other = Project::factory()->create(['name' => 'Outro']);
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('selectProject', $selected->id)
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSet('selectedProjectId', $selected->id);
+
+        $this->assertSame($selected->id, $conversation->fresh()->project_id);
+        $this->assertTrue($this->projectPickerIsDisabled($component->html()));
+
+        $component
+            ->call('selectProject', $other->id)
+            ->assertSet('selectedProjectId', $selected->id)
+            ->call('selectProject', null)
+            ->assertSet('selectedProjectId', $selected->id);
+
+        $this->assertSame($selected->id, $conversation->fresh()->project_id);
+    }
+
+    public function test_send_without_active_projects_keeps_project_id_null(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Qual problema você quer resolver?']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $deleted = Project::factory()->create([
+            'name' => 'Inativo',
+            'repository' => 'acme/gone-repo',
+        ]);
+        $deleted->delete();
+
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->assertDontSee('Inativo')
+            ->assertDontSee('acme/gone-repo')
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSee('Qual problema você quer resolver?');
+
+        $this->assertNull($conversation->fresh()->project_id);
+    }
+
+    public function test_deactivated_project_is_released_before_the_first_message(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Qual problema você quer resolver?']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $project = Project::factory()->create([
+            'name' => 'Checkout',
+            'repository' => 'acme/checkout',
+        ]);
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+            'project_id' => $project->id,
+        ]);
+        $project->delete();
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->assertSet('selectedProjectId', null)
+            ->assertSee('Sem projeto')
+            ->assertDontSee('Checkout')
+            ->assertDontSee('acme/checkout')
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage')
+            ->assertSet('selectedProjectId', null);
+
+        $this->assertNull($conversation->fresh()->project_id);
+        $this->assertNull(ProjectDocsReview::get($conversation->id));
+    }
+
+    public function test_locked_conversation_keeps_the_project_name_after_deactivation(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Qual problema você quer resolver?']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $project = Project::factory()->create([
+            'name' => 'Checkout',
+            'repository' => 'acme/checkout',
+        ]);
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Nova conversa',
+            'project_id' => $project->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage');
+
+        $project->delete();
+
+        $component = Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation->fresh()])
+            ->assertSet('selectedProjectId', $project->id)
+            ->assertSee('Checkout')
+            ->assertDontSee('acme/checkout');
+
+        $this->assertTrue($this->projectPickerIsDisabled($component->html()));
+        $this->assertSame($project->id, $conversation->fresh()->project_id);
     }
 
     private function assertReviewThenBriefing(
@@ -1441,6 +1749,17 @@ Persona: comprador
 </INTERVIEW_SUMMARY>
 </INTERVIEW_COMPLETE>
 TXT;
+    }
+
+    private function projectPickerIsDisabled(string $html): bool
+    {
+        if (! preg_match('/<button\b[^>]*aria-label="Projeto"[^>]*>/s', $html, $matches)) {
+            return false;
+        }
+
+        $tag = preg_replace('/\sclass="[^"]*"/', '', $matches[0]) ?? '';
+
+        return preg_match('/\sdisabled(?=[\s=>])/', $tag) === 1;
     }
 
     private function fakeInterviewCompleteReply(): void
