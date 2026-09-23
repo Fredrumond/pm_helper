@@ -163,6 +163,62 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.8.0',
+            'data' => '2026-09-23',
+            'estado' => 'development',
+            'titulo' => 'Admin define modelo por prompt e o catálogo de LLM no banco',
+            'resumo' => 'O PM deixa de escolher o modelo no chat. O admin escolhe o modelo ativo de cada prompt, cadastra o catálogo por provedor com preço de modelo pago, e as alterações administrativas passam a ser auditadas. O roteamento e o custo leem o mesmo registro em llm_models. O guia de lançamento e o roteiro pós-MVP separam o que ainda entra no MVP (conversa vazia, exclusão lógica, reativar projeto) do que fica depois (editar card, mencionar card).',
+            'commits' => [
+                [
+                    'hash' => '49f7fd8',
+                    'data' => '2026-09-23',
+                    'mensagem' => 'O admin passa a definir o modelo de cada prompt e o catálogo de LLM no banco, com auditoria das mudanças, para o PM não escolher modelo e o preço não exigir deploy.',
+                ],
+                [
+                    'hash' => 'd562833',
+                    'data' => '2026-09-23',
+                    'mensagem' => 'Alinhar o guia de lançamento e o roteiro pós-MVP à 0.8.0, para separar o que ainda é MVP do que fica depois.',
+                ],
+            ],
+            'modulos' => [
+                [
+                    'nome' => 'Admin',
+                    'itens' => [
+                        ['titulo' => 'Modelo ativo de cada prompt (interview, docs_retrieval, docs_briefing, card_generation)', 'estado' => 'development', 'nota' => 'Tela AdminPromptModels; vale na próxima chamada, inclusive em conversa já aberta'],
+                        ['titulo' => 'Catálogo de modelos LLM por provedor, com ativar/inativar e preço de modelo pago', 'estado' => 'development', 'nota' => 'Tela AdminLlmModels; carga inicial via llm-models:import-from-config'],
+                        ['titulo' => 'Auditoria automática de PromptModel, LlmModel e Project', 'estado' => 'development', 'nota' => 'Laravel Auditing; só no banco, sem tela de consulta'],
+                    ],
+                ],
+                [
+                    'nome' => 'Chat',
+                    'itens' => [
+                        ['titulo' => 'Seletor de modelo sai do compositor', 'estado' => 'development', 'nota' => 'O PM só escolhe o projeto; o modelo vem do PromptModelConfig'],
+                    ],
+                ],
+                [
+                    'nome' => 'LLM',
+                    'itens' => [
+                        ['titulo' => 'LlmRouter despacha pelo provider do catálogo, não pelo prefixo do id', 'estado' => 'development', 'nota' => 'ADR 0007 substitui essa parte dos ADRs 0001–0003'],
+                        ['titulo' => 'LlmPricing lê price_* de llm_models', 'estado' => 'development', 'nota' => 'config/chat.php models e config/llm.php pricing deixam de ser lidos em produção'],
+                    ],
+                ],
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'Discovery 0007, 0008, 0009 e ADR 0007', 'estado' => 'development', 'nota' => 'Catálogo no banco com provedor explícito'],
+                        ['titulo' => 'README, guia de lançamento e roteiro pós-MVP na 0.8.0', 'estado' => 'development', 'nota' => 'Pendências do MVP vs Onda 1 / Fase 2a'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'AdminPromptModels, AdminLlmModels, PromptModelConfig, LlmModelCatalog e auditoria', 'estado' => 'test'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.7.4',
             'data' => '2026-09-22',
             'estado' => 'development',
