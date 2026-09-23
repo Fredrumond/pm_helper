@@ -4,7 +4,7 @@ Assistente de discovery para Product Managers. Conduz uma entrevista guiada pelo
 
 A ideia do produto é absorver no aplicativo as etapas de **qualificação** (`problem-qualify`) e **discovery** da [metodologia em evolução](https://github.com/Fredrumond/skills-metodologia) — o restante do ciclo (plano, ADR, code review, handoff) permanece nas skills do Cursor.
 
-**Versão atual:** 0.7.4
+**Versão atual:** 0.8.0
 
 ---
 
@@ -105,24 +105,26 @@ flowchart TD
 
 ## Arquitetura LLM
 
-As chamadas de IA passam pelo contrato `LlmGateway`. O `LlmRouter` escolhe o adapter pelo prefixo do modelo:
+As chamadas de IA passam pelo contrato `LlmGateway`. O `LlmRouter` escolhe o adapter pelo campo `provider` do modelo no catálogo (`llm_models`):
 
 ```mermaid
 flowchart LR
     CC[ConversationChat] -->|injeta LlmGateway| LR[LlmRouter]
-    LR -->|"gpt- / o1 / o3 / o4"| OAI[OpenAiAdapter]
-    LR -->|demais modelos| OR[OpenRouterAdapter]
+    LR -->|"provider = openai"| OAI[OpenAiAdapter]
+    LR -->|demais / ausente / inativo| OR[OpenRouterAdapter]
     OAI -->|HTTP| OAIAPI[api.openai.com]
     OR -->|HTTP| ORAPI[openrouter.ai]
 ```
 
-- **OpenRouter** (padrão, obrigatório): `OPENROUTER_API_KEY` · modelo em `OPENROUTER_MODEL`
+- **OpenRouter** (padrão, obrigatório): `OPENROUTER_API_KEY`
 - Fallback automático em rate limit ou resposta vazia: `OPENROUTER_FALLBACK_MODELS`
-- **OpenAI** (opcional): `OPENAI_API_KEY` · modelo em `OPENAI_MODEL` (padrão `gpt-4o-mini`)
-- Sem `OPENAI_API_KEY`, ids nativos como `gpt-4o-mini` caem no OpenRouter e tendem a falhar (slug correto seria `openai/gpt-4o-mini`)
-- Custo: a OpenRouter manda `usage.cost`; a OpenAI não — nesse caso o `LlmUsage` estima pela tabela em `config/llm.php`. Sem entrada na tabela o custo fica `0` e as métricas mentem
+- **OpenAI** (opcional): `OPENAI_API_KEY` — o adapter só entra no mapa se a chave existir
+- Sem a chave, um modelo com `provider = openai` cai no OpenRouter e tende a falhar (slug correto na OpenRouter seria `openai/gpt-4o-mini`)
+- O admin cadastra, ativa e precifica os modelos em **Modelos LLM**. Só modelos ativos aparecem para os prompts
+- O admin escolhe, em **Modelos dos prompts**, qual modelo ativo cada passo usa (`interview`, `docs_retrieval`, `docs_briefing`, `card_generation`). O PM não escolhe modelo no chat
+- Custo: a OpenRouter manda `usage.cost`; a OpenAI não — nesse caso o `LlmUsage` estima pelas colunas `price_*` do catálogo. Sem preço no modelo pago o custo fica `0` e as métricas mentem
 
-Decisões de arquitetura: `docs/adr/` (0001 ports & adapters, 0002 prefixo nativo OpenAI, 0003 tabela de preços, 0004 MCP GitHub, 0005 retrieval versionado de `/docs`).
+Decisões de arquitetura: `docs/adr/` (0001 ports & adapters, 0002 OpenAI direto, 0003 estimar custo, 0004 MCP GitHub, 0005 retrieval versionado, 0006 projeto na conversa, 0007 catálogo no banco).
 
 ---
 
@@ -143,11 +145,13 @@ Prompts são versionados (`v1`, `v2`, …). Novas versões nunca sobrescrevem as
 
 | Model | Tabela | Campos-chave |
 |-------|--------|-------------|
-| `Conversation` | `conversations` | `status`, `current_step`, `interview_summary`, `prompt_name`, `prompt_version` |
+| `Conversation` | `conversations` | `status`, `current_step`, `interview_summary`, `prompt_name`, `prompt_version`, `project_id` |
 | `Message` | `messages` | `role` (user/assistant), `content` |
 | `Card` | `cards` | `title`, `objetivo`, `regras`, `aceite`, `stakeholders`, `status` (draft/approved) |
 | `LlmUsage` | `llm_usages` | `model`, `step`, `prompt_tokens`, `completion_tokens`, `cost`, `finish_reason` |
-| `Project` | `projects` | `name`, `repository` (GitHub `owner/repo`), `branch` (ref da pasta `/docs`) |
+| `Project` | `projects` | `name`, `repository` (GitHub `owner/repo`), `branch` (ref da pasta `/docs`); soft delete |
+| `LlmModel` | `llm_models` | `model_id`, `name`, `tier` (free/paid), `provider`, `active`, `price_*` |
+| `PromptModel` | `prompt_models` | `prompt` + `model` ativo (um por passo do fluxo) |
 
 ---
 
@@ -168,7 +172,10 @@ docker compose up -d --build
 docker compose exec app composer install
 docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate
+docker compose exec app php artisan llm-models:import-from-config
 ```
+
+O comando de import carrega o snapshot inicial do catálogo (os modelos que viviam em `config/chat.php`). Sem ele, o produto sobe sem modelo ativo.
 
 Acesse [http://localhost:8080](http://localhost:8080).
 

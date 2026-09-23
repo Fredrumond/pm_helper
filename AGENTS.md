@@ -6,7 +6,7 @@
 - **Tailwind CSS** + **Vite**
 - **MySQL** via Docker (nginx + PHP-FPM + MySQL)
 - **OpenRouter** como adapter padrão de LLM (`LlmGateway` + `LlmRouter`; fallback automático via `OPENROUTER_FALLBACK_MODELS`)
-- **OpenAI** como segundo adapter (`OpenAiAdapter`), ativo só com `OPENAI_API_KEY`; ids `gpt-*`, `o1*`, `o3*`, `o4*` vão direto para `api.openai.com`
+- **OpenAI** como segundo adapter (`OpenAiAdapter`), ativo só com `OPENAI_API_KEY`; o `LlmRouter` despacha pelo `provider` do catálogo (`llm_models`), não pelo prefixo do id
 - Autenticação via **Laravel Breeze**
 - Testes com **PHPUnit** (`composer test`)
 
@@ -18,7 +18,7 @@
 app/
   Http/            # Controllers e Livewire components
   Livewire/        # Componentes Livewire (ConversationChat, CardPreview…)
-  Models/          # Eloquent (Conversation, Message, Card, LlmUsage…)
+  Models/          # Eloquent (Conversation, Message, Card, LlmUsage, Project, LlmModel, PromptModel)
   Prompts/         # Catálogo e métricas de prompts (SystemPromptCatalog)
   Contracts/       # Ports (LlmGateway)
   Services/        # LlmRouter, DocsRetrievalService, CardParserService, Adapters/OpenRouterAdapter, Adapters/OpenAiAdapter
@@ -26,13 +26,14 @@ app/
 
 config/
   versoes.php      # Changelog do projeto — atualizar somente ao criar um commit
-  chat.php         # Catálogo de modelos do composer + versões de prompt
-  llm.php          # Tabela de preços (USD / 1M tokens) para adapters sem usage.cost
+  chat.php         # Versões de prompt (a lista de modelos é legado; a vigente é llm_models)
+  llm.php          # Preços legado; a vigente é price_* em llm_models
   services.php     # Chaves OpenRouter e OpenAI
 
 docs/
-  adr/             # Decisões de arquitetura (0001 ports & adapters, 0002 OpenAI, 0003 preços, 0004 MCP, 0005 retrieval /docs)
+  adr/             # Decisões de arquitetura (0001–0007; catálogo no banco é o 0007)
   MVP_LAUNCH_GUIDE.md
+  POS_MVP_ROADMAP.md
 
 resources/
   prompts/         # Prompts versionados (interview, card_generation, docs_retrieval, docs_briefing, discovery)
@@ -58,12 +59,12 @@ tests/
 
 ### Adapters LLM
 - Todo adapter novo precisa gravar `LlmUsage` via `LlmUsage::recordFromResponse()`.
-- Registrar o prefixo em `AppServiceProvider` **só se a chave do provedor existir**. O prefixo não pode colidir com slug da OpenRouter (hoje: `gpt-`, `o1`, `o3`, `o4`).
+- Registrar o `provider` em `LlmModel::PROVIDERS` e o adapter no `AppServiceProvider` **só se a chave do provedor existir**. O `LlmRouter` despacha pelo `provider` do catálogo, não pelo prefixo do id (ADR 0007).
 - Sem a chave, o modelo cai no `OpenRouterAdapter`. Ids nativos da OpenAI (`gpt-4o-mini`) não são slugs da OpenRouter (`openai/gpt-4o-mini`) — a chamada tende a falhar.
-- Colocar o modelo no catálogo (`config/chat.php`) e, se a API não devolver `usage.cost`, cadastrar preço em `config/llm.php` (`input` / `cached` / `output` em USD por 1M tokens). Sem isso o custo fica 0 e as métricas mentem.
-- A OpenRouter já manda `cost`; esse valor prevalece sobre a tabela — inclusive `0` nos modelos free.
+- Cadastrar o modelo no catálogo (`llm_models`, tela admin). Se a API não devolver `usage.cost`, o admin grava `price_input` / `price_cached` / `price_output` (USD / 1M tokens) no mesmo registro. Sem isso o custo fica 0 e as métricas mentem.
+- A OpenRouter já manda `cost`; esse valor prevalece sobre o catálogo — inclusive `0` nos modelos free.
 - Fallback de rate limit **e de resposta vazia** é responsabilidade do `OpenRouterAdapter` (`OPENROUTER_FALLBACK_MODELS`). O `OpenAiAdapter` só relança a mensagem de “tente de novo”.
-- Decisões: `docs/adr/0001`, `0002`, `0003`, `0004`, `0005`.
+- Decisões: `docs/adr/0001` a `0007`.
 
 ### Testes
 - **Sempre rodar dentro do container Docker**, nunca localmente.

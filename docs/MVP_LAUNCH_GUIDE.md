@@ -1,6 +1,6 @@
 # PM Helper — Guia de Lançamento do MVP
 
-> **Versão:** 0.7.4 · **Data:** 22/09/2026  
+> **Versão:** 0.8.0 · **Data:** 23/09/2026  
 > **Público:** PMs que vão testar o PM Helper
 
 ---
@@ -54,11 +54,14 @@ O PM Helper não substitui o ciclo inteiro. Hoje ele qualifica a demanda e entre
 
 ### Rastreio de consumo e modelos
 - Tokens, cache e custo por chamada gravados e exibidos na sessão
-- Seletor de modelo no chat: modelos **free** (via OpenRouter) e **OpenAI** (GPT-4o Mini, GPT-4o, GPT-4.1, o4 Mini) em chamada direta
+- O admin define, para cada prompt (`interview`, `docs_retrieval`, `docs_briefing`, `card_generation`), qual modelo ativo o sistema usa. O PM não escolhe modelo no chat
+- Catálogo de modelos administrável: cadastro, ativação, inativação e preço de modelo pago, separados por provedor (OpenRouter e OpenAI)
 - Fallback automático em rate limit ou resposta vazia — só nos modelos OpenRouter
 
 ### Administração (só admin)
 - Cadastro e desativação de projetos GitHub
+- Modelo ativo de cada prompt e catálogo de modelos LLM
+- Auditoria automática das alterações nessas telas (quem fez, quando fez, o que mudou) — só no banco, sem tela de consulta nesta versão
 - Página de métricas: consumo por step, comparação entre versões de prompt, custo por modelo
 - Página de histórico de versões do produto (`/versoes`)
 
@@ -70,7 +73,7 @@ O PM Helper não substitui o ciclo inteiro. Hoje ele qualifica a demanda e entre
 
 1. Faça login com as credenciais que o time vai compartilhar
 2. Clique em **"Nova conversa"**
-3. Se quiser, ao lado do modelo, vincule um projeto a esta conversa (opcional). Sem projeto, a entrevista segue. Depois da primeira mensagem, a escolha fica travada
+3. Se quiser, vincule um projeto a esta conversa (opcional). Sem projeto, a entrevista segue. Depois da primeira mensagem, a escolha fica travada
 4. Descreva o card em linguagem livre, ex: _"Preciso de um card para adicionar validação de CPF no checkout antes de finalizar a compra"_
 5. Responda as perguntas do assistente — ele guia fase a fase, sem sobrecarregar
 6. Quando o assistente fechar o resumo, leia o briefing de `/docs` (o que já existe e o que limita o card) e clique em **"Gerar Card"**
@@ -79,33 +82,44 @@ O PM Helper não substitui o ciclo inteiro. Hoje ele qualifica a demanda e entre
 ### Dicas
 - Seja específico sobre **comportamento**, não sobre implementação técnica
 - Se o assistente recusar por "escopo amplo", é sinal de épico: quebre em cards menores
-- Modelos **Free** não geram custo; modelos **OpenAI** são pagos e exigem `OPENAI_API_KEY` no ambiente
+- O modelo de cada passo é o que o admin deixou ativo. Modelos **free** não geram custo; modelos **OpenAI** são pagos e exigem `OPENAI_API_KEY` no ambiente
 
 ---
 
+## 🔧 Ainda no MVP (antes do lançamento)
+
+Correções do que este guia já promete. Sem elas, a lista de conversas, as métricas ou o cadastro de projetos mentem ou travam. Detalhe no [`POS_MVP_ROADMAP.md`](./POS_MVP_ROADMAP.md#11-pendências-do-mvp).
+
+| Item | Por quê ainda no MVP | Solução prevista |
+|---|---|---|
+| **"Nova conversa" sem uso** | Cada clique grava uma linha vazia na lista do fluxo principal | Reusar a conversa vazia do PM, em vez de criar outra |
+| **Exclusão lógica de conversa** | Hard delete apaga card e `LlmUsage` (`cascadeOnDelete`); as métricas do MVP passam a mentir | `SoftDeletes` na conversa; card e custo permanecem |
+| **Reativar projeto desativado** | O repositório continua único depois do soft delete, e a tela só lista ativos — desativar por engano trava o cadastro | Bloco "Desativados" + **Reativar** |
+
 ## ⏳ Fora do escopo do MVP
 
-Funcionalidades que **não estão no MVP** e serão priorizadas com base no feedback de uso:
+Capacidade nova, não correção do que já está no produto. Prioridade no [`POS_MVP_ROADMAP.md`](./POS_MVP_ROADMAP.md) com base no feedback de uso:
 
-| Item | Probabilidade de ser pedido |
-|---|---|
-| **Editar card** diretamente no PM Helper | Alta — card vai sair com lacunas a ajustar |
-| **Exportar card** (Jira, Linear, Notion, CSV) | Alta — card precisa ir para onde o time gerencia o backlog |
-| **Desmembrar épico em cards** | Alta — PM vai querer fatiar um épico direto na ferramenta |
-| **Comentários e aprovação de card** | Alta — liderança quer aprovar antes do refinamento |
-| **Notificações** (e-mail ou Slack) ao gerar card | Média — PM não vai ficar recarregando esperando |
-| **Dashboard de cards por status** | Média — visibilidade do backlog gerado |
-| **Retomar entrevista interrompida** | Média — hoje o contexto se perde ao fechar |
-| **Histórico de versões do card** | Média — saber o que mudou entre gerações |
-| **Busca semântica em cards antigos** | Baixa — evitar duplicar cards já escritos |
-| **Relatório de custo por squad** | Baixa — relevante quando escalar para vários times |
+| Item | Probabilidade de ser pedido | Onde no roteiro |
+|---|---|---|
+| **Editar card** rascunho **ou** aprovado | Alta — card vai sair com lacunas a ajustar | Trilha A, Onda 1 |
+| **Mencionar um card no chat** | Média — reusar um card existente como contexto da entrevista | Trilha B, Fase 2a |
+| **Exportar card** (Jira, Linear, Notion, CSV) | Alta — card precisa ir para onde o time gerencia o backlog | Trilha A, Onda 1 |
+| **Desmembrar épico em cards** | Alta — PM vai querer fatiar um épico direto na ferramenta | Trilha A, Onda 1 |
+| **Comentários no card** | Alta — liderança quer discutir antes do refinamento. O botão **Aprovar** (`draft` → `approved`) já existe; faltam comentários e o fluxo em volta | Trilha A, Onda 2 |
+| **Notificações** (e-mail ou Slack) ao gerar card | Média — PM não vai ficar recarregando esperando | Trilha A, Onda 2 |
+| **Dashboard de cards por status** | Média — visibilidade do backlog gerado | Trilha A, Onda 2 |
+| **Retomar entrevista interrompida** | Média — hoje o contexto se perde ao fechar | Trilha A, Onda 2 |
+| **Histórico de versões do card** | Média — saber o que mudou entre gerações | Trilha A, Onda 3 |
+| **Busca semântica em cards antigos** | Baixa — evitar duplicar cards já escritos | Trilha B, Fase 2 |
+| **Relatório de custo por squad** | Baixa — relevante quando escalar para vários times | Trilha A, Onda 3 |
 
 ---
 
 ## Perguntas frequentes
 
 **"O card gerado está errado / incompleto. E agora?"**  
-Copie o conteúdo e ajuste no Jira/Notion. Edição direta no PM Helper está na lista de próximas iterações.
+Copie o conteúdo e ajuste no Jira/Notion. Editar o rascunho ou o aprovado no PM Helper fica para depois do lançamento (Onda 1 do roteiro pós-MVP).
 
 **"Por que o assistente recusou minha demanda?"**  
 Ela provavelmente cobre mais de um card. É feedback válido — anote o caso e traga para o time calibrar o critério.
@@ -114,7 +128,7 @@ Ela provavelmente cobre mais de um card. É feedback válido — anote o caso e 
 O conteúdo das conversas só sai do ambiente nas chamadas à LLM. Modelos Free vão para a [OpenRouter](https://openrouter.ai); GPT/o4 vão direto para a [OpenAI](https://platform.openai.com). Nenhum dos dois treina modelos com dados via API.
 
 **"Por que o custo da OpenAI aparece como estimado?"**  
-A OpenAI devolve só tokens, não o valor em dólar. O PM Helper calcula pela tabela interna (`config/llm.php`). A OpenRouter já manda o custo real — inclusive zero nos modelos grátis.
+A OpenAI devolve só tokens, não o valor em dólar. O PM Helper calcula pelo preço que o admin gravou no catálogo de modelos. A OpenRouter já manda o custo real — inclusive zero nos modelos grátis.
 
 ---
 

@@ -25,7 +25,7 @@ Não commite `.env`, chaves de API nem dumps de banco.
 
 - Prompts ficam em `resources/prompts/<passo>/v<n>.md`. Para mudar o comportamento, crie uma versão nova (`v2.md`, `v3.md`…) e registre em `SystemPromptCatalog`. Não edite a versão anterior.
 - Migrations novas saem de `php artisan make:migration`. Não altere uma migration que já rodou.
-- Adapter novo de LLM grava `LlmUsage`. Se a API não devolver `usage.cost`, cadastre o preço em `config/llm.php`.
+- Adapter novo de LLM grava `LlmUsage`. Se a API não devolver `usage.cost`, cadastre o preço no catálogo (`llm_models`).
 - Decisões de arquitetura vão em `docs/adr/`.
 
 ## Testes
