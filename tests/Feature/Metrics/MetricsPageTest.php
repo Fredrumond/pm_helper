@@ -6,6 +6,7 @@ use App\Models\Conversation;
 use App\Models\LlmUsage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\CatalogModels;
 use Tests\TestCase;
 
 class MetricsPageTest extends TestCase
@@ -120,6 +121,8 @@ class MetricsPageTest extends TestCase
 
     public function test_shows_estimated_openai_cost_and_pricing_table_note(): void
     {
+        CatalogModels::seedGpt4oMiniPrice();
+
         $user = User::factory()->admin()->create();
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,

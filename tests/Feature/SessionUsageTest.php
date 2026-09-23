@@ -7,6 +7,7 @@ use App\Models\Conversation;
 use App\Models\LlmUsage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\CatalogModels;
 use Tests\TestCase;
 
 class SessionUsageTest extends TestCase
@@ -152,6 +153,8 @@ class SessionUsageTest extends TestCase
 
     public function test_estimates_cost_when_api_omits_usage_cost(): void
     {
+        CatalogModels::seedGpt4oMiniPrice();
+
         $user = User::factory()->create();
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,

@@ -131,49 +131,9 @@
 
             <form
                 wire:submit="sendMessage"
-                x-data="chatComposer(@js($models))"
-                @click.outside="showModels = false"
+                x-data="chatComposer()"
                 class="relative max-w-3xl mx-auto"
             >
-                {{-- Modelos --}}
-                <div
-                    x-show="showModels"
-                    x-cloak
-                    x-transition.opacity
-                    class="absolute bottom-12 left-0 z-20 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
-                    role="listbox"
-                    aria-label="Modelos"
-                >
-                    <div class="border-b border-gray-100 p-2">
-                        <input
-                            type="search"
-                            x-model="modelQuery"
-                            @keydown.enter.prevent
-                            placeholder="Buscar modelos"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                        >
-                    </div>
-                    <ul class="max-h-56 overflow-y-auto py-1">
-                        <template x-for="model in filteredModels" :key="model.id">
-                            <li>
-                                <button
-                                    type="button"
-                                    @click="chooseModel(model.id)"
-                                    class="w-full flex items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-indigo-50"
-                                >
-                                    <span>
-                                        <span class="block text-sm text-gray-800" x-text="model.name"></span>
-                                        <span class="block text-[11px] text-gray-400" x-text="model.tier"></span>
-                                    </span>
-                                    <svg x-show="model.id === $wire.selectedModel" class="w-4 h-4 shrink-0 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                    </svg>
-                                </button>
-                            </li>
-                        </template>
-                    </ul>
-                </div>
-
                 <div class="rounded-xl border border-gray-200 bg-white shadow-sm transition-colors focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-200">
                     <textarea
                         wire:model="input"
@@ -182,7 +142,6 @@
                         wire:target="sendMessage,retryProjectDocsReview"
                         x-ref="input"
                         @input="onDraftInput($event)"
-                        @keydown.escape="showModels = false"
                         placeholder="Descreva sua necessidade ou ideia..."
                         rows="2"
                         class="w-full resize-none bg-transparent px-4 pt-3 pb-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none disabled:opacity-60"
@@ -190,21 +149,6 @@
 
                     <div class="flex items-center justify-between gap-2 px-2.5 pb-2.5">
                         <div class="flex items-center min-w-0 gap-1">
-                            <button
-                                type="button"
-                                @click="toggleModels()"
-                                class="inline-flex items-center gap-1 max-w-full rounded-lg px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-100"
-                                :aria-expanded="showModels.toString()"
-                            >
-                                <span class="truncate">{{ $selectedModelMeta['name'] }}</span>
-                                @if ($selectedModelMeta['tier'] !== '')
-                                    <span class="hidden text-gray-400 sm:inline">{{ $selectedModelMeta['tier'] }}</span>
-                                @endif
-                                <svg class="w-3 h-3 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                </svg>
-                            </button>
-
                             <div
                                 x-data="{ open: false }"
                                 @click.outside="open = false"
@@ -330,7 +274,7 @@
 
             @if ($messages->isEmpty())
                 <p class="mt-1.5 max-w-3xl mx-auto text-center text-[11px] text-gray-400">
-                    Ao lado do modelo, você pode vincular um projeto a esta conversa (opcional). Depois da primeira mensagem, a escolha fica travada.
+                    Você pode vincular um projeto a esta conversa (opcional). Depois da primeira mensagem, a escolha fica travada.
                 </p>
             @endif
         @endif

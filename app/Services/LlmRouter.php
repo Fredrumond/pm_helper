@@ -8,7 +8,7 @@ use App\Models\Conversation;
 class LlmRouter implements LlmGateway
 {
     /**
-     * @param  array<string, LlmGateway>  $adapters
+     * @param  array<string, LlmGateway>  $adapters  Provedor do catálogo (`openai`) => adapter. OpenRouter é o default.
      */
     public function __construct(
         private readonly LlmGateway $default,
@@ -36,10 +36,14 @@ class LlmRouter implements LlmGateway
 
     private function resolve(?string $model): LlmGateway
     {
-        foreach ($this->adapters as $prefix => $adapter) {
-            if ($model && str_starts_with($model, $prefix)) {
-                return $adapter;
-            }
+        if (! is_string($model) || $model === '') {
+            return $this->default;
+        }
+
+        $record = app(LlmModelCatalog::class)->findActive($model);
+
+        if ($record !== null && isset($this->adapters[$record->provider])) {
+            return $this->adapters[$record->provider];
         }
 
         return $this->default;

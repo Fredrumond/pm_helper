@@ -14,6 +14,7 @@ use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Tests\Support\CatalogModels;
 use Tests\TestCase;
 
 class OpenRouterAdapterTest extends TestCase
@@ -192,10 +193,12 @@ class OpenRouterAdapterTest extends TestCase
         config([
             'services.openrouter.api_key' => 'test-key',
             'services.openrouter.model' => 'test/model',
-            'chat.models' => [
-                ['id' => 'openai/gpt-4o', 'name' => 'GPT-4o', 'tier' => 'High'],
-            ],
         ]);
+
+        CatalogModels::seed([[
+            'id' => 'openai/gpt-4o',
+            'name' => 'GPT-4o',
+        ]]);
 
         Http::preventStrayRequests();
         Http::fake([

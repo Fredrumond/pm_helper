@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+use App\Models\LlmModel;
+use App\Services\LlmModelCatalog;
+
 class LlmPricing
 {
     /**
@@ -9,25 +12,21 @@ class LlmPricing
      */
     public static function ratesFor(string $model): ?array
     {
-        $catalog = config('llm.pricing', []);
+        $paid = app(LlmModelCatalog::class)
+            ->list()
+            ->filter(fn (LlmModel $record): bool => $record->isPaid());
 
-        if (! is_array($catalog) || $catalog === []) {
-            return null;
-        }
+        $exact = $paid->firstWhere('model_id', $model);
 
-        if (isset($catalog[$model]) && is_array($catalog[$model])) {
-            return self::normalizeRates($catalog[$model]);
+        if ($exact instanceof LlmModel) {
+            return self::ratesFromModel($exact);
         }
 
         $matches = [];
 
-        foreach ($catalog as $id => $rates) {
-            if (! is_string($id) || ! is_array($rates)) {
-                continue;
-            }
-
-            if (str_starts_with($model, $id.'-')) {
-                $matches[$id] = $rates;
+        foreach ($paid as $record) {
+            if (str_starts_with($model, $record->model_id.'-')) {
+                $matches[$record->model_id] = $record;
             }
         }
 
@@ -37,7 +36,7 @@ class LlmPricing
 
         uksort($matches, fn (string $a, string $b): int => strlen($b) <=> strlen($a));
 
-        return self::normalizeRates(array_values($matches)[0]);
+        return self::ratesFromModel(array_values($matches)[0]);
     }
 
     public static function resolveProvider(string $model): ?string
@@ -69,18 +68,21 @@ class LlmPricing
     }
 
     /**
-     * @param  array<string, mixed>  $rates
-     * @return array{provider: string, input: float, cached: float, output: float}
+     * @return array{provider: string, input: float, cached: float, output: float}|null
      */
-    private static function normalizeRates(array $rates): array
+    private static function ratesFromModel(LlmModel $record): ?array
     {
-        $input = (float) ($rates['input'] ?? 0);
+        if ($record->price_input === null || $record->price_output === null) {
+            return null;
+        }
+
+        $input = (float) $record->price_input;
 
         return [
-            'provider' => (string) ($rates['provider'] ?? ''),
+            'provider' => $record->provider,
             'input' => $input,
-            'cached' => (float) ($rates['cached'] ?? $input),
-            'output' => (float) ($rates['output'] ?? 0),
+            'cached' => $record->price_cached === null ? $input : (float) $record->price_cached,
+            'output' => (float) $record->price_output,
         ];
     }
 }

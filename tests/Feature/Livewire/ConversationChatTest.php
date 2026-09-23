@@ -10,13 +10,14 @@ use App\Models\Project;
 use App\Models\User;
 use App\Services\ProjectDocsPathsResult;
 use App\Services\ProjectDocsResult;
-use App\Support\ChatComposer;
+use App\Services\PromptModelConfig;
 use App\Support\ProjectDocsReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use RuntimeException;
+use Tests\Support\CatalogModels;
 use Tests\Support\FakeLlmGateway;
 use Tests\Support\FakeProjectDocsGateway;
 use Tests\TestCase;
@@ -398,17 +399,20 @@ TXT;
             ->assertSee('wire:submit="sendMessage"', false)
             ->assertSee('wire:keydown.enter.exact.prevent="sendMessage"', false)
             ->assertDontSee('$wire.set(', false)
-            ->assertSee(ChatComposer::findModel(ChatComposer::defaultModel())['name'] ?? ChatComposer::defaultModel());
+            ->assertDontSee('Buscar modelos')
+            ->assertDontSee('aria-label="Modelos"', false)
+            ->assertDontSee('selectModel', false)
+            ->assertDontSee('selectedModel', false)
+            ->assertDontSee('Ao lado do modelo')
+            ->assertSee('aria-label="Projeto"', false)
+            ->assertSee('Sem projeto')
+            ->assertSee('Você pode vincular um projeto a esta conversa (opcional).');
     }
 
-    public function test_sends_the_selected_model_to_openrouter(): void
+    public function test_sends_the_interview_active_model_even_when_the_session_has_another(): void
     {
-        config([
-            'chat.models' => [
-                ['id' => 'test/model', 'name' => 'Test', 'tier' => 'Free'],
-                ['id' => 'openai/gpt-4o', 'name' => 'GPT-4o', 'tier' => 'High'],
-            ],
-        ]);
+        $this->catalogOfPromptModels();
+        app(PromptModelConfig::class)->save('interview', 'interview/model');
 
         Http::preventStrayRequests();
         Http::fake([
@@ -425,28 +429,134 @@ TXT;
             'title' => 'Nova conversa',
         ]);
 
+        $this->session(['chat.selected_model' => 'pm/chosen']);
+
         Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
-            ->call('selectModel', 'openai/gpt-4o')
-            ->assertSet('selectedModel', 'openai/gpt-4o')
             ->set('input', 'Quero um checkout')
-            ->call('sendMessage');
+            ->call('sendMessage')
+            ->assertDontSee('Modelo do PM')
+            ->assertDontSee('Modelo Entrevista');
 
-        Http::assertSent(fn (Request $request) => $request['model'] === 'openai/gpt-4o');
+        Http::assertSent(fn (Request $request) => $request['model'] === 'interview/model');
+        $this->assertNull(session('chat.selected_model'));
     }
 
-    public function test_ignores_unknown_model_selection(): void
+    public function test_generate_card_sends_the_card_generation_active_model(): void
     {
+        $this->catalogOfPromptModels();
+        app(PromptModelConfig::class)->save('card_generation', 'card/model');
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Sem card.']],
+                ],
+            ], 200),
+        ]);
+
         $user = User::factory()->create();
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
-            'title' => 'Nova conversa',
+            'title' => 'Checkout',
+            'prompt_name' => 'interview',
+            'prompt_version' => 'v1',
+            'current_step' => 'card_generation',
+            'interview_summary' => 'Problema: checkout sem pagamento',
         ]);
+
+        $this->session(['chat.selected_model' => 'pm/chosen']);
 
         Livewire::actingAs($user)
             ->test(ConversationChat::class, ['conversation' => $conversation])
-            ->call('selectModel', 'unknown/model')
-            ->assertSet('selectedModel', ChatComposer::defaultModel());
+            ->call('generateCard')
+            ->assertSee('Sem card.');
+
+        Http::assertSent(fn (Request $request) => $request['model'] === 'card/model');
+    }
+
+    public function test_next_message_uses_the_active_model_saved_after_the_conversation_opened(): void
+    {
+        $this->catalogOfPromptModels();
+        $promptModels = app(PromptModelConfig::class);
+        $promptModels->save('interview', 'interview/model');
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'Qual problema você quer resolver?']],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+        ]);
+
+        $this->session(['chat.selected_model' => 'pm/chosen']);
+
+        $component = Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage');
+
+        $promptModels->save('interview', 'interview/next');
+
+        $component
+            ->set('input', 'O comprador não consegue pagar')
+            ->call('sendMessage');
+
+        Http::assertSentInOrder([
+            fn (Request $request) => $request['model'] === 'interview/model',
+            fn (Request $request) => $request['model'] === 'interview/next',
+        ]);
+    }
+
+    public function test_retrieval_and_briefing_use_their_own_active_models(): void
+    {
+        $this->catalogOfPromptModels();
+        $promptModels = app(PromptModelConfig::class);
+        $promptModels->save('interview', 'interview/model');
+        $promptModels->save('docs_retrieval', 'retrieval/model');
+        $promptModels->save('docs_briefing', 'briefing/model');
+
+        $project = Project::factory()->create([
+            'repository' => 'acme/checkout',
+            'branch' => 'develop',
+        ]);
+        $docs = $this->bindFakeProjectDocsGateway();
+        $docs->queuePaths(ProjectDocsPathsResult::ok(['docs/regras/pagamento.md']));
+        $docs->queueReadByPaths(ProjectDocsResult::ok('# Pagamento obrigatório', 1, 0));
+
+        $llm = $this->bindFakeLlmGateway();
+        $llm->queueChat($this->interviewCompleteReply());
+        $llm->queueComplete('{"paths": ["docs/regras/pagamento.md"]}');
+        $llm->queueComplete('A documentação confirma pagamento obrigatório.');
+
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'project_id' => $project->id,
+        ]);
+
+        $this->session(['chat.selected_model' => 'pm/chosen']);
+
+        Livewire::actingAs($user)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quero um checkout')
+            ->call('sendMessage');
+
+        $this->assertSame('retrieval/model', $llm->completeCalls[0]['model']);
+        $this->assertSame('docs_retrieval', $llm->completeCalls[0]['step']);
+        $this->assertSame('briefing/model', $llm->completeCalls[1]['model']);
+        $this->assertSame('docs_briefing', $llm->completeCalls[1]['step']);
+        $this->assertNotSame('pm/chosen', $llm->completeCalls[0]['model']);
+        $this->assertNotSame('pm/chosen', $llm->completeCalls[1]['model']);
     }
 
     public function test_captures_interview_summary_and_shows_generate_card_button(): void
@@ -1749,6 +1859,25 @@ Persona: comprador
 </INTERVIEW_SUMMARY>
 </INTERVIEW_COMPLETE>
 TXT;
+    }
+
+    private function catalogOfPromptModels(): void
+    {
+        config([
+            'services.openrouter.model' => 'openai/gpt-4o-mini',
+            'chat.prompts.docs_retrieval.model' => null,
+            'chat.prompts.docs_briefing.model' => null,
+        ]);
+
+        CatalogModels::seed([
+            ['id' => 'openai/gpt-4o-mini', 'name' => 'Mini Slice3'],
+            ['id' => 'pm/chosen', 'name' => 'Modelo do PM'],
+            ['id' => 'interview/model', 'name' => 'Modelo Entrevista'],
+            ['id' => 'interview/next', 'name' => 'Modelo Seguinte'],
+            ['id' => 'card/model', 'name' => 'Modelo Card'],
+            ['id' => 'retrieval/model', 'name' => 'Modelo Retrieval'],
+            ['id' => 'briefing/model', 'name' => 'Modelo Briefing'],
+        ]);
     }
 
     private function projectPickerIsDisabled(string $html): bool

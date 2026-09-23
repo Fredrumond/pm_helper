@@ -14,11 +14,19 @@ use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Tests\Support\CatalogModels;
 use Tests\TestCase;
 
 class OpenAiAdapterTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        CatalogModels::seedGpt4oMiniPrice();
+    }
 
     public function test_sends_bearer_token_and_returns_assistant_content(): void
     {
@@ -197,10 +205,12 @@ class OpenAiAdapterTest extends TestCase
         config([
             'services.openai.api_key' => 'sk-test-key',
             'services.openai.model' => 'gpt-4o-mini',
-            'chat.models' => [
-                ['id' => 'gpt-4o', 'name' => 'GPT-4o', 'tier' => 'OpenAI'],
-            ],
         ]);
+
+        CatalogModels::seed([[
+            'id' => 'gpt-4o',
+            'name' => 'GPT-4o',
+        ]]);
 
         Http::preventStrayRequests();
         Http::fake([

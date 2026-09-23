@@ -5,7 +5,9 @@ use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\MetricsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\VersoesController;
+use App\Livewire\AdminLlmModels;
 use App\Livewire\AdminProjects;
+use App\Livewire\AdminPromptModels;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('conversations.index'));
@@ -34,6 +36,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/metrics', [MetricsController::class, 'index'])->name('metrics.index');
         Route::get('/versoes', [VersoesController::class, 'index'])->name('versoes.index');
         Route::get('/admin/projetos', AdminProjects::class)->name('admin.projects.index');
+        Route::get('/admin/prompts', AdminPromptModels::class)->name('admin.prompts.index');
+        Route::get('/admin/modelos', AdminLlmModels::class)->name('admin.models.index');
     });
 
 });

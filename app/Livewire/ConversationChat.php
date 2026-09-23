@@ -11,7 +11,7 @@ use App\Models\Project;
 use App\Services\CardParserService;
 use App\Services\DocsRetrievalService;
 use App\Services\ProjectDocsResult;
-use App\Support\ChatComposer;
+use App\Services\PromptModelConfig;
 use App\Support\ProjectDocsReview;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -26,8 +26,6 @@ class ConversationChat extends Component
 
     public string $input = '';
 
-    public string $selectedModel = '';
-
     #[Locked]
     public ?int $selectedProjectId = null;
 
@@ -38,21 +36,7 @@ class ConversationChat extends Component
         abort_if($conversation->user_id !== Auth::id(), 403);
         $this->conversation = $conversation;
         $this->forgetInactiveProjectIfNotStarted();
-
-        $stored = session('chat.selected_model');
-        $this->selectedModel = is_string($stored) && ChatComposer::isAllowedModel($stored)
-            ? $stored
-            : ChatComposer::defaultModel();
-    }
-
-    public function selectModel(string $model): void
-    {
-        if (! ChatComposer::isAllowedModel($model)) {
-            return;
-        }
-
-        $this->selectedModel = $model;
-        session(['chat.selected_model' => $model]);
+        session()->forget('chat.selected_model');
     }
 
     public function selectProject(mixed $projectId): void
@@ -122,7 +106,7 @@ class ConversationChat extends Component
             $this->conversation->load('messages');
             $alreadyScopeTooBroad = $this->conversation->isScopeTooBroad();
 
-            $assistantResponse = $llm->chat($this->conversation, $this->selectedModel);
+            $assistantResponse = $llm->chat($this->conversation, $this->activeModel('interview'));
 
             Message::create([
                 'conversation_id' => $this->conversation->id,
@@ -226,7 +210,7 @@ class ConversationChat extends Component
             $assistantResponse = $llm->generateCard(
                 $this->conversation,
                 (string) $this->conversation->interview_summary,
-                $this->selectedModel,
+                $this->activeModel('card_generation'),
                 $projectDocs,
             );
 
@@ -354,7 +338,6 @@ class ConversationChat extends Component
                 ->retrieve(
                     $project,
                     (string) $this->conversation->interview_summary,
-                    $this->selectedModel,
                     $this->conversation,
                 );
         } catch (Throwable $exception) {
@@ -463,8 +446,6 @@ class ConversationChat extends Component
     {
         $this->forgetInactiveProjectIfNotStarted();
 
-        $selected = ChatComposer::findModel($this->selectedModel);
-
         $this->conversation->unsetRelation('project');
         $this->conversation->load(['messages', 'card', 'project']);
 
@@ -473,18 +454,17 @@ class ConversationChat extends Component
             'card' => $this->conversation->card,
             'projects' => Project::query()->orderBy('name')->get(['id', 'name']),
             'selectedProjectName' => $this->conversation->project?->name,
-            'models' => ChatComposer::models(),
             'showGenerateCardButton' => $this->conversation->isInterviewComplete()
                 && ! $this->conversation->isCompleted()
                 && ! $this->conversation->isScopeTooBroad(),
             'showRetryProjectDocsReview' => ProjectDocsReview::canRetry($this->conversation->id)
                 && ! $this->conversation->isCompleted(),
-            'selectedModelMeta' => $selected ?? [
-                'id' => $this->selectedModel,
-                'name' => $this->selectedModel,
-                'tier' => '',
-            ],
         ]);
+    }
+
+    private function activeModel(string $prompt): string
+    {
+        return app(PromptModelConfig::class)->active($prompt);
     }
 
     private function hydrateSelectedProject(): void

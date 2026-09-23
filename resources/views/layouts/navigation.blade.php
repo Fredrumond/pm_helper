@@ -22,6 +22,12 @@
                         <x-nav-link :href="route('admin.projects.index')" :active="request()->routeIs('admin.projects.*')">
                             Gerenciar Projetos
                         </x-nav-link>
+                        <x-nav-link :href="route('admin.prompts.index')" :active="request()->routeIs('admin.prompts.*')">
+                            Modelos dos prompts
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.models.index')" :active="request()->routeIs('admin.models.*')">
+                            Modelos LLM
+                        </x-nav-link>
                     @endif
                 </div>
             </div>
@@ -94,6 +100,12 @@
             @if (Auth::user()->can('admin'))
                 <x-responsive-nav-link :href="route('admin.projects.index')" :active="request()->routeIs('admin.projects.*')">
                     Gerenciar Projetos
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.prompts.index')" :active="request()->routeIs('admin.prompts.*')">
+                    Modelos dos prompts
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.models.index')" :active="request()->routeIs('admin.models.*')">
+                    Modelos LLM
                 </x-responsive-nav-link>
             @endif
         </div>

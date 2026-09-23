@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+use App\Models\LlmModel;
+use App\Services\LlmModelCatalog;
+
 class ChatComposer
 {
     /**
@@ -9,19 +12,15 @@ class ChatComposer
      */
     public static function models(): array
     {
-        /** @var list<array{id: string, name: string, tier: string}> $models */
-        $models = array_values(config('chat.models', []));
-        $default = (string) config('services.openrouter.model');
-
-        if ($default !== '' && ! self::containsModel($models, $default)) {
-            array_unshift($models, [
-                'id' => $default,
-                'name' => $default,
-                'tier' => 'Padrão',
-            ]);
-        }
-
-        return $models;
+        return app(LlmModelCatalog::class)
+            ->active()
+            ->map(fn (LlmModel $model): array => [
+                'id' => $model->model_id,
+                'name' => $model->name,
+                'tier' => $model->tier,
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -37,14 +36,14 @@ class ChatComposer
 
     public static function defaultModel(): string
     {
-        $configured = (string) config('services.openrouter.model');
         $ids = array_column(self::models(), 'id');
+        $configured = (string) config('services.openrouter.model');
 
         if ($configured !== '' && in_array($configured, $ids, true)) {
             return $configured;
         }
 
-        return $ids[0] ?? $configured;
+        return $ids[0] ?? '';
     }
 
     public static function isAllowedModel(string $model): bool
@@ -64,19 +63,5 @@ class ChatComposer
         }
 
         return null;
-    }
-
-    /**
-     * @param  list<array{id: string, name: string, tier: string}>  $models
-     */
-    private static function containsModel(array $models, string $id): bool
-    {
-        foreach ($models as $model) {
-            if ($model['id'] === $id) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

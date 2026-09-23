@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
+use OwenIt\Auditing\Models\Audit;
 use Tests\TestCase;
 
 class AdminProjectsTest extends TestCase
@@ -43,6 +44,7 @@ class AdminProjectsTest extends TestCase
     public function test_admin_accesses_creates_a_valid_project_and_sees_it_in_the_list(): void
     {
         Event::fake([MessageLogged::class]);
+        config(['audit.console' => true]);
 
         $admin = User::factory()->admin()->create();
 
@@ -84,13 +86,9 @@ class AdminProjectsTest extends TestCase
         $this->assertSame('develop', $project->branch);
         $this->assertNull($project->deleted_at);
 
-        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($admin, $project): bool {
-            return $log->level === 'info'
-                && $log->message === 'Projeto criado.'
-                && ($log->context['user_id'] ?? null) === $admin->id
-                && ($log->context['project_id'] ?? null) === $project->id
-                && ! array_key_exists('request', $log->context)
-                && ! array_key_exists('GITHUB_APP_PRIVATE_KEY', $log->context);
+        $this->assertProjectAudit('created', $admin->id, $project->id);
+        Event::assertNotDispatched(MessageLogged::class, function (MessageLogged $log): bool {
+            return $log->message === 'Projeto criado.';
         });
     }
 
@@ -169,6 +167,8 @@ class AdminProjectsTest extends TestCase
             'repository' => 'octocat/hello-world',
         ]);
 
+        config(['audit.console' => true]);
+
         Livewire::actingAs($admin)
             ->test(AdminProjects::class)
             ->call('startEdit', $project->id)
@@ -191,11 +191,9 @@ class AdminProjectsTest extends TestCase
             'deleted_at' => null,
         ]);
 
-        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($admin, $project): bool {
-            return $log->level === 'info'
-                && $log->message === 'Projeto editado.'
-                && ($log->context['user_id'] ?? null) === $admin->id
-                && ($log->context['project_id'] ?? null) === $project->id;
+        $this->assertProjectAudit('updated', $admin->id, $project->id);
+        Event::assertNotDispatched(MessageLogged::class, function (MessageLogged $log): bool {
+            return $log->message === 'Projeto editado.';
         });
     }
 
@@ -208,6 +206,8 @@ class AdminProjectsTest extends TestCase
             'name' => 'App mobile',
             'repository' => 'octocat/hello-world',
         ]);
+
+        config(['audit.console' => true]);
 
         Livewire::actingAs($admin)
             ->test(AdminProjects::class)
@@ -226,12 +226,24 @@ class AdminProjectsTest extends TestCase
         $this->assertSame(0, Project::query()->count());
         $this->assertSame(1, Project::withTrashed()->count());
 
-        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($admin, $project): bool {
-            return $log->level === 'info'
-                && $log->message === 'Projeto desativado.'
-                && ($log->context['user_id'] ?? null) === $admin->id
-                && ($log->context['project_id'] ?? null) === $project->id;
+        $this->assertProjectAudit('deleted', $admin->id, $project->id);
+        Event::assertNotDispatched(MessageLogged::class, function (MessageLogged $log): bool {
+            return $log->message === 'Projeto desativado.';
         });
+    }
+
+    private function assertProjectAudit(string $event, int $userId, int $projectId): void
+    {
+        $audits = Audit::query()
+            ->where('auditable_type', Project::class)
+            ->get();
+
+        $this->assertCount(1, $audits);
+
+        $audit = $audits->first();
+        $this->assertSame($event, $audit->event);
+        $this->assertSame($userId, $audit->user_id);
+        $this->assertSame($projectId, $audit->auditable_id);
     }
 
     public function test_unique_repository_fails_validation_even_after_soft_delete(): void

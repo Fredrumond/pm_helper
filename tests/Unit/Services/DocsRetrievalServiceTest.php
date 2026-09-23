@@ -8,15 +8,20 @@ use App\Prompts\SystemPromptCatalog;
 use App\Services\DocsRetrievalService;
 use App\Services\ProjectDocsPathsResult;
 use App\Services\ProjectDocsResult;
+use App\Services\PromptModelConfig;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use RuntimeException;
+use Tests\Support\CatalogModels;
 use Tests\Support\FakeLlmGateway;
 use Tests\Support\FakeProjectDocsGateway;
 use Tests\TestCase;
 
 class DocsRetrievalServiceTest extends TestCase
 {
+    use RefreshDatabase;
+
     private const BRIEFING = 'A documentação confirma pagamento obrigatório e não há conflito com a entrevista.';
 
     public function test_happy_path_returns_filtered_content_and_logs_retrieval(): void
@@ -40,7 +45,6 @@ class DocsRetrievalServiceTest extends TestCase
         $result = $this->service($docs, $llm)->retrieve(
             $this->project(),
             $summary,
-            'test/model',
             $conversation,
         );
 
@@ -63,7 +67,9 @@ class DocsRetrievalServiceTest extends TestCase
         $this->assertSame($conversation, $llm->completeCalls[0]['conversation']);
         $this->assertSame('docs_briefing', $llm->completeCalls[1]['step']);
         $this->assertSame($conversation, $llm->completeCalls[1]['conversation']);
-        $this->assertSame('test/model', $llm->completeCalls[1]['model']);
+        $promptModels = new PromptModelConfig;
+        $this->assertSame($promptModels->active('docs_retrieval'), $llm->completeCalls[0]['model']);
+        $this->assertSame($promptModels->active('docs_briefing'), $llm->completeCalls[1]['model']);
         $this->assertStringContainsString('docs/regras/pagamento.md', $llm->completeCalls[0]['messages'][1]['content']);
         $this->assertStringContainsString($summary, $llm->completeCalls[0]['messages'][1]['content']);
         $this->assertStringContainsString('filtrador de relevância', $llm->completeCalls[0]['messages'][0]['content']);
@@ -226,9 +232,16 @@ class DocsRetrievalServiceTest extends TestCase
         $this->assertCount(1, $docs->calls);
     }
 
-    public function test_uses_configured_retrieval_model_when_set(): void
+    public function test_retrieval_and_briefing_use_saved_active_models(): void
     {
-        config(['chat.prompts.docs_retrieval.model' => 'cheap/fast']);
+        $this->catalog();
+        $promptModels = new PromptModelConfig;
+        $promptModels->save('docs_retrieval', 'retrieval/model');
+        $promptModels->save('docs_briefing', 'briefing/model');
+        config([
+            'chat.prompts.docs_retrieval.model' => 'openai/gpt-4o-mini',
+            'chat.prompts.docs_briefing.model' => 'openai/gpt-4o-mini',
+        ]);
 
         $docs = (new FakeProjectDocsGateway)
             ->queuePaths(ProjectDocsPathsResult::ok(['docs/regras/pagamento.md']))
@@ -238,17 +251,21 @@ class DocsRetrievalServiceTest extends TestCase
             ->queueComplete('{"paths": ["docs/regras/pagamento.md"]}')
             ->queueComplete(self::BRIEFING);
 
-        $this->retrieve($docs, $llm, 'resumo', 'card/model');
+        $this->retrieve($docs, $llm);
 
-        $this->assertSame('cheap/fast', $llm->completeCalls[0]['model']);
+        $this->assertSame('retrieval/model', $llm->completeCalls[0]['model']);
         $this->assertSame('docs_retrieval', $llm->completeCalls[0]['step']);
-        $this->assertSame('card/model', $llm->completeCalls[1]['model']);
+        $this->assertSame('briefing/model', $llm->completeCalls[1]['model']);
         $this->assertSame('docs_briefing', $llm->completeCalls[1]['step']);
     }
 
-    public function test_uses_configured_briefing_model_when_set(): void
+    public function test_without_saved_row_retrieval_and_briefing_use_their_own_env_defaults(): void
     {
-        config(['chat.prompts.docs_briefing.model' => 'brief/cheap']);
+        $this->catalog();
+        config([
+            'chat.prompts.docs_retrieval.model' => 'retrieval/model',
+            'chat.prompts.docs_briefing.model' => 'briefing/model',
+        ]);
 
         $docs = (new FakeProjectDocsGateway)
             ->queuePaths(ProjectDocsPathsResult::ok(['docs/regras/pagamento.md']))
@@ -258,11 +275,12 @@ class DocsRetrievalServiceTest extends TestCase
             ->queueComplete('{"paths": ["docs/regras/pagamento.md"]}')
             ->queueComplete(self::BRIEFING);
 
-        $this->retrieve($docs, $llm, 'resumo', 'card/model');
+        $this->retrieve($docs, $llm);
 
-        $this->assertSame('card/model', $llm->completeCalls[0]['model']);
-        $this->assertSame('brief/cheap', $llm->completeCalls[1]['model']);
-        $this->assertSame('docs_briefing', $llm->completeCalls[1]['step']);
+        $this->assertSame('retrieval/model', $llm->completeCalls[0]['model']);
+        $this->assertSame('briefing/model', $llm->completeCalls[1]['model']);
+        $this->assertNotSame('openai/gpt-4o-mini', $llm->completeCalls[0]['model']);
+        $this->assertNotSame('openai/gpt-4o-mini', $llm->completeCalls[1]['model']);
     }
 
     public function test_briefing_llm_failure_keeps_ok_result_without_rereading_github(): void
@@ -359,20 +377,29 @@ class DocsRetrievalServiceTest extends TestCase
         FakeProjectDocsGateway $docs,
         FakeLlmGateway $llm,
         string $summary = 'resumo',
-        string $model = 'test/model',
         ?Conversation $conversation = null,
     ): ProjectDocsResult {
         return $this->service($docs, $llm)->retrieve(
             $this->project(),
             $summary,
-            $model,
             $conversation ?? $this->conversation(),
         );
     }
 
     private function service(FakeProjectDocsGateway $docs, FakeLlmGateway $llm): DocsRetrievalService
     {
-        return new DocsRetrievalService($docs, $llm, new SystemPromptCatalog);
+        return new DocsRetrievalService($docs, $llm, new SystemPromptCatalog, new PromptModelConfig);
+    }
+
+    private function catalog(): void
+    {
+        config(['services.openrouter.model' => 'openai/gpt-4o-mini']);
+
+        CatalogModels::seed([
+            ['id' => 'openai/gpt-4o-mini', 'name' => 'Mini'],
+            ['id' => 'retrieval/model', 'name' => 'Retrieval'],
+            ['id' => 'briefing/model', 'name' => 'Briefing'],
+        ]);
     }
 
     private function conversation(): Conversation

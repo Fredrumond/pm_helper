@@ -2,32 +2,9 @@ import { Livewire, Alpine } from '../../vendor/livewire/livewire/dist/livewire.e
 
 window.Alpine = Alpine;
 
-window.chatComposer = function (models) {
+window.chatComposer = function () {
     return {
-        models,
-        showModels: false,
-        modelQuery: '',
         soonHint: '',
-        get filteredModels() {
-            const query = this.modelQuery.toLowerCase();
-            if (! query) {
-                return this.models;
-            }
-
-            return this.models.filter((model) =>
-                model.name.toLowerCase().includes(query)
-                || model.id.toLowerCase().includes(query)
-                || model.tier.toLowerCase().includes(query)
-            );
-        },
-        toggleModels() {
-            this.showModels = ! this.showModels;
-        },
-        chooseModel(id) {
-            this.$wire.selectModel(id);
-            this.showModels = false;
-            this.modelQuery = '';
-        },
         soon(kind) {
             this.soonHint = kind;
             setTimeout(() => { this.soonHint = ''; }, 1800);

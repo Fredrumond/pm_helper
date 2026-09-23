@@ -16,7 +16,8 @@
         "laravel/breeze": "^2.4",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
-        "livewire/livewire": "^4.4"
+        "livewire/livewire": "^4.4",
+        "owen-it/laravel-auditing": "dev-master#3f7136466b42c0745b2bb5288f06d929a37c9aab"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -53,7 +54,7 @@
             "@php artisan dev"
         ],
         "test": [
-            "@php artisan config:clear --ansi @no_additional_args",
+            "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
         "post-autoload-dump": [

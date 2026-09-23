@@ -7,7 +7,6 @@ use App\Rules\GitHubBranch;
 use App\Rules\GitHubRepository;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
@@ -79,19 +78,9 @@ class AdminProjects extends Component
                 $project = Project::query()->findOrFail($this->editingId);
                 $project->update($validated);
 
-                Log::info('Projeto editado.', [
-                    'user_id' => Auth::id(),
-                    'project_id' => $project->id,
-                ]);
-
                 $this->statusMessage = 'Projeto atualizado.';
             } else {
                 $project = Project::query()->create($validated);
-
-                Log::info('Projeto criado.', [
-                    'user_id' => Auth::id(),
-                    'project_id' => $project->id,
-                ]);
 
                 $this->statusMessage = 'Projeto cadastrado.';
             }
@@ -110,11 +99,6 @@ class AdminProjects extends Component
 
         $project = Project::query()->findOrFail($projectId);
         $project->delete();
-
-        Log::info('Projeto desativado.', [
-            'user_id' => Auth::id(),
-            'project_id' => $project->id,
-        ]);
 
         if ($this->editingId === $projectId) {
             $this->resetForm();
