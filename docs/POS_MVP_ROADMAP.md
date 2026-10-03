@@ -1,7 +1,7 @@
 # PM Helper — Roteiro Pós-MVP
 
 > **Base:** versão 0.8.0 (23/09/2026) · [`MVP_LAUNCH_GUIDE.md`](./MVP_LAUNCH_GUIDE.md)
-> **Objetivo deste documento:** organizar, por trilha e prioridade, o que fica para depois do MVP — com atenção especial ao pipeline de contexto de projeto (`/docs`), hoje a etapa mais simples e mais cara do fluxo. As pendências que ainda entram no MVP estão na [seção própria](#pendencias-do-mvp); não misturam com as ondas da Trilha A.
+> **Objetivo deste documento:** organizar, por trilha e prioridade, o que fica para depois do MVP — com atenção especial ao pipeline de contexto de projeto (`/docs`), hoje a etapa mais simples e mais cara do fluxo. Conversa vazia, exclusão lógica e reativar projeto também ficam depois do lançamento, na [Trilha A](#4-trilha-a--produto-e-fluxo-itens-já-listados-no-launch-guide-em-ondas).
 
 ---
 
@@ -9,7 +9,7 @@
 
 O MVP cobre qualificação de demanda (entrevista → resumo → card) com contexto opcional de `/docs`. Na 0.8.0 o admin passou a definir o modelo de cada prompt, o catálogo de LLM (lista, provedor e preço) vive no banco e as alterações administrativas são auditadas. Duas trilhas emergem do que já existe:
 
-- **Trilha A — Produto/fluxo:** o que o launch guide marca como [fora do escopo do MVP](MVP_LAUNCH_GUIDE.md#-fora-do-escopo-do-mvp) (editar card, mencionar card, exportar, comentários, notificações, dashboard...).
+- **Trilha A — Produto/fluxo:** o que o launch guide marca como [fora do escopo do MVP](MVP_LAUNCH_GUIDE.md#-fora-do-escopo-do-mvp) (correções do fluxo atual, editar card, mencionar card, exportar, comentários, notificações, dashboard...).
 - **Trilha B — Contexto de projeto (`/docs`):** o pipeline que lê o repositório para embasar o card. É o foco principal deste documento, porque:
 
 ### O que o pipeline de `/docs` faz hoje
@@ -33,19 +33,7 @@ O MVP cobre qualificação de demanda (entrevista → resumo → card) com conte
 
 Esses pontos são o motivo de existir uma trilha dedicada (Seção 3) em vez de só empilhar mais prompts.
 
----
-
-## 1.1 Pendências do MVP
-
-Não são feature nova. São correção do que o [`MVP_LAUNCH_GUIDE.md`](./MVP_LAUNCH_GUIDE.md) já promete (lista de conversas, métricas, projetos). Ficam fora das ondas da Trilha A. Detalhe da classificação: conversa vazia, exclusão lógica e reativar projeto entram no MVP; editar card e mencionar card ficam no pós-MVP.
-
-| Item | Situação hoje | Solução | Por quê não espera o pós-MVP |
-|---|---|---|---|
-| **"Nova conversa" sem uso** | `ConversationController::store` grava a linha na hora. Cada clique vira um "Nova conversa" vazio | Reusar a conversa do PM que ainda não tem mensagem. Gravar só na primeira mensagem é melhoria posterior | Polui o passo 2 do launch guide |
-| **Exclusão lógica de conversa** | `destroy` faz hard delete. `messages`, `cards` e `llm_usages` têm `cascadeOnDelete` | `SoftDeletes` em `Conversation`. Soft delete no Laravel não apaga filhos. Preview do card lê `conversation()` com `withTrashed()`. Sem tela de lixeira nesta entrega | Métricas e cards do MVP somem se o PM excluir a conversa |
-| **Reativar projeto desativado** | Soft delete já existe; a tela só lista ativos e só tem **Desativar**. O `repository` único vale também para desativado | Bloco "Desativados" + **Reativar**. O teste do model já descreve restore em vez de duplicar | Admin que desativa por engano não recria o mesmo `owner/repo` e não vê o registro |
-
-Editar card (rascunho ou aprovado) e mencionar um card no chat **não** entram aqui — são capacidade nova, nas ondas abaixo.
+O lançamento da 0.8.0 segue com o comportamento atual de conversa e de projeto. Reusar a conversa vazia, exclusão lógica e reativar projeto desativado saíram do pré-lançamento e estão nas [correções do fluxo](#correções-do-fluxo-atual) da Trilha A.
 
 ---
 
@@ -357,6 +345,16 @@ Para não superdimensionar a infraestrutura em relação ao estágio do PM Helpe
 
 Reaproveita a tabela "Fora do escopo do MVP" do [`MVP_LAUNCH_GUIDE.md`](./MVP_LAUNCH_GUIDE.md#-fora-do-escopo-do-mvp), organizada por onda de entrega. Prioridade final depende do feedback real dos PMs testando o MVP — isto é um ponto de partida, não uma decisão fechada.
 
+### Correções do fluxo atual
+
+Correção do que o lançamento já faz (lista de conversas, métricas, cadastro de projetos). Entram logo após o lançamento, antes das ondas de capacidade nova.
+
+| Item | Situação hoje | Solução |
+|---|---|---|
+| **"Nova conversa" sem uso** | `ConversationController::store` grava a linha na hora. Cada clique vira um "Nova conversa" vazio | Reusar a conversa do PM que ainda não tem mensagem. Gravar só na primeira mensagem é melhoria posterior |
+| **Exclusão lógica de conversa** | `destroy` faz hard delete. `messages`, `cards` e `llm_usages` têm `cascadeOnDelete` | `SoftDeletes` em `Conversation`. Soft delete no Laravel não apaga filhos. Preview do card lê `conversation()` com `withTrashed()`. Sem tela de lixeira nesta entrega |
+| **Reativar projeto desativado** | Soft delete já existe; a tela só lista ativos e só tem **Desativar**. O `repository` único vale também para desativado | Bloco "Desativados" + **Reativar**. O teste do model já descreve restore em vez de duplicar |
+
 ### Onda 1 — Fricção do dia a dia (alta probabilidade de pedido)
 
 | Item | Por quê primeiro |
@@ -386,29 +384,30 @@ Reaproveita a tabela "Fora do escopo do MVP" do [`MVP_LAUNCH_GUIDE.md`](./MVP_LA
 
 ## 5. Sequenciamento sugerido
 
-As etapas 1–3 são o caminho padrão, porque a dor já está descrita no baseline. Da 4 em diante, a coluna **Sobe quando** é a condição para abrir o Discovery. Entregar a linha anterior não compromete a seguinte.
+As etapas 1–4 são o caminho padrão, porque a dor já está descrita no baseline. Da 5 em diante, a coluna **Sobe quando** é a condição para abrir o Discovery. Entregar a linha anterior não compromete a seguinte.
 
 | Etapa | Trilha | Entrega | Sobe quando | Depende de |
 |---|---|---|---|---|
-| 1 | B — Fase 1a | Fallback sem `/docs`, contexto colado, cache por commit, orçamento por tokens | Já: custo repetido e projeto sem `/docs` | Nada |
-| 2 | A — Onda 1 | Editar card (draft e approved), exportar, desmembrar épico | O PM pede para editar, exportar ou quebrar épico no uso do MVP | Nada |
-| 3 | B — Fase 1b (barato) | Nota de contexto por projeto + selo "sem contexto verificado" | O card sai cego e o PM não vê o risco | Fase 1a |
-| 4 | B — 2a | `FULLTEXT` em cards e resumos + mencionar card no chat | Duplicata de card escapa, ou o PM quer reusar um card existente na entrevista | Volume de cards no projeto |
-| 5 | A — Onda 2 | Aprovação, retomar entrevista, dashboard, notificações | Aprovação, retomada ou fila de cards passa a doer no dia a dia | Onda 1 |
-| 6 | B — Fase 1b (resto) | Fonte alternativa (Notion/Confluence/PDF) + busca de código sob demanda | README e nota de projeto não bastam, e a spec vive fora do repositório | Fase 1b (itens baratos) |
-| 7 | B — 3a | Chunks de `/docs` + `FULLTEXT`, sem embedding | Retrieval caro em toda entrevista, arquivo inteiro polui o briefing, ou aborto `too_large` | Fase 1a (cache por commit) |
-| 8 | B — 2b | Embedding dos cards + RRF com o 2a | O 2a erra porque o card antigo e o resumo novo não compartilham palavras | 2a em uso, dor de paráfrase confirmada |
-| 9 | B — 3b | Embedding dos chunks de `/docs` + RRF com o 3a | O 3a perde a seção que um `grep` acha por outra palavra | 3a estável, dor de paráfrase confirmada |
-| 10 | B — 3c | Fila, botão "Reindexar", depois agenda e webhook | O índice cita trecho velho, arquivo novo não entra, ou a indexação trava a entrevista | 3a; worker na prática junto com o 3b |
-| 11 | A — Onda 3 + B — Fase 4 | Histórico de versão, busca de cards na UI (reusa 2a/2b), grafo/drift | Volume de cards e doc defasada em relação ao card | Os degraus 2 e 3 que já tiverem subido |
-| 12 | B — 3d | Meilisearch, Typesense ou Qdrant | A busca do 3b fica perceptível na entrevista | 3b com milhares de trechos medidos |
-| 13 | B — Fase 5 | Federação multi-projeto, MCP próprio do PM Helper | Vários times com convenções comuns | Demanda real de múltiplos times |
+| 1 | A — Correções do fluxo | Reusar conversa vazia, exclusão lógica, reativar projeto | Logo após o lançamento | Nada |
+| 2 | B — Fase 1a | Fallback sem `/docs`, contexto colado, cache por commit, orçamento por tokens | Já: custo repetido e projeto sem `/docs` | Nada |
+| 3 | A — Onda 1 | Editar card (draft e approved), exportar, desmembrar épico | O PM pede para editar, exportar ou quebrar épico no uso do MVP | Nada |
+| 4 | B — Fase 1b (barato) | Nota de contexto por projeto + selo "sem contexto verificado" | O card sai cego e o PM não vê o risco | Fase 1a |
+| 5 | B — 2a | `FULLTEXT` em cards e resumos + mencionar card no chat | Duplicata de card escapa, ou o PM quer reusar um card existente na entrevista | Volume de cards no projeto |
+| 6 | A — Onda 2 | Aprovação, retomar entrevista, dashboard, notificações | Aprovação, retomada ou fila de cards passa a doer no dia a dia | Onda 1 |
+| 7 | B — Fase 1b (resto) | Fonte alternativa (Notion/Confluence/PDF) + busca de código sob demanda | README e nota de projeto não bastam, e a spec vive fora do repositório | Fase 1b (itens baratos) |
+| 8 | B — 3a | Chunks de `/docs` + `FULLTEXT`, sem embedding | Retrieval caro em toda entrevista, arquivo inteiro polui o briefing, ou aborto `too_large` | Fase 1a (cache por commit) |
+| 9 | B — 2b | Embedding dos cards + RRF com o 2a | O 2a erra porque o card antigo e o resumo novo não compartilham palavras | 2a em uso, dor de paráfrase confirmada |
+| 10 | B — 3b | Embedding dos chunks de `/docs` + RRF com o 3a | O 3a perde a seção que um `grep` acha por outra palavra | 3a estável, dor de paráfrase confirmada |
+| 11 | B — 3c | Fila, botão "Reindexar", depois agenda e webhook | O índice cita trecho velho, arquivo novo não entra, ou a indexação trava a entrevista | 3a; worker na prática junto com o 3b |
+| 12 | A — Onda 3 + B — Fase 4 | Histórico de versão, busca de cards na UI (reusa 2a/2b), grafo/drift | Volume de cards e doc defasada em relação ao card | Os degraus 2 e 3 que já tiverem subido |
+| 13 | B — 3d | Meilisearch, Typesense ou Qdrant | A busca do 3b fica perceptível na entrevista | 3b com milhares de trechos medidos |
+| 14 | B — Fase 5 | Federação multi-projeto, MCP próprio do PM Helper | Vários times com convenções comuns | Demanda real de múltiplos times |
 
 ---
 
 ## 6. Próximos passos imediatos
 
-1. Fechar as [pendências do MVP](#11-pendências-do-mvp) (conversa vazia, exclusão lógica, reativar projeto) antes de tratar o lançamento como pronto — não são onda do pós-MVP.
+1. Tratar a 0.8.0 como lançamento do MVP. As [correções do fluxo](#correções-do-fluxo-atual) (conversa vazia, exclusão lógica, reativar projeto) entram logo depois, na Trilha A — não bloqueiam o lançamento.
 2. Validar com os PMs testando o MVP quais itens da Onda 1 (Trilha A) doem mais na prática — o launch guide já pede esse feedback via `#pm-helper-feedback`.
 3. Abrir um **Discovery** para a Fase 1a da Trilha B (fallback sem `/docs` + cache por commit) — é a entrega mais barata e ataca diretamente a queixa "nem todo projeto tem `/docs`".
 4. Logo em seguida, abrir Discovery para os itens baratos da **Fase 1b** (nota de contexto por projeto + selo "sem contexto verificado" no card) — resolve o cenário "nem `/docs` nem README bastam" sem esperar por infraestrutura nova.

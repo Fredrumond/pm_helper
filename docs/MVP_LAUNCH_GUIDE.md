@@ -86,22 +86,15 @@ O PM Helper não substitui o ciclo inteiro. Hoje ele qualifica a demanda e entre
 
 ---
 
-## 🔧 Ainda no MVP (antes do lançamento)
-
-Correções do que este guia já promete. Sem elas, a lista de conversas, as métricas ou o cadastro de projetos mentem ou travam. Detalhe no [`POS_MVP_ROADMAP.md`](./POS_MVP_ROADMAP.md#11-pendências-do-mvp).
-
-| Item | Por quê ainda no MVP | Solução prevista |
-|---|---|---|
-| **"Nova conversa" sem uso** | Cada clique grava uma linha vazia na lista do fluxo principal | Reusar a conversa vazia do PM, em vez de criar outra |
-| **Exclusão lógica de conversa** | Hard delete apaga card e `LlmUsage` (`cascadeOnDelete`); as métricas do MVP passam a mentir | `SoftDeletes` na conversa; card e custo permanecem |
-| **Reativar projeto desativado** | O repositório continua único depois do soft delete, e a tela só lista ativos — desativar por engano trava o cadastro | Bloco "Desativados" + **Reativar** |
-
 ## ⏳ Fora do escopo do MVP
 
-Capacidade nova, não correção do que já está no produto. Prioridade no [`POS_MVP_ROADMAP.md`](./POS_MVP_ROADMAP.md) com base no feedback de uso:
+O lançamento segue com o comportamento atual. As três correções abaixo e a capacidade nova ficam para depois, na ordem do [`POS_MVP_ROADMAP.md`](./POS_MVP_ROADMAP.md), com prioridade ajustada pelo feedback de uso.
 
 | Item | Probabilidade de ser pedido | Onde no roteiro |
 |---|---|---|
+| **Reusar conversa vazia** | Alta — cada "Nova conversa" sem mensagem entra na lista | Trilha A, correções do fluxo |
+| **Exclusão lógica de conversa** | Alta — excluir a conversa apaga o card e o custo (`cascadeOnDelete`) | Trilha A, correções do fluxo |
+| **Reativar projeto desativado** | Média — desativar por engano trava o mesmo repositório | Trilha A, correções do fluxo |
 | **Editar card** rascunho **ou** aprovado | Alta — card vai sair com lacunas a ajustar | Trilha A, Onda 1 |
 | **Mencionar um card no chat** | Média — reusar um card existente como contexto da entrevista | Trilha B, Fase 2a |
 | **Exportar card** (Jira, Linear, Notion, CSV) | Alta — card precisa ir para onde o time gerencia o backlog | Trilha A, Onda 1 |
