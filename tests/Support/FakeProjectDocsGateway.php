@@ -5,6 +5,7 @@ namespace Tests\Support;
 use App\Contracts\ProjectDocsGateway;
 use App\Services\ProjectDocsPathsResult;
 use App\Services\ProjectDocsResult;
+use App\Services\ProjectIndexableFilesResult;
 use RuntimeException;
 
 class FakeProjectDocsGateway implements ProjectDocsGateway
@@ -27,6 +28,12 @@ class FakeProjectDocsGateway implements ProjectDocsGateway
     /** @var list<ProjectDocsResult> */
     private array $readByPathResults = [];
 
+    /** @var list<array{repository: string, branch: ?string}> */
+    public array $indexableCalls = [];
+
+    /** @var list<ProjectIndexableFilesResult> */
+    private array $indexableResults = [];
+
     public function queue(ProjectDocsResult $result): self
     {
         $this->results[] = $result;
@@ -44,6 +51,13 @@ class FakeProjectDocsGateway implements ProjectDocsGateway
     public function queueReadByPaths(ProjectDocsResult $result): self
     {
         $this->readByPathResults[] = $result;
+
+        return $this;
+    }
+
+    public function queueIndexable(ProjectIndexableFilesResult $result): self
+    {
+        $this->indexableResults[] = $result;
 
         return $this;
     }
@@ -89,5 +103,19 @@ class FakeProjectDocsGateway implements ProjectDocsGateway
         }
 
         return array_shift($this->readByPathResults);
+    }
+
+    public function readIndexableFiles(string $repository, ?string $branch = null): ProjectIndexableFilesResult
+    {
+        $this->indexableCalls[] = [
+            'repository' => $repository,
+            'branch' => $branch,
+        ];
+
+        if ($this->indexableResults === []) {
+            return ProjectIndexableFilesResult::empty();
+        }
+
+        return array_shift($this->indexableResults);
     }
 }

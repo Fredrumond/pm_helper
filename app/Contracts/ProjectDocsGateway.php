@@ -4,6 +4,7 @@ namespace App\Contracts;
 
 use App\Services\ProjectDocsPathsResult;
 use App\Services\ProjectDocsResult;
+use App\Services\ProjectIndexableFilesResult;
 
 interface ProjectDocsGateway
 {
@@ -31,4 +32,10 @@ interface ProjectDocsGateway
      * @param  list<string>  $paths
      */
     public function readDocsByPaths(string $repository, array $paths, ?string $branch = null): ProjectDocsResult;
+
+    /**
+     * Lê o README.md da raiz e todos os arquivos de `/docs` (recursivo)
+     * como arquivos individuais, para indexar como documentos.
+     */
+    public function readIndexableFiles(string $repository, ?string $branch = null): ProjectIndexableFilesResult;
 }

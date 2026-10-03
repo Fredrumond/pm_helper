@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Project;
 use App\Rules\GitHubBranch;
 use App\Rules\GitHubRepository;
+use App\Services\ProjectDocumentsIndexer;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -81,6 +82,7 @@ class AdminProjects extends Component
                 $this->statusMessage = 'Projeto atualizado.';
             } else {
                 $project = Project::query()->create($validated);
+                app(ProjectDocumentsIndexer::class)->index($project);
 
                 $this->statusMessage = 'Projeto cadastrado.';
             }
@@ -110,7 +112,7 @@ class AdminProjects extends Component
         $this->ensureAdmin();
 
         return view('livewire.admin-projects', [
-            'projects' => Project::query()->orderBy('name')->get(),
+            'projects' => Project::query()->withCount('documents')->orderBy('name')->get(),
         ]);
     }
 

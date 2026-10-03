@@ -2,13 +2,20 @@
 
 namespace Tests\Unit\Services;
 
+use App\Models\Conversation;
+use App\Models\LlmUsage;
+use App\Models\User;
 use App\Services\EmbeddingService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\CatalogModels;
 use Tests\TestCase;
 
 class EmbeddingServiceTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_sends_text_to_openai_and_returns_the_vector(): void
     {
         config(['services.openai.api_key' => 'sk-test']);
@@ -17,6 +24,11 @@ class EmbeddingServiceTest extends TestCase
             'https://api.openai.com/v1/embeddings' => Http::response([
                 'data' => [
                     ['embedding' => [0.21, -0.43, 0.72]],
+                ],
+                'model' => EmbeddingService::MODEL,
+                'usage' => [
+                    'prompt_tokens' => 8,
+                    'total_tokens' => 8,
                 ],
             ], 200),
         ]);
@@ -31,6 +43,44 @@ class EmbeddingServiceTest extends TestCase
                 && $request['model'] === EmbeddingService::MODEL
                 && $request['input'] === 'Laravel usa Eloquent';
         });
+    }
+
+    public function test_records_usage_and_estimated_cost_from_the_catalog(): void
+    {
+        CatalogModels::seedEmbeddingPrice();
+        config(['services.openai.api_key' => 'sk-test']);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'id' => 'embd-test-1',
+                'data' => [
+                    ['embedding' => [0.21, -0.43, 0.72]],
+                ],
+                'model' => EmbeddingService::MODEL,
+                'usage' => [
+                    'prompt_tokens' => 1000,
+                    'total_tokens' => 1000,
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::createExploreFor($user);
+
+        $this->actingAs($user);
+        (new EmbeddingService)->embed('texto para vetor', $conversation);
+
+        $usage = LlmUsage::query()->first();
+        $this->assertNotNull($usage);
+        $this->assertSame($conversation->id, $usage->conversation_id);
+        $this->assertSame($user->id, $usage->user_id);
+        $this->assertSame(EmbeddingService::MODEL, $usage->model);
+        $this->assertSame(LlmUsage::STEP_EMBEDDING, $usage->step);
+        $this->assertSame('openai', $usage->provider);
+        $this->assertSame(1000, $usage->prompt_tokens);
+        $this->assertSame(0, $usage->completion_tokens);
+        $this->assertSame(1000, $usage->total_tokens);
+        $this->assertEqualsWithDelta(0.00002, (float) $usage->cost, 0.00000001);
     }
 
     public function test_fails_without_api_key(): void

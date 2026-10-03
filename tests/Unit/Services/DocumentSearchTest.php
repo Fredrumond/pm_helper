@@ -4,6 +4,7 @@ namespace Tests\Unit\Services;
 
 use App\Models\Document;
 use App\Models\DocumentChunk;
+use App\Models\Project;
 use App\Services\CosineSimilarity;
 use App\Services\DocumentSearch;
 use App\Services\EmbeddingService;
@@ -91,5 +92,65 @@ class DocumentSearchTest extends TestCase
 
         $this->assertCount(1, $matches);
         $this->assertSame('Com vetor', $matches[0]['content']);
+    }
+
+    public function test_scoped_search_without_project_uses_only_unscoped_documents(): void
+    {
+        $project = Project::factory()->create();
+        $manual = Document::factory()->create(['name' => 'manual.md', 'project_id' => null]);
+        $ofProject = Document::factory()->create(['name' => 'projeto.md', 'project_id' => $project->id]);
+
+        DocumentChunk::factory()->create([
+            'document_id' => $manual->id,
+            'content' => 'Doc sem projeto',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $ofProject->id,
+            'content' => 'Doc do projeto',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+
+        $matches = (new DocumentSearch(new EmbeddingService, new CosineSimilarity))
+            ->search('pergunta', null, true);
+
+        $this->assertCount(1, $matches);
+        $this->assertSame('Doc sem projeto', $matches[0]['content']);
+    }
+
+    public function test_scoped_search_with_project_uses_only_that_projects_documents(): void
+    {
+        $selected = Project::factory()->create();
+        $other = Project::factory()->create();
+        $manual = Document::factory()->create(['name' => 'manual.md', 'project_id' => null]);
+        $ofSelected = Document::factory()->create(['name' => 'selecionado.md', 'project_id' => $selected->id]);
+        $ofOther = Document::factory()->create(['name' => 'outro.md', 'project_id' => $other->id]);
+
+        DocumentChunk::factory()->create([
+            'document_id' => $manual->id,
+            'content' => 'Doc sem projeto',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $ofSelected->id,
+            'content' => 'Doc do selecionado',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $ofOther->id,
+            'content' => 'Doc de outro projeto',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+
+        $matches = (new DocumentSearch(new EmbeddingService, new CosineSimilarity))
+            ->search('pergunta', $selected->id, true);
+
+        $this->assertCount(1, $matches);
+        $this->assertSame('Doc do selecionado', $matches[0]['content']);
     }
 }

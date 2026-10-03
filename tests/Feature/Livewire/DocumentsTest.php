@@ -58,6 +58,7 @@ class DocumentsTest extends TestCase
         $this->assertDatabaseHas('documents', [
             'name' => 'guia.md',
             'content' => "# Guia\n\nConteúdo de teste.",
+            'project_id' => null,
         ]);
         $this->assertDatabaseHas('document_chunks', [
             'chunk_index' => 0,

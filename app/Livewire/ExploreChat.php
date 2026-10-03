@@ -7,11 +7,13 @@ use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Conversation;
 use App\Models\DocumentChunk;
 use App\Models\Message;
+use App\Models\Project;
 use App\Prompts\SystemPromptCatalog;
 use App\Services\DocumentRag;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
 
@@ -23,17 +25,45 @@ class ExploreChat extends Component
 
     public string $input = '';
 
+    #[Locked]
+    public ?int $selectedProjectId = null;
+
     public function mount(Conversation $conversation): void
     {
         abort_if($conversation->user_id !== Auth::id(), 403);
         abort_unless($conversation->isExplore(), 404);
 
         $this->conversation = $conversation;
+        $this->forgetInactiveProjectIfNotStarted();
+    }
+
+    public function selectProject(mixed $projectId): void
+    {
+        abort_if($this->conversation->user_id !== Auth::id(), 403);
+
+        if ($this->conversationHasStarted()) {
+            $this->hydrateSelectedProject();
+
+            return;
+        }
+
+        $projectId = $this->activeProjectId($projectId);
+
+        Conversation::query()
+            ->whereKey($this->conversation->id)
+            ->where('user_id', Auth::id())
+            ->whereDoesntHave('messages')
+            ->update(['project_id' => $projectId]);
+
+        $this->conversation->refresh();
+        $this->conversation->unsetRelation('project');
+        $this->hydrateSelectedProject();
     }
 
     public function sendMessage(LlmGateway $llm, SystemPromptCatalog $prompts): void
     {
         abort_if($this->conversation->user_id !== Auth::id(), 403);
+        $this->forgetInactiveProjectIfNotStarted();
 
         if (trim($this->input) === '') {
             return;
@@ -91,11 +121,24 @@ class ExploreChat extends Component
 
     private function answerFromDocuments(string $question): ?string
     {
-        if (! DocumentChunk::query()->whereNotNull('embedding')->exists()) {
+        $projectId = $this->conversation->project_id;
+
+        $hasChunks = DocumentChunk::query()
+            ->whereNotNull('embedding')
+            ->whereHas('document', function ($documents) use ($projectId): void {
+                if ($projectId === null) {
+                    $documents->whereNull('project_id');
+                } else {
+                    $documents->where('project_id', $projectId);
+                }
+            })
+            ->exists();
+
+        if (! $hasChunks) {
             return null;
         }
 
-        return app(DocumentRag::class)->ask($question, self::MODEL, $this->conversation)['answer'];
+        return app(DocumentRag::class)->ask($question, self::MODEL, $this->conversation, true)['answer'];
     }
 
     private function answerFromExplore(LlmGateway $llm, SystemPromptCatalog $prompts): string
@@ -115,10 +158,70 @@ class ExploreChat extends Component
 
     public function render()
     {
-        $this->conversation->load('messages');
+        $this->forgetInactiveProjectIfNotStarted();
+
+        $this->conversation->unsetRelation('project');
+        $this->conversation->load(['messages', 'project']);
 
         return view('livewire.explore-chat', [
             'messages' => $this->conversation->messages,
+            'projects' => Project::query()->orderBy('name')->get(['id', 'name']),
+            'selectedProjectName' => $this->conversation->project?->name,
         ]);
+    }
+
+    private function hydrateSelectedProject(): void
+    {
+        $projectId = $this->conversation->project_id;
+
+        $this->selectedProjectId = $projectId !== null ? (int) $projectId : null;
+    }
+
+    private function conversationHasStarted(): bool
+    {
+        return $this->conversation->messages()->exists();
+    }
+
+    private function forgetInactiveProjectIfNotStarted(): void
+    {
+        if ($this->conversationHasStarted()) {
+            $this->hydrateSelectedProject();
+
+            return;
+        }
+
+        $projectId = $this->conversation->project_id;
+
+        if ($projectId !== null && ! Project::query()->whereKey($projectId)->exists()) {
+            Conversation::query()
+                ->whereKey($this->conversation->id)
+                ->where('user_id', Auth::id())
+                ->whereDoesntHave('messages')
+                ->update(['project_id' => null]);
+
+            $this->conversation->refresh();
+            $this->conversation->unsetRelation('project');
+        }
+
+        $this->hydrateSelectedProject();
+    }
+
+    private function activeProjectId(mixed $projectId): ?int
+    {
+        if ($projectId === null || $projectId === '') {
+            return null;
+        }
+
+        if (! is_int($projectId) && ! (is_string($projectId) && preg_match('/^\d+$/', $projectId) === 1)) {
+            return null;
+        }
+
+        $id = (int) $projectId;
+
+        if ($id < 1 || ! Project::query()->whereKey($id)->exists()) {
+            return null;
+        }
+
+        return $id;
     }
 }

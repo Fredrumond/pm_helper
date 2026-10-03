@@ -4,7 +4,7 @@ Assistente de discovery para Product Managers. Conduz uma entrevista guiada pelo
 
 A ideia do produto é absorver no aplicativo as etapas de **qualificação** (`problem-qualify`) e **discovery** da [metodologia em evolução](https://github.com/Fredrumond/skills-metodologia) — o restante do ciclo (plano, ADR, code review, handoff) permanece nas skills do Cursor.
 
-**Versão atual:** 0.8.0
+**Versão atual:** 0.9.0
 
 ---
 

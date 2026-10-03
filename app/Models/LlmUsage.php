@@ -10,8 +10,11 @@ use Illuminate\Support\Facades\Log;
 
 class LlmUsage extends Model
 {
+    public const STEP_EMBEDDING = 'embedding';
+
     protected $fillable = [
         'conversation_id',
+        'user_id',
         'generation_id',
         'model',
         'step',
@@ -37,6 +40,72 @@ class LlmUsage extends Model
     public function conversation(): BelongsTo
     {
         return $this->belongsTo(Conversation::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function recordFromEmbedding(
+        array $data,
+        string $fallbackModel,
+        ?Conversation $conversation = null,
+        ?int $userId = null,
+    ): self {
+        $usage = is_array($data['usage'] ?? null) ? $data['usage'] : [];
+        $model = (string) ($data['model'] ?? $fallbackModel);
+        $promptTokens = (int) ($usage['prompt_tokens'] ?? 0);
+        $totalTokens = (int) ($usage['total_tokens'] ?? $promptTokens);
+        self::ensureEmbeddingModel($model);
+        $cost = self::resolveCost($usage, $model, $promptTokens, 0, 0);
+
+        $record = self::query()->create([
+            'conversation_id' => $conversation?->id,
+            'user_id' => $userId ?? $conversation?->user_id,
+            'generation_id' => $data['id'] ?? null,
+            'model' => $model,
+            'step' => self::STEP_EMBEDDING,
+            'provider' => $data['provider'] ?? LlmPricing::resolveProvider($model) ?? LlmModel::PROVIDER_OPENAI,
+            'prompt_tokens' => $promptTokens,
+            'completion_tokens' => 0,
+            'total_tokens' => $totalTokens,
+            'cached_tokens' => 0,
+            'cost' => $cost,
+            'finish_reason' => null,
+        ]);
+
+        Log::info('embedding.usage', [
+            'conversation_id' => $record->conversation_id,
+            'user_id' => $record->user_id,
+            'model' => $record->model,
+            'prompt_tokens' => $record->prompt_tokens,
+            'total_tokens' => $record->total_tokens,
+            'cost' => (float) $record->cost,
+        ]);
+
+        return $record;
+    }
+
+    private static function ensureEmbeddingModel(string $model): void
+    {
+        if (LlmModel::query()->where('model_id', $model)->exists()) {
+            return;
+        }
+
+        LlmModel::query()->create([
+            'model_id' => $model,
+            'name' => $model,
+            'tier' => LlmModel::TIER_PAID,
+            'provider' => LlmModel::PROVIDER_OPENAI,
+            'active' => false,
+            'price_input' => 0.02,
+            'price_cached' => null,
+            'price_output' => 0,
+        ]);
     }
 
     /**

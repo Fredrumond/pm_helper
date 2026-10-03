@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Conversation;
 use App\Models\DocumentChunk;
 
 class DocumentSearch
@@ -16,13 +17,25 @@ class DocumentSearch
     /**
      * @return list<array{document: string, chunk_index: int, content: string, score: float}>
      */
-    public function search(string $question): array
+    public function search(string $question, ?int $projectId = null, bool $scoped = false, ?Conversation $conversation = null): array
     {
-        $query = $this->embeddings->embed($question);
+        $query = $this->embeddings->embed($question, $conversation);
 
-        return DocumentChunk::query()
+        $chunks = DocumentChunk::query()
             ->whereNotNull('embedding')
-            ->with('document')
+            ->with('document');
+
+        if ($scoped) {
+            $chunks->whereHas('document', function ($documents) use ($projectId): void {
+                if ($projectId === null) {
+                    $documents->whereNull('project_id');
+                } else {
+                    $documents->where('project_id', $projectId);
+                }
+            });
+        }
+
+        return $chunks
             ->get()
             ->filter(fn (DocumentChunk $chunk): bool => is_array($chunk->embedding) && $chunk->embedding !== [])
             ->map(fn (DocumentChunk $chunk): array => [

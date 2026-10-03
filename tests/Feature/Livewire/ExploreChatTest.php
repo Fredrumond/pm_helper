@@ -8,6 +8,7 @@ use App\Livewire\ExploreChat;
 use App\Models\Conversation;
 use App\Models\Document;
 use App\Models\DocumentChunk;
+use App\Models\Project;
 use App\Models\User;
 use App\Prompts\SystemPromptCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -199,6 +200,131 @@ class ExploreChatTest extends TestCase
             'role' => 'assistant',
             'content' => 'Há exatamente 42 quilos.',
         ]);
+    }
+
+    public function test_selecting_a_project_before_the_first_message_persists(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['name' => 'Checkout']);
+        $conversation = Conversation::createExploreFor($user);
+
+        Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->assertSet('selectedProjectId', null)
+            ->assertSee('Sem projeto')
+            ->call('selectProject', $project->id)
+            ->assertSet('selectedProjectId', $project->id)
+            ->assertSee('Checkout');
+
+        $this->assertSame($project->id, $conversation->fresh()->project_id);
+    }
+
+    public function test_project_cannot_change_after_the_first_message(): void
+    {
+        $user = User::factory()->create();
+        $first = Project::factory()->create(['name' => 'Checkout']);
+        $second = Project::factory()->create(['name' => 'Mobile']);
+        $conversation = Conversation::createExploreFor($user);
+        $conversation->update(['project_id' => $first->id]);
+
+        $llm = $this->bindFakeLlmGateway()->queueComplete('Resposta livre.');
+
+        Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->set('input', 'Oi')
+            ->call('sendMessage')
+            ->call('selectProject', $second->id)
+            ->assertSet('selectedProjectId', $first->id)
+            ->assertSee('Checkout');
+
+        $this->assertSame($first->id, $conversation->fresh()->project_id);
+        $this->assertNotSame([], $llm->completeCalls);
+    }
+
+    public function test_without_project_rag_uses_only_unscoped_documents(): void
+    {
+        config(['services.openai.api_key' => 'sk-test']);
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'data' => [
+                    ['embedding' => [1.0, 0.0]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::createExploreFor($user);
+        $project = Project::factory()->create();
+        $manual = Document::factory()->create(['name' => 'manual.md', 'project_id' => null]);
+        $ofProject = Document::factory()->create(['name' => 'projeto.md', 'project_id' => $project->id]);
+        DocumentChunk::factory()->create([
+            'document_id' => $manual->id,
+            'content' => 'Resposta do documento manual.',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $ofProject->id,
+            'content' => 'Resposta do documento do projeto.',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+
+        $llm = $this->bindFakeLlmGateway()->queueComplete('Veio do manual.');
+
+        Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->set('input', 'O que diz o documento?')
+            ->call('sendMessage')
+            ->assertSee('Veio do manual.');
+
+        $this->assertSame('rag', $llm->completeCalls[0]['step']);
+        $this->assertStringContainsString('Resposta do documento manual.', $llm->completeCalls[0]['messages'][0]['content']);
+        $this->assertStringNotContainsString('Resposta do documento do projeto.', $llm->completeCalls[0]['messages'][0]['content']);
+    }
+
+    public function test_with_project_rag_uses_only_that_projects_documents(): void
+    {
+        config(['services.openai.api_key' => 'sk-test']);
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'data' => [
+                    ['embedding' => [1.0, 0.0]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['name' => 'Checkout']);
+        $conversation = Conversation::createExploreFor($user);
+        $conversation->update(['project_id' => $project->id]);
+        $manual = Document::factory()->create(['name' => 'manual.md', 'project_id' => null]);
+        $ofProject = Document::factory()->create(['name' => 'projeto.md', 'project_id' => $project->id]);
+        DocumentChunk::factory()->create([
+            'document_id' => $manual->id,
+            'content' => 'Resposta do documento manual.',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $ofProject->id,
+            'content' => 'Resposta do documento do projeto.',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+
+        $llm = $this->bindFakeLlmGateway()->queueComplete('Veio do projeto.');
+
+        Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->assertSee('Checkout')
+            ->set('input', 'O que diz o documento?')
+            ->call('sendMessage')
+            ->assertSee('Veio do projeto.');
+
+        $this->assertSame('rag', $llm->completeCalls[0]['step']);
+        $this->assertStringContainsString('Resposta do documento do projeto.', $llm->completeCalls[0]['messages'][0]['content']);
+        $this->assertStringNotContainsString('Resposta do documento manual.', $llm->completeCalls[0]['messages'][0]['content']);
     }
 
     public function test_rejects_another_users_explore_conversation(): void

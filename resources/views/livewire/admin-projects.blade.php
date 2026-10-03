@@ -30,12 +30,39 @@
             <p class="mt-1 text-sm text-gray-500">
                 Use <span class="font-mono text-gray-700">owner/repo</span> ou cole a URL do GitHub. A branch é enviada como <span class="font-mono text-gray-700">ref</span> ao MCP.
             </p>
+            @unless ($editingId)
+                <p class="mt-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Ao cadastrar, o README e a pasta /docs serão indexados. Permaneça nesta tela até a operação terminar.
+                </p>
+            @endunless
 
             <form wire:submit.prevent="save" class="mt-6 space-y-5">
+                <div
+                    wire:loading.flex
+                    wire:target="save"
+                    class="items-start gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-3 text-sm text-indigo-900"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <svg class="w-4 h-4 mt-0.5 shrink-0 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    <span>
+                        @if ($editingId)
+                            Salvando o projeto…
+                        @else
+                            Indexação em andamento. Permaneça nesta tela; o botão fica bloqueado até concluir.
+                        @endif
+                    </span>
+                </div>
+
                 <div>
                     <x-input-label for="project-name" value="Nome" />
                     <x-text-input
                         wire:model="name"
+                        wire:loading.attr="disabled"
+                        wire:target="save"
                         id="project-name"
                         class="mt-1 block w-full"
                         type="text"
@@ -49,6 +76,8 @@
                     <x-input-label for="project-repository" value="Repositório" />
                     <x-text-input
                         wire:model="repository"
+                        wire:loading.attr="disabled"
+                        wire:target="save"
                         id="project-repository"
                         class="mt-1 block w-full font-mono"
                         type="text"
@@ -62,6 +91,8 @@
                     <x-input-label for="project-branch" value="Branch" />
                     <x-text-input
                         wire:model="branch"
+                        wire:loading.attr="disabled"
+                        wire:target="save"
                         id="project-branch"
                         class="mt-1 block w-full font-mono"
                         type="text"
@@ -73,10 +104,15 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <x-primary-button>
-                        {{ $editingId ? 'Salvar alterações' : 'Cadastrar' }}
+                    <x-primary-button wire:loading.attr="disabled" wire:target="save" class="disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span wire:loading.remove wire:target="save">
+                            {{ $editingId ? 'Salvar alterações' : 'Cadastrar' }}
+                        </span>
+                        <span wire:loading wire:target="save">
+                            {{ $editingId ? 'Salvando…' : 'Indexando…' }}
+                        </span>
                     </x-primary-button>
-                    <x-secondary-button type="button" wire:click="cancelForm">
+                    <x-secondary-button type="button" wire:click="cancelForm" wire:loading.attr="disabled" wire:target="save">
                         Cancelar
                     </x-secondary-button>
                 </div>
@@ -101,6 +137,11 @@
                         <div class="min-w-0">
                             <p class="font-medium text-gray-900 truncate">{{ $project->name }}</p>
                             <p class="text-xs font-mono text-gray-500 mt-1 truncate">{{ $project->repository }} @ {{ $project->branch }}</p>
+                            @if ($project->documents_count === 0)
+                                <span class="mt-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                    Sem documento sincronizado
+                                </span>
+                            @endif
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             <button type="button"

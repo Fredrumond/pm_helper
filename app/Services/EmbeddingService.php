@@ -2,7 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Conversation;
+use App\Models\LlmUsage;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class EmbeddingService
 {
@@ -11,7 +16,7 @@ class EmbeddingService
     /**
      * @return list<float>
      */
-    public function embed(string $text): array
+    public function embed(string $text, ?Conversation $conversation = null): array
     {
         $apiKey = trim((string) config('services.openai.api_key'));
 
@@ -36,12 +41,36 @@ class EmbeddingService
             );
         }
 
-        $embedding = $response->json('data.0.embedding');
+        $payload = $response->json();
+        $embedding = is_array($payload) ? ($payload['data'][0]['embedding'] ?? null) : null;
 
         if (! is_array($embedding) || $embedding === []) {
             throw new \RuntimeException('A API de embedding retornou um vetor inválido.');
         }
 
+        $this->recordUsage(is_array($payload) ? $payload : [], $conversation);
+
         return $embedding;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function recordUsage(array $payload, ?Conversation $conversation): void
+    {
+        try {
+            LlmUsage::recordFromEmbedding(
+                $payload,
+                self::MODEL,
+                $conversation,
+                Auth::id(),
+            );
+        } catch (Throwable $exception) {
+            Log::error('Falha ao registrar uso de embedding', [
+                'model' => self::MODEL,
+                'conversation_id' => $conversation?->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 }

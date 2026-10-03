@@ -18,6 +18,7 @@ class DocumentFactory extends Factory
     public function definition(): array
     {
         return [
+            'project_id' => null,
             'name' => fake()->word().'.md',
             'content' => '# '.fake()->sentence()."\n\n".fake()->paragraph(),
         ];

@@ -2,14 +2,19 @@
 
 namespace Tests\Feature\Livewire;
 
+use App\Contracts\ProjectDocsGateway;
 use App\Livewire\AdminProjects;
+use App\Models\Document;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\ProjectIndexableFilesResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use OwenIt\Auditing\Models\Audit;
+use Tests\Support\FakeProjectDocsGateway;
 use Tests\TestCase;
 
 class AdminProjectsTest extends TestCase
@@ -282,5 +287,147 @@ class AdminProjectsTest extends TestCase
             'deleted_at' => null,
         ]);
         $this->assertSame(1, Project::withTrashed()->where('repository', 'octocat/hello-world')->count());
+    }
+
+    public function test_create_form_warns_that_indexing_requires_staying_on_the_page(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->call('startCreate')
+            ->assertSee('Ao cadastrar, o README e a pasta /docs serão indexados')
+            ->assertSee('Permaneça nesta tela até a operação terminar.')
+            ->assertSee('Indexação em andamento. Permaneça nesta tela; o botão fica bloqueado até concluir.');
+    }
+
+    public function test_edit_form_does_not_warn_about_create_indexing(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $project = Project::factory()->create(['name' => 'App mobile']);
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->call('startEdit', $project->id)
+            ->assertDontSee('Ao cadastrar, o README e a pasta /docs serão indexados')
+            ->assertDontSee('Indexação em andamento. Permaneça nesta tela; o botão fica bloqueado até concluir.');
+    }
+
+    public function test_first_save_indexes_repo_files_and_hides_the_empty_label(): void
+    {
+        config(['services.openai.api_key' => 'sk-test']);
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'data' => [
+                    ['embedding' => [0.21, -0.43, 0.72]],
+                ],
+            ], 200),
+        ]);
+
+        $docs = $this->bindFakeProjectDocsGateway();
+        $docs->queueIndexable(ProjectIndexableFilesResult::ok([
+            ['path' => 'README.md', 'content' => '# App'],
+            ['path' => 'docs/regras.txt', 'content' => 'Regra 1'],
+        ]));
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->call('startCreate')
+            ->set('name', 'App mobile')
+            ->set('repository', 'octocat/hello-world')
+            ->set('branch', 'develop')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSee('App mobile')
+            ->assertDontSee('Sem documento sincronizado');
+
+        $project = Project::query()->where('repository', 'octocat/hello-world')->first();
+        $this->assertNotNull($project);
+        $this->assertSame([
+            ['repository' => 'octocat/hello-world', 'branch' => 'develop'],
+        ], $docs->indexableCalls);
+        $this->assertDatabaseHas('documents', [
+            'project_id' => $project->id,
+            'name' => 'README.md',
+            'content' => '# App',
+        ]);
+        $this->assertDatabaseHas('documents', [
+            'project_id' => $project->id,
+            'name' => 'docs/regras.txt',
+            'content' => 'Regra 1',
+        ]);
+        $this->assertSame(2, $project->documents()->count());
+    }
+
+    public function test_first_save_shows_empty_label_when_nothing_is_indexed(): void
+    {
+        $docs = $this->bindFakeProjectDocsGateway();
+        $docs->queueIndexable(ProjectIndexableFilesResult::empty());
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->call('startCreate')
+            ->set('name', 'App mobile')
+            ->set('repository', 'octocat/hello-world')
+            ->set('branch', 'main')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSee('App mobile')
+            ->assertSee('Sem documento sincronizado');
+
+        $this->assertDatabaseCount('documents', 0);
+    }
+
+    public function test_edit_does_not_index_documents(): void
+    {
+        $docs = $this->bindFakeProjectDocsGateway();
+        $docs->queueIndexable(ProjectIndexableFilesResult::ok([
+            ['path' => 'README.md', 'content' => '# Nao deveria indexar'],
+        ]));
+
+        $admin = User::factory()->admin()->create();
+        $project = Project::factory()->create([
+            'name' => 'Nome antigo',
+            'repository' => 'octocat/hello-world',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->assertSee('Sem documento sincronizado')
+            ->call('startEdit', $project->id)
+            ->set('name', 'App mobile')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSee('Sem documento sincronizado');
+
+        $this->assertSame([], $docs->indexableCalls);
+        $this->assertDatabaseCount('documents', 0);
+    }
+
+    public function test_label_is_hidden_when_project_already_has_documents(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $project = Project::factory()->create(['name' => 'App mobile']);
+        Document::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'README.md',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->assertSee('App mobile')
+            ->assertDontSee('Sem documento sincronizado');
+    }
+
+    private function bindFakeProjectDocsGateway(): FakeProjectDocsGateway
+    {
+        $fake = new FakeProjectDocsGateway;
+        $this->app->instance(ProjectDocsGateway::class, $fake);
+
+        return $fake;
     }
 }

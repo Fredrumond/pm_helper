@@ -163,6 +163,78 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.9.0',
+            'data' => '2026-10-03',
+            'estado' => 'development',
+            'titulo' => 'Explore responde com a documentação do projeto',
+            'resumo' => 'O PM ganha o Explorar, um chat separado da entrevista. Documentos .md ficam no banco, são fatiados e indexados com embedding. No primeiro salvamento do projeto, a pasta /docs e o README.md da raiz viram documentos daquele projeto. No Explore, com projeto a busca usa esses documentos; sem projeto, só os que não têm projeto. Se a leitura não achar arquivo ou falhar, o projeto fica salvo e mostra que não há documento sincronizado. Edição do projeto não indexa de novo.',
+            'commits' => [
+                [
+                    'hash' => '2dbd2ab',
+                    'data' => '2026-10-03',
+                    'mensagem' => 'Adicionar o Explorar, um chat livre separado da entrevista, para o PM tirar dúvidas sem gerar card.',
+                ],
+                [
+                    'hash' => 'a09cc36',
+                    'data' => '2026-10-03',
+                    'mensagem' => 'Adicionar CRUD de documentos .md com conteúdo salvo no banco, sem arquivo em disco.',
+                ],
+                [
+                    'hash' => '749df66',
+                    'data' => '2026-10-03',
+                    'mensagem' => 'Quebrar o documento em chunks de 500 caracteres no upload, para o RAG ter pedaços persistidos.',
+                ],
+                [
+                    'hash' => '3bdb7b0',
+                    'data' => '2026-10-03',
+                    'mensagem' => 'Gerar embedding de cada chunk e ranquear os 3 mais próximos por cosseno, para o RAG buscar por significado.',
+                ],
+                [
+                    'hash' => 'af3c1b3',
+                    'data' => '2026-10-03',
+                    'mensagem' => 'Responder o Explorar com os chunks mais próximos e registrar a consulta do RAG no log e nas métricas.',
+                ],
+            ],
+            'modulos' => [
+                [
+                    'nome' => 'Explore',
+                    'itens' => [
+                        ['titulo' => 'Chat livre, separado da entrevista', 'estado' => 'development', 'nota' => 'Não gera card; prompt explore@v1'],
+                        ['titulo' => 'Projeto opcional, travado depois da primeira mensagem', 'estado' => 'development', 'nota' => 'Com projeto, a busca usa os documentos daquele projeto; sem projeto, só documentos sem projeto'],
+                        ['titulo' => 'Resposta com os 3 chunks mais próximos', 'estado' => 'development', 'nota' => 'DocumentRag; sem chunks com embedding, o Explore responde só com o prompt livre'],
+                    ],
+                ],
+                [
+                    'nome' => 'Documentos',
+                    'itens' => [
+                        ['titulo' => 'CRUD de arquivos .md gravados no banco', 'estado' => 'development', 'nota' => 'Upload manual fica sem projeto'],
+                        ['titulo' => 'Fatiamento e embedding no upload', 'estado' => 'development', 'nota' => 'Chunks de 500 caracteres; text-embedding-3-small, inativo no catálogo de chat'],
+                        ['titulo' => 'Indexação de /docs e README no primeiro salvamento do projeto', 'estado' => 'development', 'nota' => 'Discovery 0010; edição não relê nem substitui os documentos'],
+                        ['titulo' => 'Label quando não há documento sincronizado', 'estado' => 'development', 'nota' => 'Mesmo desfecho se a leitura falhar ou não achar arquivo'],
+                    ],
+                ],
+                [
+                    'nome' => 'Métricas',
+                    'itens' => [
+                        ['titulo' => 'Uso de embedding e consulta do RAG', 'estado' => 'development', 'nota' => 'llm_usages.user_id; conversation_id pode ser nulo no embedding do salvamento do projeto'],
+                    ],
+                ],
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'Discovery 0010 — indexar docs e README ao salvar o projeto', 'estado' => 'development', 'nota' => 'docs/discovery/0010-indexar-docs-e-readme-ao-salvar-projeto.md'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'Indexação no salvamento, busca por projeto no Explore e uso de embedding', 'estado' => 'test'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.8.0',
             'data' => '2026-09-23',
             'estado' => 'development',

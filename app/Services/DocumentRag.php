@@ -17,9 +17,9 @@ class DocumentRag
     /**
      * @return array{matches: list<array{document: string, chunk_index: int, content: string, score: float}>, answer: ?string}
      */
-    public function ask(string $question, ?string $model = null, ?Conversation $conversation = null): array
+    public function ask(string $question, ?string $model = null, ?Conversation $conversation = null, bool $scoped = false): array
     {
-        $matches = $this->search->search($question);
+        $matches = $this->search->search($question, $scoped ? $conversation?->project_id : null, $scoped, $conversation);
 
         if ($matches === []) {
             $this->logConsulta($conversation, $matches, false, null);

@@ -5,6 +5,7 @@ namespace Tests\Unit\Services;
 use App\Models\Conversation;
 use App\Models\Document;
 use App\Models\DocumentChunk;
+use App\Models\Project;
 use App\Models\User;
 use App\Services\CosineSimilarity;
 use App\Services\DocumentRag;
@@ -104,6 +105,40 @@ TXT,
                 && ($log->context['llm'] ?? null) === false
                 && ($log->context['model'] ?? null) === null;
         });
+    }
+
+    public function test_scoped_ask_uses_only_the_conversation_project_documents(): void
+    {
+        $project = Project::factory()->create();
+        $other = Document::factory()->create(['name' => 'manual.md']);
+        $ofProject = Document::factory()->create([
+            'name' => 'projeto.md',
+            'project_id' => $project->id,
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $other->id,
+            'content' => 'Contexto manual.',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $ofProject->id,
+            'content' => 'Contexto do projeto.',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::createExploreFor($user);
+        $conversation->update(['project_id' => $project->id]);
+        $llm = (new FakeLlmGateway)->queueComplete('Resposta do projeto.');
+
+        $result = $this->rag($llm)->ask('pergunta', 'gpt-4o-mini', $conversation, true);
+
+        $this->assertSame('Resposta do projeto.', $result['answer']);
+        $this->assertCount(1, $result['matches']);
+        $this->assertStringContainsString('Contexto do projeto.', $llm->completeCalls[0]['messages'][0]['content']);
+        $this->assertStringNotContainsString('Contexto manual.', $llm->completeCalls[0]['messages'][0]['content']);
     }
 
     private function rag(FakeLlmGateway $llm): DocumentRag
