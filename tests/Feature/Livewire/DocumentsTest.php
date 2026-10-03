@@ -159,6 +159,64 @@ class DocumentsTest extends TestCase
     public function test_search_ranks_chunks_by_cosine_and_shows_top_three(): void
     {
         $user = User::factory()->create();
+        $this->seedRankedChunks();
+
+        $component = Livewire::actingAs($user)
+            ->test(Documents::class)
+            ->set('question', 'quantos quilos de Lumina')
+            ->call('search')
+            ->assertHasNoErrors()
+            ->assertSee('Chunk A mais próximo')
+            ->assertSee('Chunk B')
+            ->assertSee('Chunk C')
+            ->assertDontSee('Chunk D mais distante');
+
+        $matches = $component->get('matches');
+
+        $this->assertCount(3, $matches);
+        $this->assertSame(['Chunk A mais próximo', 'Chunk B', 'Chunk C'], array_column($matches, 'content'));
+        $this->assertEqualsWithDelta(1.0, $matches[0]['score'], 0.0001);
+        $this->assertGreaterThan($matches[1]['score'], $matches[0]['score']);
+        $this->assertGreaterThan($matches[2]['score'], $matches[1]['score']);
+    }
+
+    public function test_search_does_not_call_llm(): void
+    {
+        $user = User::factory()->create();
+        $this->seedRankedChunks();
+
+        // Sem nenhum fake de LLM — se chamar a LLM a chamada Http real falharia;
+        // verificamos que nenhuma chamada ao endpoint de completions ocorre.
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'data' => [['embedding' => [0.21, -0.43, 0.72]]],
+            ], 200),
+            'https://openrouter.ai/*' => Http::response(['error' => 'should not be called'], 500),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(Documents::class)
+            ->set('question', 'quantos quilos de Lumina')
+            ->call('search')
+            ->assertHasNoErrors()
+            ->assertSee('Chunk A mais próximo');
+
+        Http::assertNotSent(fn ($req) => str_contains($req->url(), 'completions'));
+    }
+
+    public function test_search_requires_a_question(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(Documents::class)
+            ->set('question', '   ')
+            ->call('search')
+            ->assertHasErrors(['question']);
+    }
+
+    private function seedRankedChunks(): void
+    {
         $document = Document::factory()->create(['name' => 'missao.md']);
 
         DocumentChunk::factory()->create([
@@ -185,34 +243,5 @@ class DocumentsTest extends TestCase
             'chunk_index' => 3,
             'embedding' => [0.0, 1.0, 0.0],
         ]);
-
-        $component = Livewire::actingAs($user)
-            ->test(Documents::class)
-            ->set('question', 'quantos quilos de Lumina')
-            ->call('search')
-            ->assertHasNoErrors()
-            ->assertSee('Chunk A mais próximo')
-            ->assertSee('Chunk B')
-            ->assertSee('Chunk C')
-            ->assertDontSee('Chunk D mais distante');
-
-        $matches = $component->get('matches');
-
-        $this->assertCount(3, $matches);
-        $this->assertSame(['Chunk A mais próximo', 'Chunk B', 'Chunk C'], array_column($matches, 'content'));
-        $this->assertEqualsWithDelta(1.0, $matches[0]['score'], 0.0001);
-        $this->assertGreaterThan($matches[1]['score'], $matches[0]['score']);
-        $this->assertGreaterThan($matches[2]['score'], $matches[1]['score']);
-    }
-
-    public function test_search_requires_a_question(): void
-    {
-        $user = User::factory()->create();
-
-        Livewire::actingAs($user)
-            ->test(Documents::class)
-            ->set('question', '   ')
-            ->call('search')
-            ->assertHasErrors(['question']);
     }
 }

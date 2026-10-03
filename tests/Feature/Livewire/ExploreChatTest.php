@@ -6,6 +6,8 @@ use App\Contracts\LlmGateway;
 use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Livewire\ExploreChat;
 use App\Models\Conversation;
+use App\Models\Document;
+use App\Models\DocumentChunk;
 use App\Models\User;
 use App\Prompts\SystemPromptCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -154,6 +156,49 @@ class ExploreChatTest extends TestCase
             ->set('input', 'Oi')
             ->call('sendMessage')
             ->assertSee('Não consegui continuar agora.');
+    }
+
+    public function test_uses_document_rag_when_chunks_have_embeddings(): void
+    {
+        config(['services.openai.api_key' => 'sk-test']);
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'data' => [
+                    ['embedding' => [1.0, 0.0]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::createExploreFor($user);
+        $document = Document::factory()->create(['name' => 'missao.md']);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Há exatamente 42 quilos de minério Lumina.',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+
+        $llm = $this->bindFakeLlmGateway()->queueComplete('Há exatamente 42 quilos.');
+
+        Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quanto pesava o minério Lumina?')
+            ->call('sendMessage')
+            ->assertSee('Há exatamente 42 quilos.');
+
+        $this->assertCount(1, $llm->completeCalls);
+        $this->assertSame(ExploreChat::MODEL, $llm->lastModel);
+        $this->assertSame('rag', $llm->completeCalls[0]['step']);
+        $this->assertTrue($conversation->is($llm->completeCalls[0]['conversation']));
+        $this->assertStringContainsString('Responda usando somente o contexto.', $llm->completeCalls[0]['messages'][0]['content']);
+        $this->assertStringContainsString('Há exatamente 42 quilos de minério Lumina.', $llm->completeCalls[0]['messages'][0]['content']);
+        $this->assertStringContainsString('Quanto pesava o minério Lumina?', $llm->completeCalls[0]['messages'][0]['content']);
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Há exatamente 42 quilos.',
+        ]);
     }
 
     public function test_rejects_another_users_explore_conversation(): void

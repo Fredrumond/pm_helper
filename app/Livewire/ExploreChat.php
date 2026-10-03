@@ -5,8 +5,10 @@ namespace App\Livewire;
 use App\Contracts\LlmGateway;
 use App\Exceptions\LlmTemporarilyUnavailableException;
 use App\Models\Conversation;
+use App\Models\DocumentChunk;
 use App\Models\Message;
 use App\Prompts\SystemPromptCatalog;
+use App\Services\DocumentRag;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -56,16 +58,8 @@ class ExploreChat extends Component
             $this->conversation->refresh();
             $this->conversation->load('messages');
 
-            $prompt = $prompts->current('explore');
-            $assistantResponse = $llm->completePrompt(
-                array_merge(
-                    [['role' => 'system', 'content' => $prompt->content]],
-                    $this->conversation->toLlmHistory(),
-                ),
-                self::MODEL,
-                'explore',
-                $this->conversation,
-            );
+            $assistantResponse = $this->answerFromDocuments($text)
+                ?? $this->answerFromExplore($llm, $prompts);
 
             Message::create([
                 'conversation_id' => $this->conversation->id,
@@ -93,6 +87,30 @@ class ExploreChat extends Component
 
         $this->conversation->refresh();
         $this->conversation->load('messages');
+    }
+
+    private function answerFromDocuments(string $question): ?string
+    {
+        if (! DocumentChunk::query()->whereNotNull('embedding')->exists()) {
+            return null;
+        }
+
+        return app(DocumentRag::class)->ask($question, self::MODEL, $this->conversation)['answer'];
+    }
+
+    private function answerFromExplore(LlmGateway $llm, SystemPromptCatalog $prompts): string
+    {
+        $prompt = $prompts->current('explore');
+
+        return $llm->completePrompt(
+            array_merge(
+                [['role' => 'system', 'content' => $prompt->content]],
+                $this->conversation->toLlmHistory(),
+            ),
+            self::MODEL,
+            'explore',
+            $this->conversation,
+        );
     }
 
     public function render()

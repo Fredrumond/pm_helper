@@ -2,7 +2,7 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Documentos</h1>
-            <p class="text-sm text-gray-500 mt-1">Envie arquivos Markdown (.md). No upload, o texto vira chunks com embedding. A busca compara o significado da pergunta com esses vetores.</p>
+            <p class="text-sm text-gray-500 mt-1">Envie um .md e veja os chunks mais próximos da sua pergunta por similaridade.</p>
         </div>
         @unless ($showForm)
             <button type="button"
@@ -23,9 +23,9 @@
     @endif
 
     <div class="bg-white border border-gray-200 rounded-xl px-5 py-5 mb-6">
-        <h2 class="text-lg font-medium text-gray-900">Buscar por significado</h2>
+        <h2 class="text-lg font-medium text-gray-900">Perguntar aos documentos</h2>
         <p class="mt-1 text-sm text-gray-500">
-            A pergunta vira um vetor. Cada chunk ganha um score de cosseno. Ficam os 3 mais próximos.
+            Pergunta → embedding → top 3 chunks mais próximos por similaridade de cosseno.
         </p>
 
         <form wire:submit.prevent="search" class="mt-5 space-y-4">
@@ -46,7 +46,7 @@
                     Buscar
                 </x-primary-button>
                 <span wire:loading wire:target="search" class="text-xs text-gray-500">
-                    Gerando embedding e comparando…
+                    Buscando chunks…
                 </span>
             </div>
         </form>

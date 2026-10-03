@@ -14,7 +14,7 @@
                     </div>
                     <h3 class="font-semibold text-gray-800 mb-1">Assistente de Exploração</h3>
                     <p class="text-sm text-gray-500 max-w-md mx-auto">
-                        Pergunte qualquer coisa. O assistente responde direto, sem entrevista e sem gerar card.
+                        Pergunte qualquer coisa. Se houver documentos com embedding, a resposta usa só os 3 chunks mais próximos.
                     </p>
                 </div>
             </div>
