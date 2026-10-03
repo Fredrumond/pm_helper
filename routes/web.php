@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\ConversationController;
+use App\Http\Controllers\ExploreController;
 use App\Http\Controllers\MetricsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\VersoesController;
@@ -27,6 +28,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/conversations', [ConversationController::class, 'store'])->name('conversations.store');
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show'])->name('conversations.show');
     Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
+
+    Route::get('/explorar', [ExploreController::class, 'index'])->name('explorar.index');
+    Route::post('/explorar', [ExploreController::class, 'store'])->name('explorar.store');
+    Route::get('/explorar/{conversation}', [ExploreController::class, 'show'])->name('explorar.show');
+    Route::delete('/explorar/{conversation}', [ExploreController::class, 'destroy'])->name('explorar.destroy');
 
     // Cards
     Route::get('/cards', [CardController::class, 'index'])->name('cards.index');

@@ -13,6 +13,7 @@ class ConversationController extends Controller
     {
         $conversations = Auth::user()
             ->conversations()
+            ->interview()
             ->with('card')
             ->latest()
             ->paginate(20);
@@ -33,6 +34,7 @@ class ConversationController extends Controller
     public function show(Conversation $conversation): View
     {
         abort_if($conversation->user_id !== Auth::id(), 403);
+        abort_if($conversation->isExplore(), 404);
 
         $conversation->load(['messages', 'card', 'llmUsages']);
 
@@ -42,6 +44,7 @@ class ConversationController extends Controller
     public function destroy(Conversation $conversation): RedirectResponse
     {
         abort_if($conversation->user_id !== Auth::id(), 403);
+        abort_if($conversation->isExplore(), 404);
 
         $conversation->delete();
 

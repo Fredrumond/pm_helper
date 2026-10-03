@@ -15,6 +15,9 @@
                     <x-nav-link :href="route('conversations.index')" :active="request()->routeIs('conversations.*')">
                         Conversas
                     </x-nav-link>
+                    <x-nav-link :href="route('explorar.index')" :active="request()->routeIs('explorar.*')">
+                        Explorar
+                    </x-nav-link>
                     <x-nav-link :href="route('cards.index')" :active="request()->routeIs('cards.*')">
                         Cards
                     </x-nav-link>
@@ -93,6 +96,9 @@
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('conversations.index')" :active="request()->routeIs('conversations.*')">
                 Conversas
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('explorar.index')" :active="request()->routeIs('explorar.*')">
+                Explorar
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('cards.index')" :active="request()->routeIs('cards.*')">
                 Cards

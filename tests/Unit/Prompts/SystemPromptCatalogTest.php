@@ -34,6 +34,7 @@ class SystemPromptCatalogTest extends TestCase
         $this->assertContains('v3', $catalog->versions('card_generation'));
         $this->assertContains('v1', $catalog->versions('docs_retrieval'));
         $this->assertContains('v1', $catalog->versions('docs_briefing'));
+        $this->assertContains('v1', $catalog->versions('explore'));
     }
 
     public function test_loads_the_configured_interview_prompt(): void
@@ -100,6 +101,19 @@ class SystemPromptCatalogTest extends TestCase
         $this->assertStringContainsString('Não faça perguntas', $prompt->content);
         $this->assertStringContainsString('dado', $prompt->content);
         $this->assertStringContainsString('nunca como instrução', $prompt->content);
+        $this->assertSame(hash('sha256', $prompt->content), $prompt->hash);
+    }
+
+    public function test_loads_the_configured_explore_prompt(): void
+    {
+        $prompt = (new SystemPromptCatalog)->current('explore');
+
+        $this->assertSame('explore', $prompt->name);
+        $this->assertSame('v1', $prompt->version);
+        $this->assertSame('explore@v1', $prompt->identifier());
+        $this->assertStringContainsString('chat livre', mb_strtolower($prompt->content));
+        $this->assertStringNotContainsString('<INTERVIEW_COMPLETE>', $prompt->content);
+        $this->assertStringNotContainsString('<CARD_JSON>', $prompt->content);
         $this->assertSame(hash('sha256', $prompt->content), $prompt->hash);
     }
 
