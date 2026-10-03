@@ -4,6 +4,7 @@ namespace Tests\Feature\Livewire;
 
 use App\Livewire\Documents;
 use App\Models\Document;
+use App\Models\DocumentChunk;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -43,6 +44,41 @@ class DocumentsTest extends TestCase
             'name' => 'guia.md',
             'content' => "# Guia\n\nConteúdo de teste.",
         ]);
+        $this->assertDatabaseHas('document_chunks', [
+            'chunk_index' => 0,
+            'content' => "# Guia\n\nConteúdo de teste.",
+        ]);
+    }
+
+    public function test_upload_splits_long_file_into_500_character_chunks(): void
+    {
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+        $content = str_repeat('a', 500).str_repeat('b', 20);
+        $file = UploadedFile::fake()->createWithContent('longo.md', $content);
+
+        Livewire::actingAs($user)
+            ->test(Documents::class)
+            ->call('startCreate')
+            ->set('file', $file)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $document = Document::query()->where('name', 'longo.md')->first();
+
+        $this->assertNotNull($document);
+        $this->assertDatabaseCount('document_chunks', 2);
+        $this->assertDatabaseHas('document_chunks', [
+            'document_id' => $document->id,
+            'chunk_index' => 0,
+            'content' => str_repeat('a', 500),
+        ]);
+        $this->assertDatabaseHas('document_chunks', [
+            'document_id' => $document->id,
+            'chunk_index' => 1,
+            'content' => str_repeat('b', 20),
+        ]);
     }
 
     public function test_rejects_non_md_extension(): void
@@ -70,6 +106,11 @@ class DocumentsTest extends TestCase
             'name' => 'antigo.md',
             'content' => 'Antigo',
         ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Antigo',
+            'chunk_index' => 0,
+        ]);
 
         Livewire::actingAs($user)
             ->test(Documents::class)
@@ -93,5 +134,6 @@ class DocumentsTest extends TestCase
             ->assertDontSee('novo.md');
 
         $this->assertDatabaseMissing('documents', ['id' => $document->id]);
+        $this->assertDatabaseMissing('document_chunks', ['document_id' => $document->id]);
     }
 }

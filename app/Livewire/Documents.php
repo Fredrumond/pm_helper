@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Document;
+use App\Services\DocumentChunker;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -73,10 +74,12 @@ class Documents extends Component
 
             $this->statusMessage = 'Documento atualizado.';
         } else {
-            Document::query()->create([
+            $document = Document::query()->create([
                 'name' => $this->name,
                 'content' => $this->content,
             ]);
+
+            app(DocumentChunker::class)->chunk($document);
 
             $this->statusMessage = 'Documento enviado.';
         }
@@ -97,7 +100,7 @@ class Documents extends Component
     public function render(): View
     {
         return view('livewire.documents', [
-            'documents' => Document::query()->latest()->get(),
+            'documents' => Document::query()->withCount('chunks')->latest()->get(),
         ]);
     }
 

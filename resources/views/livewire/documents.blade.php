@@ -2,7 +2,7 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Documentos</h1>
-            <p class="text-sm text-gray-500 mt-1">Envie arquivos Markdown (.md). O conteúdo fica salvo no banco — nada é gravado em disco no servidor.</p>
+            <p class="text-sm text-gray-500 mt-1">Envie arquivos Markdown (.md). No upload, o texto é quebrado em pedaços de 500 caracteres e gravado em document_chunks.</p>
         </div>
         @unless ($showForm)
             <button type="button"
@@ -100,6 +100,7 @@
                             <p class="font-medium text-gray-900 truncate font-mono">{{ $document->name }}</p>
                             <p class="text-xs text-gray-500 mt-1">
                                 {{ number_format(strlen($document->content)) }} caracteres
+                                · {{ $document->chunks_count }} {{ $document->chunks_count === 1 ? 'chunk' : 'chunks' }}
                                 · {{ $document->created_at->format('d/m/Y H:i') }}
                             </p>
                             <details class="mt-3 group">
