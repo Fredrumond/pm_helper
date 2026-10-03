@@ -163,6 +163,30 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.8.1',
+            'data' => '2026-10-03',
+            'estado' => 'development',
+            'titulo' => 'CRUD de documentos Markdown no banco',
+            'resumo' => 'Usuários autenticados enviam arquivos .md pela tela Documentos; nome e conteúdo ficam na tabela documents, sem gravar arquivo em disco. Listagem, edição de texto e exclusão completam o fluxo inicial para RAG.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Documentos',
+                    'itens' => [
+                        ['titulo' => 'Upload de .md com conteúdo persistido em documents (name, content)', 'estado' => 'development', 'nota' => 'Livewire Documents em /documentos; limite 5 MB; só extensão .md'],
+                        ['titulo' => 'Edição de nome/conteúdo e exclusão na mesma tela', 'estado' => 'development'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'DocumentsTest (upload, validação .md, editar, excluir)', 'estado' => 'test'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.8.0',
             'data' => '2026-09-23',
             'estado' => 'development',

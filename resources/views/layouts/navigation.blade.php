@@ -21,6 +21,9 @@
                     <x-nav-link :href="route('cards.index')" :active="request()->routeIs('cards.*')">
                         Cards
                     </x-nav-link>
+                    <x-nav-link :href="route('documents.index')" :active="request()->routeIs('documents.*')">
+                        Documentos
+                    </x-nav-link>
                     @if (Auth::user()->can('admin'))
                         <x-nav-link :href="route('admin.projects.index')" :active="request()->routeIs('admin.projects.*')">
                             Gerenciar Projetos
@@ -102,6 +105,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('cards.index')" :active="request()->routeIs('cards.*')">
                 Cards
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('documents.index')" :active="request()->routeIs('documents.*')">
+                Documentos
             </x-responsive-nav-link>
             @if (Auth::user()->can('admin'))
                 <x-responsive-nav-link :href="route('admin.projects.index')" :active="request()->routeIs('admin.projects.*')">

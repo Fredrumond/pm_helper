@@ -9,6 +9,7 @@ use App\Http\Controllers\VersoesController;
 use App\Livewire\AdminLlmModels;
 use App\Livewire\AdminProjects;
 use App\Livewire\AdminPromptModels;
+use App\Livewire\Documents;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('conversations.index'));
@@ -37,6 +38,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Cards
     Route::get('/cards', [CardController::class, 'index'])->name('cards.index');
     Route::get('/cards/{card}', [CardController::class, 'show'])->name('cards.show');
+
+    Route::get('/documentos', Documents::class)->name('documents.index');
 
     Route::middleware('admin')->group(function () {
         Route::get('/metrics', [MetricsController::class, 'index'])->name('metrics.index');
