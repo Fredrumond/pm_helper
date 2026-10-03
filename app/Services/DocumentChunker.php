@@ -7,17 +7,23 @@ use App\Models\DocumentChunk;
 
 class DocumentChunker
 {
-    public const SIZE = 500;
+    public const SIZE = RagConfig::DEFAULT_CHUNK_SIZE;
 
     public function __construct(
         private readonly EmbeddingService $embeddings,
+        private readonly ?RagConfig $rag = null,
     ) {}
 
     public function chunk(Document $document): void
     {
         $document->chunks()->delete();
 
-        foreach (str_split($document->content, self::SIZE) as $index => $content) {
+        $size = $this->rag()->chunkSize();
+        $pieces = $size > 0
+            ? str_split($document->content, $size)
+            : [$document->content];
+
+        foreach ($pieces as $index => $content) {
             DocumentChunk::query()->create([
                 'document_id' => $document->id,
                 'content' => $content,
@@ -25,5 +31,10 @@ class DocumentChunker
                 'embedding' => $this->embeddings->embed($content),
             ]);
         }
+    }
+
+    private function rag(): RagConfig
+    {
+        return $this->rag ?? app(RagConfig::class);
     }
 }

@@ -9,6 +9,7 @@ use App\Http\Controllers\VersoesController;
 use App\Livewire\AdminLlmModels;
 use App\Livewire\AdminProjects;
 use App\Livewire\AdminPromptModels;
+use App\Livewire\AdminRagSettings;
 use App\Livewire\Documents;
 use Illuminate\Support\Facades\Route;
 
@@ -46,6 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/versoes', [VersoesController::class, 'index'])->name('versoes.index');
         Route::get('/admin/projetos', AdminProjects::class)->name('admin.projects.index');
         Route::get('/admin/prompts', AdminPromptModels::class)->name('admin.prompts.index');
+        Route::get('/admin/rag', AdminRagSettings::class)->name('admin.rag.index');
         Route::get('/admin/modelos', AdminLlmModels::class)->name('admin.models.index');
     });
 

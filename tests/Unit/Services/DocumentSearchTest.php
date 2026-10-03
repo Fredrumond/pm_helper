@@ -4,12 +4,15 @@ namespace Tests\Unit\Services;
 
 use App\Models\Document;
 use App\Models\DocumentChunk;
+use App\Models\LlmModel;
 use App\Models\Project;
 use App\Services\CosineSimilarity;
 use App\Services\DocumentSearch;
 use App\Services\EmbeddingService;
+use App\Services\RagConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\CatalogModels;
 use Tests\TestCase;
 
 class DocumentSearchTest extends TestCase
@@ -152,5 +155,59 @@ class DocumentSearchTest extends TestCase
 
         $this->assertCount(1, $matches);
         $this->assertSame('Doc do selecionado', $matches[0]['content']);
+    }
+
+    public function test_keeps_only_the_configured_top_k(): void
+    {
+        $this->seedEmbeddingModel();
+        $this->assertTrue(app(RagConfig::class)->save(RagConfig::DEFAULT_CHUNK_SIZE, RagConfig::DEFAULT_EMBEDDING_MODEL, 1));
+
+        $document = Document::factory()->create(['name' => 'missao.md']);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Chunk A',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Chunk B',
+            'chunk_index' => 1,
+            'embedding' => [0.0, 1.0],
+        ]);
+
+        $matches = (new DocumentSearch(new EmbeddingService, new CosineSimilarity))->search('pergunta');
+
+        $this->assertCount(1, $matches);
+        $this->assertSame('Chunk A', $matches[0]['content']);
+    }
+
+    public function test_returns_nothing_when_top_k_is_not_positive(): void
+    {
+        $this->seedEmbeddingModel();
+        $this->assertTrue(app(RagConfig::class)->save(RagConfig::DEFAULT_CHUNK_SIZE, RagConfig::DEFAULT_EMBEDDING_MODEL, 0));
+
+        $document = Document::factory()->create();
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Chunk A',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+
+        $matches = (new DocumentSearch(new EmbeddingService, new CosineSimilarity))->search('pergunta');
+
+        $this->assertSame([], $matches);
+    }
+
+    private function seedEmbeddingModel(): void
+    {
+        CatalogModels::seed([[
+            'id' => RagConfig::DEFAULT_EMBEDDING_MODEL,
+            'name' => 'Embedding small',
+            'tier' => LlmModel::TIER_PAID,
+            'provider' => LlmModel::PROVIDER_OPENAI,
+            'active' => false,
+        ]]);
     }
 }

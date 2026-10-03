@@ -24,7 +24,7 @@
 | Tabela | Propósito |
 |---|---|
 | `documents` | Nome e conteúdo bruto do arquivo |
-| `document_chunks` | Trechos de 500 chars + vetor de embedding (JSON) |
+| `document_chunks` | Trechos do tamanho configurado no painel + vetor de embedding (JSON) |
 
 ---
 
@@ -43,9 +43,9 @@ sequenceDiagram
     D->>DB: Salva Document (name, content)
     D->>Ch: chunk(document)
     Ch->>DB: Exclui chunks anteriores
-    loop Cada bloco de 500 chars
+    loop Cada bloco do tamanho configurado
         Ch->>E: embed(trecho)
-        E->>E: POST /v1/embeddings (text-embedding-3-small)
+        E->>E: POST /v1/embeddings (modelo de embedding do painel)
         E-->>Ch: vetor float[]
         Ch->>DB: Salva DocumentChunk (content, chunk_index, embedding)
     end
@@ -70,14 +70,14 @@ sequenceDiagram
     U->>D: Digita pergunta e clica Buscar
     D->>S: search(question)
     S->>E: embed(question)
-    E->>E: POST /v1/embeddings (text-embedding-3-small)
+    E->>E: POST /v1/embeddings (modelo de embedding do painel)
     E-->>S: vetor da pergunta
     S->>DB: Carrega todos os DocumentChunks com embedding
     loop Cada chunk
         S->>C: score(query_vec, chunk_vec)
         C-->>S: similaridade cosseno (-1 a 1)
     end
-    S-->>D: top-3 chunks mais similares
+    S-->>D: top-K chunks mais similares
     D-->>U: Exibe chunks com score e conteúdo (sem resposta LLM)
 ```
 
@@ -98,7 +98,7 @@ sequenceDiagram
     U->>E: Envia mensagem no Explore
     E->>R: ask(question, gpt-4o-mini)
     R->>S: search(question)
-    S-->>R: top-3 chunks mais similares
+    S-->>R: top-K chunks mais similares
     R->>L: completePrompt([contexto + pergunta], "rag")
     L-->>R: resposta textual
     R-->>E: { matches[], answer }
@@ -152,9 +152,9 @@ erDiagram
 
 | Parâmetro | Valor | Onde |
 |---|---|---|
-| Tamanho do chunk | 500 chars | `DocumentChunker::SIZE` |
-| Modelo de embedding | `text-embedding-3-small` | `EmbeddingService::MODEL` |
-| Top-K resultados | 3 | `DocumentSearch::LIMIT` |
+| Tamanho do chunk | o definido no painel; até a primeira troca, 500 caracteres | `RagConfig` |
+| Modelo de embedding | o definido no painel, escolhido no catálogo; até a primeira troca, `text-embedding-3-small` | `RagConfig` |
+| Top-K resultados | o definido no painel; até a primeira troca, 3 | `RagConfig` |
 | Modelo de resposta no Explore | `gpt-4o-mini` | `ExploreChat::MODEL` |
 | Versão do prompt RAG | `v1` | `config/chat.php` → `prompts.rag` |
 
@@ -163,6 +163,7 @@ erDiagram
 ## Limitações atuais
 
 - **Sem vector store:** a busca por similaridade carrega **todos** os chunks em memória — OK para volumes pequenos, inviável com muitos documentos.
-- **Chunk por caractere:** o split em 500 chars pode cortar palavras no meio; chunking semântico (por parágrafo/sentença) daria contexto mais preciso.
+- **Chunk por caractere:** o split no tamanho configurado pode cortar palavras no meio; chunking semântico (por parágrafo/sentença) daria contexto mais preciso.
+- **Trocar tamanho ou modelo de embedding não reindexa:** os trechos já gravados permanecem até o documento ser embeddado de novo. O painel avisa que a reindexação ficou pendente. O top-K vale na busca seguinte.
 - **Embedding requer `OPENAI_API_KEY`:** sem a chave, o upload falha no momento do chunking.
 - **Sem score mínimo:** qualquer chunk é retornado mesmo com similaridade baixa.

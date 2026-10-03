@@ -11,7 +11,9 @@ use Throwable;
 
 class EmbeddingService
 {
-    public const MODEL = 'text-embedding-3-small';
+    public const MODEL = RagConfig::DEFAULT_EMBEDDING_MODEL;
+
+    public function __construct(private readonly ?RagConfig $rag = null) {}
 
     /**
      * @return list<float>
@@ -26,12 +28,14 @@ class EmbeddingService
             );
         }
 
+        $model = $this->rag()->embeddingModel();
+
         $response = Http::withToken($apiKey)
             ->acceptJson()
             ->connectTimeout(10)
             ->timeout(60)
             ->post('https://api.openai.com/v1/embeddings', [
-                'model' => self::MODEL,
+                'model' => $model,
                 'input' => $text,
             ]);
 
@@ -53,6 +57,11 @@ class EmbeddingService
         return $embedding;
     }
 
+    private function rag(): RagConfig
+    {
+        return $this->rag ?? app(RagConfig::class);
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -61,13 +70,13 @@ class EmbeddingService
         try {
             LlmUsage::recordFromEmbedding(
                 $payload,
-                self::MODEL,
+                $this->rag()->embeddingModel(),
                 $conversation,
                 Auth::id(),
             );
         } catch (Throwable $exception) {
             Log::error('Falha ao registrar uso de embedding', [
-                'model' => self::MODEL,
+                'model' => $this->rag()->embeddingModel(),
                 'conversation_id' => $conversation?->id,
                 'error' => $exception->getMessage(),
             ]);

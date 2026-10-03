@@ -7,11 +7,12 @@ use App\Models\DocumentChunk;
 
 class DocumentSearch
 {
-    public const LIMIT = 3;
+    public const LIMIT = RagConfig::DEFAULT_TOP_K;
 
     public function __construct(
         private readonly EmbeddingService $embeddings,
         private readonly CosineSimilarity $cosine,
+        private readonly ?RagConfig $rag = null,
     ) {}
 
     /**
@@ -35,7 +36,7 @@ class DocumentSearch
             });
         }
 
-        return $chunks
+        $ranked = $chunks
             ->get()
             ->filter(fn (DocumentChunk $chunk): bool => is_array($chunk->embedding) && $chunk->embedding !== [])
             ->map(fn (DocumentChunk $chunk): array => [
@@ -45,8 +46,19 @@ class DocumentSearch
                 'score' => $this->cosine->score($query, $chunk->embedding),
             ])
             ->sortByDesc('score')
-            ->take(self::LIMIT)
-            ->values()
-            ->all();
+            ->values();
+
+        $limit = $this->rag()->topK();
+
+        if ($limit < 1) {
+            return [];
+        }
+
+        return $ranked->take($limit)->all();
+    }
+
+    private function rag(): RagConfig
+    {
+        return $this->rag ?? app(RagConfig::class);
     }
 }

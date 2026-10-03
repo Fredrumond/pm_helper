@@ -31,6 +31,9 @@
                         <x-nav-link :href="route('admin.prompts.index')" :active="request()->routeIs('admin.prompts.*')">
                             Modelos dos prompts
                         </x-nav-link>
+                        <x-nav-link :href="route('admin.rag.index')" :active="request()->routeIs('admin.rag.*')">
+                            Parâmetros do RAG
+                        </x-nav-link>
                         <x-nav-link :href="route('admin.models.index')" :active="request()->routeIs('admin.models.*')">
                             Modelos LLM
                         </x-nav-link>
@@ -115,6 +118,9 @@
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.prompts.index')" :active="request()->routeIs('admin.prompts.*')">
                     Modelos dos prompts
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.rag.index')" :active="request()->routeIs('admin.rag.*')">
+                    Parâmetros do RAG
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.models.index')" :active="request()->routeIs('admin.models.*')">
                     Modelos LLM
