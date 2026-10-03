@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Document;
 use App\Services\DocumentChunker;
+use App\Services\DocumentSearch;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -28,6 +29,13 @@ class Documents extends Component
 
     /** @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null */
     public $file = null;
+
+    public string $question = '';
+
+    /** @var list<array{document: string, chunk_index: int, content: string, score: float}> */
+    public array $matches = [];
+
+    public bool $searched = false;
 
     public function startCreate(): void
     {
@@ -85,6 +93,19 @@ class Documents extends Component
         }
 
         $this->resetForm();
+    }
+
+    public function search(): void
+    {
+        $this->question = trim($this->question);
+        $this->validate([
+            'question' => ['required', 'string'],
+        ], [
+            'question.required' => 'Digite uma pergunta.',
+        ]);
+
+        $this->matches = app(DocumentSearch::class)->search($this->question);
+        $this->searched = true;
     }
 
     public function destroy(int $documentId): void

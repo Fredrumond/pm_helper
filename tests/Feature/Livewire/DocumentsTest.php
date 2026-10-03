@@ -8,6 +8,7 @@ use App\Models\DocumentChunk;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -15,6 +16,20 @@ use Tests\TestCase;
 class DocumentsTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['services.openai.api_key' => 'sk-test']);
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'data' => [
+                    ['embedding' => [0.21, -0.43, 0.72]],
+                ],
+            ], 200),
+        ]);
+    }
 
     public function test_guest_is_redirected_to_login(): void
     {
@@ -48,6 +63,10 @@ class DocumentsTest extends TestCase
             'chunk_index' => 0,
             'content' => "# Guia\n\nConteúdo de teste.",
         ]);
+        $this->assertSame(
+            [0.21, -0.43, 0.72],
+            DocumentChunk::query()->first()?->embedding
+        );
     }
 
     public function test_upload_splits_long_file_into_500_character_chunks(): void
@@ -135,5 +154,65 @@ class DocumentsTest extends TestCase
 
         $this->assertDatabaseMissing('documents', ['id' => $document->id]);
         $this->assertDatabaseMissing('document_chunks', ['document_id' => $document->id]);
+    }
+
+    public function test_search_ranks_chunks_by_cosine_and_shows_top_three(): void
+    {
+        $user = User::factory()->create();
+        $document = Document::factory()->create(['name' => 'missao.md']);
+
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Chunk A mais próximo',
+            'chunk_index' => 0,
+            'embedding' => [0.21, -0.43, 0.72],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Chunk B',
+            'chunk_index' => 1,
+            'embedding' => [0.21, -0.43, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Chunk C',
+            'chunk_index' => 2,
+            'embedding' => [0.21, 0.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Chunk D mais distante',
+            'chunk_index' => 3,
+            'embedding' => [0.0, 1.0, 0.0],
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(Documents::class)
+            ->set('question', 'quantos quilos de Lumina')
+            ->call('search')
+            ->assertHasNoErrors()
+            ->assertSee('Chunk A mais próximo')
+            ->assertSee('Chunk B')
+            ->assertSee('Chunk C')
+            ->assertDontSee('Chunk D mais distante');
+
+        $matches = $component->get('matches');
+
+        $this->assertCount(3, $matches);
+        $this->assertSame(['Chunk A mais próximo', 'Chunk B', 'Chunk C'], array_column($matches, 'content'));
+        $this->assertEqualsWithDelta(1.0, $matches[0]['score'], 0.0001);
+        $this->assertGreaterThan($matches[1]['score'], $matches[0]['score']);
+        $this->assertGreaterThan($matches[2]['score'], $matches[1]['score']);
+    }
+
+    public function test_search_requires_a_question(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(Documents::class)
+            ->set('question', '   ')
+            ->call('search')
+            ->assertHasErrors(['question']);
     }
 }

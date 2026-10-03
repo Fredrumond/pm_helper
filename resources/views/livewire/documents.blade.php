@@ -2,7 +2,7 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Documentos</h1>
-            <p class="text-sm text-gray-500 mt-1">Envie arquivos Markdown (.md). No upload, o texto é quebrado em pedaços de 500 caracteres e gravado em document_chunks.</p>
+            <p class="text-sm text-gray-500 mt-1">Envie arquivos Markdown (.md). No upload, o texto vira chunks com embedding. A busca compara o significado da pergunta com esses vetores.</p>
         </div>
         @unless ($showForm)
             <button type="button"
@@ -21,6 +21,59 @@
             {{ $statusMessage }}
         </div>
     @endif
+
+    <div class="bg-white border border-gray-200 rounded-xl px-5 py-5 mb-6">
+        <h2 class="text-lg font-medium text-gray-900">Buscar por significado</h2>
+        <p class="mt-1 text-sm text-gray-500">
+            A pergunta vira um vetor. Cada chunk ganha um score de cosseno. Ficam os 3 mais próximos.
+        </p>
+
+        <form wire:submit.prevent="search" class="mt-5 space-y-4">
+            <div>
+                <x-input-label for="document-question" value="Pergunta" />
+                <x-text-input
+                    wire:model="question"
+                    id="document-question"
+                    class="mt-1 block w-full"
+                    type="text"
+                    placeholder="Ex.: quantos quilos de Lumina?"
+                />
+                <x-input-error class="mt-2" :messages="$errors->get('question')" />
+            </div>
+
+            <div class="flex items-center gap-3">
+                <x-primary-button>
+                    Buscar
+                </x-primary-button>
+                <span wire:loading wire:target="search" class="text-xs text-gray-500">
+                    Gerando embedding e comparando…
+                </span>
+            </div>
+        </form>
+
+        @if ($searched)
+            @if (count($matches) === 0)
+                <p class="mt-5 text-sm text-gray-500">Nenhum chunk com embedding para comparar.</p>
+            @else
+                <ol class="mt-5 space-y-3">
+                    @foreach ($matches as $match)
+                        <li class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                            <div class="flex items-baseline justify-between gap-3">
+                                <p class="text-sm font-medium text-gray-900">
+                                    {{ number_format($match['score'], 2) }}
+                                    <span class="font-normal text-gray-500">
+                                        · {{ $match['document'] }}
+                                        · chunk {{ $match['chunk_index'] }}
+                                    </span>
+                                </p>
+                            </div>
+                            <pre class="mt-2 text-xs text-gray-800 whitespace-pre-wrap">{{ $match['content'] }}</pre>
+                        </li>
+                    @endforeach
+                </ol>
+            @endif
+        @endif
+    </div>
 
     @if ($showForm)
         <div class="bg-white border border-gray-200 rounded-xl px-5 py-5 mb-6">

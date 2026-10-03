@@ -16,7 +16,18 @@ class DocumentChunk extends Model
         'document_id',
         'content',
         'chunk_index',
+        'embedding',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'embedding' => 'array',
+        ];
+    }
 
     public function document(): BelongsTo
     {

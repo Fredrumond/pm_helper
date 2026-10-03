@@ -9,6 +9,10 @@ class DocumentChunker
 {
     public const SIZE = 500;
 
+    public function __construct(
+        private readonly EmbeddingService $embeddings,
+    ) {}
+
     public function chunk(Document $document): void
     {
         $document->chunks()->delete();
@@ -18,6 +22,7 @@ class DocumentChunker
                 'document_id' => $document->id,
                 'content' => $content,
                 'chunk_index' => $index,
+                'embedding' => $this->embeddings->embed($content),
             ]);
         }
     }
