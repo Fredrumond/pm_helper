@@ -296,7 +296,7 @@ class AdminProjectsTest extends TestCase
         Livewire::actingAs($admin)
             ->test(AdminProjects::class)
             ->call('startCreate')
-            ->assertSee('Ao cadastrar, o README e a pasta /docs serão indexados')
+            ->assertSee('Ao cadastrar, os arquivos .md do README e da pasta /docs serão indexados')
             ->assertSee('Permaneça nesta tela até a operação terminar.')
             ->assertSee('Indexação em andamento. Permaneça nesta tela; o botão fica bloqueado até concluir.');
     }
@@ -309,8 +309,7 @@ class AdminProjectsTest extends TestCase
         Livewire::actingAs($admin)
             ->test(AdminProjects::class)
             ->call('startEdit', $project->id)
-            ->assertDontSee('Ao cadastrar, o README e a pasta /docs serão indexados')
-            ->assertDontSee('Indexação em andamento. Permaneça nesta tela; o botão fica bloqueado até concluir.');
+            ->assertDontSee('Ao cadastrar, os arquivos .md do README e da pasta /docs serão indexados');
     }
 
     public function test_first_save_indexes_repo_files_and_hides_the_empty_label(): void
@@ -327,7 +326,8 @@ class AdminProjectsTest extends TestCase
         $docs = $this->bindFakeProjectDocsGateway();
         $docs->queueIndexable(ProjectIndexableFilesResult::ok([
             ['path' => 'README.md', 'content' => '# App'],
-            ['path' => 'docs/regras.txt', 'content' => 'Regra 1'],
+            ['path' => 'docs/regras.md', 'content' => 'Regra 1'],
+            ['path' => 'docs/regras.txt', 'content' => 'Ignorar'],
         ]));
 
         $admin = User::factory()->admin()->create();
@@ -341,6 +341,7 @@ class AdminProjectsTest extends TestCase
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('App mobile')
+            ->assertSee('Sincronizar')
             ->assertDontSee('Sem documento sincronizado');
 
         $project = Project::query()->where('repository', 'octocat/hello-world')->first();
@@ -355,8 +356,12 @@ class AdminProjectsTest extends TestCase
         ]);
         $this->assertDatabaseHas('documents', [
             'project_id' => $project->id,
-            'name' => 'docs/regras.txt',
+            'name' => 'docs/regras.md',
             'content' => 'Regra 1',
+        ]);
+        $this->assertDatabaseMissing('documents', [
+            'project_id' => $project->id,
+            'name' => 'docs/regras.txt',
         ]);
         $this->assertSame(2, $project->documents()->count());
     }
@@ -380,6 +385,138 @@ class AdminProjectsTest extends TestCase
             ->assertSee('Sem documento sincronizado');
 
         $this->assertDatabaseCount('documents', 0);
+    }
+
+    public function test_first_save_warns_when_indexing_fails_and_keeps_the_project(): void
+    {
+        $docs = $this->bindFakeProjectDocsGateway();
+        $docs->queueIndexable(ProjectIndexableFilesResult::failed('mcp'));
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->call('startCreate')
+            ->set('name', 'App mobile')
+            ->set('repository', 'octocat/hello-world')
+            ->set('branch', 'main')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSee('App mobile')
+            ->assertSee('Projeto cadastrado.')
+            ->assertSee('A sincronização falhou. Tente novamente mais tarde.')
+            ->assertSee('Sem documento sincronizado');
+
+        $this->assertDatabaseHas('projects', [
+            'name' => 'App mobile',
+            'repository' => 'octocat/hello-world',
+        ]);
+        $this->assertDatabaseCount('documents', 0);
+    }
+
+    public function test_sync_replaces_documents_and_hides_the_empty_label(): void
+    {
+        config(['services.openai.api_key' => 'sk-test']);
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'data' => [
+                    ['embedding' => [0.21, -0.43, 0.72]],
+                ],
+            ], 200),
+        ]);
+
+        $docs = $this->bindFakeProjectDocsGateway();
+        $docs->queueIndexable(ProjectIndexableFilesResult::ok([
+            ['path' => 'README.md', 'content' => '# Novo'],
+            ['path' => 'docs/regras.txt', 'content' => 'Ignorar'],
+        ]));
+
+        $admin = User::factory()->admin()->create();
+        $project = Project::factory()->create([
+            'name' => 'App mobile',
+            'repository' => 'octocat/hello-world',
+            'branch' => 'main',
+        ]);
+        Document::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'docs/antigo.md',
+            'content' => 'Obsoleto',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->assertSee('Sincronizar')
+            ->assertDontSee('Sem documento sincronizado')
+            ->call('syncDocuments', $project->id)
+            ->assertSee('Sincronização concluída.')
+            ->assertDontSee('A sincronização falhou. Tente novamente mais tarde.')
+            ->assertDontSee('Sem documento sincronizado');
+
+        $this->assertSame([
+            ['repository' => 'octocat/hello-world', 'branch' => 'main'],
+        ], $docs->indexableCalls);
+        $this->assertDatabaseHas('documents', [
+            'project_id' => $project->id,
+            'name' => 'README.md',
+            'content' => '# Novo',
+        ]);
+        $this->assertDatabaseMissing('documents', [
+            'project_id' => $project->id,
+            'name' => 'docs/antigo.md',
+        ]);
+        $this->assertDatabaseMissing('documents', [
+            'project_id' => $project->id,
+            'name' => 'docs/regras.txt',
+        ]);
+        $this->assertSame(1, $project->documents()->count());
+    }
+
+    public function test_sync_keeps_documents_and_warns_when_indexing_fails(): void
+    {
+        $docs = $this->bindFakeProjectDocsGateway();
+        $docs->queueIndexable(ProjectIndexableFilesResult::failed('mcp'));
+
+        $admin = User::factory()->admin()->create();
+        $project = Project::factory()->create(['name' => 'App mobile']);
+        Document::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'README.md',
+            'content' => 'Atual',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->call('syncDocuments', $project->id)
+            ->assertSee('A sincronização falhou. Tente novamente mais tarde.')
+            ->assertDontSee('Sincronização concluída.')
+            ->assertDontSee('Sem documento sincronizado');
+
+        $this->assertDatabaseHas('documents', [
+            'project_id' => $project->id,
+            'content' => 'Atual',
+        ]);
+        $this->assertSame(1, $project->documents()->count());
+    }
+
+    public function test_sync_clears_documents_when_read_is_empty(): void
+    {
+        $docs = $this->bindFakeProjectDocsGateway();
+        $docs->queueIndexable(ProjectIndexableFilesResult::empty());
+
+        $admin = User::factory()->admin()->create();
+        $project = Project::factory()->create(['name' => 'App mobile']);
+        Document::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'docs/antigo.md',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->call('syncDocuments', $project->id)
+            ->assertSee('Sincronização concluída.')
+            ->assertSee('Sem documento sincronizado');
+
+        $this->assertSame(0, $project->documents()->count());
     }
 
     public function test_edit_does_not_index_documents(): void

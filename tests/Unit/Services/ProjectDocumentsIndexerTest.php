@@ -3,16 +3,19 @@
 namespace Tests\Unit\Services;
 
 use App\Models\Document;
+use App\Models\DocumentChunk;
 use App\Models\Project;
 use App\Services\DocumentChunker;
 use App\Services\EmbeddingService;
-use App\Services\ProjectDocumentsIndexer;
 use App\Services\ProjectDocsResult;
+use App\Services\ProjectDocumentsIndexer;
+use App\Services\ProjectDocumentsSyncResult;
 use App\Services\ProjectIndexableFilesResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 use Tests\Support\FakeProjectDocsGateway;
 use Tests\TestCase;
 
@@ -62,6 +65,129 @@ class ProjectDocumentsIndexerTest extends TestCase
         ]);
         $this->assertSame(2, Document::query()->where('project_id', $project->id)->count());
         $this->assertSame(2, $project->documents()->withCount('chunks')->get()->sum('chunks_count'));
+    }
+
+    public function test_indexes_only_markdown_files(): void
+    {
+        $project = Project::factory()->create();
+        $docs = (new FakeProjectDocsGateway)->queueIndexable(ProjectIndexableFilesResult::ok([
+            ['path' => 'README.md', 'content' => '# Checkout'],
+            ['path' => 'docs/regras.txt', 'content' => 'Regra 1'],
+            ['path' => 'docs/adr/0001.MD', 'content' => 'ADR'],
+        ]));
+
+        $result = $this->indexer($docs)->index($project);
+
+        $this->assertSame(ProjectDocumentsSyncResult::STATUS_OK, $result->status);
+        $this->assertDatabaseHas('documents', [
+            'project_id' => $project->id,
+            'name' => 'README.md',
+        ]);
+        $this->assertDatabaseHas('documents', [
+            'project_id' => $project->id,
+            'name' => 'docs/adr/0001.MD',
+        ]);
+        $this->assertDatabaseMissing('documents', [
+            'project_id' => $project->id,
+            'name' => 'docs/regras.txt',
+        ]);
+        $this->assertSame(2, Document::query()->where('project_id', $project->id)->count());
+    }
+
+    public function test_replaces_existing_project_documents_when_read_succeeds(): void
+    {
+        $project = Project::factory()->create();
+        $other = Project::factory()->create();
+        $old = Document::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'docs/antigo.md',
+            'content' => 'Obsoleto',
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $old->id,
+            'content' => 'Obsoleto',
+        ]);
+        $otherDocument = Document::factory()->create([
+            'project_id' => $other->id,
+            'name' => 'README.md',
+            'content' => 'Outro projeto',
+        ]);
+        $docs = (new FakeProjectDocsGateway)->queueIndexable(ProjectIndexableFilesResult::ok([
+            ['path' => 'README.md', 'content' => '# Novo'],
+        ]));
+
+        $result = $this->indexer($docs)->index($project);
+
+        $this->assertSame(ProjectDocumentsSyncResult::STATUS_OK, $result->status);
+        $this->assertDatabaseMissing('documents', ['id' => $old->id]);
+        $this->assertDatabaseMissing('document_chunks', ['document_id' => $old->id]);
+        $this->assertDatabaseHas('documents', [
+            'project_id' => $project->id,
+            'name' => 'README.md',
+            'content' => '# Novo',
+        ]);
+        $this->assertDatabaseHas('documents', [
+            'id' => $otherDocument->id,
+            'content' => 'Outro projeto',
+        ]);
+        $this->assertSame(1, Document::query()->where('project_id', $project->id)->count());
+    }
+
+    public function test_keeps_existing_documents_when_read_fails(): void
+    {
+        $project = Project::factory()->create();
+        Document::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'README.md',
+            'content' => 'Atual',
+        ]);
+        $failed = (new FakeProjectDocsGateway)->queueIndexable(
+            ProjectIndexableFilesResult::failed(ProjectDocsResult::ERROR_MCP)
+        );
+
+        $result = $this->indexer($failed)->index($project);
+
+        $this->assertTrue($result->isFailed());
+        $this->assertDatabaseHas('documents', [
+            'project_id' => $project->id,
+            'name' => 'README.md',
+            'content' => 'Atual',
+        ]);
+        $this->assertSame(1, Document::query()->where('project_id', $project->id)->count());
+    }
+
+    public function test_keeps_existing_documents_when_gateway_throws(): void
+    {
+        $project = Project::factory()->create();
+        Document::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'README.md',
+            'content' => 'Atual',
+        ]);
+        $docs = (new FakeProjectDocsGateway)->throwOnIndexable(new RuntimeException('mcp down'));
+
+        $result = $this->indexer($docs)->index($project);
+
+        $this->assertTrue($result->isFailed());
+        $this->assertDatabaseHas('documents', [
+            'project_id' => $project->id,
+            'content' => 'Atual',
+        ]);
+    }
+
+    public function test_clears_existing_documents_when_read_is_empty(): void
+    {
+        $project = Project::factory()->create();
+        Document::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'docs/antigo.md',
+        ]);
+        $docs = (new FakeProjectDocsGateway)->queueIndexable(ProjectIndexableFilesResult::empty());
+
+        $result = $this->indexer($docs)->index($project);
+
+        $this->assertSame(ProjectDocumentsSyncResult::STATUS_EMPTY, $result->status);
+        $this->assertSame(0, Document::query()->where('project_id', $project->id)->count());
     }
 
     public function test_logs_sync_progress_for_each_file(): void

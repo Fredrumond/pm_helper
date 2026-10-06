@@ -15,7 +15,7 @@ class ProjectDocumentsIndexer
         private readonly DocumentChunker $chunker,
     ) {}
 
-    public function index(Project $project): void
+    public function index(Project $project): ProjectDocumentsSyncResult
     {
         Log::info('project_docs.sync.start', [
             'project_id' => $project->id,
@@ -34,38 +34,55 @@ class ProjectDocumentsIndexer
                 'error' => $exception->getMessage(),
             ]);
 
-            return;
+            return ProjectDocumentsSyncResult::failed();
         }
 
-        $paths = array_column($result->files, 'path');
+        $files = array_values(array_filter(
+            $result->files,
+            fn (array $file): bool => $this->isMarkdownPath($file['path']),
+        ));
+        $paths = array_column($files, 'path');
 
         Log::info('project_docs.sync.read', [
             'project_id' => $project->id,
             'repository' => $project->repository,
             'branch' => $project->branch,
             'status' => $result->status,
-            'files' => count($result->files),
+            'files' => count($files),
             'paths' => $paths,
             'errorCode' => $result->errorCode,
         ]);
 
-        if ($result->status !== ProjectIndexableFilesResult::STATUS_OK || $result->files === []) {
+        if ($result->status === ProjectIndexableFilesResult::STATUS_FAILED) {
             Log::info('project_docs.sync.done', [
                 'project_id' => $project->id,
-                'status' => $result->status,
+                'status' => ProjectIndexableFilesResult::STATUS_FAILED,
                 'indexed' => 0,
                 'failed' => 0,
             ]);
 
-            return;
+            return ProjectDocumentsSyncResult::failed();
+        }
+
+        $project->documents()->delete();
+
+        if ($files === []) {
+            Log::info('project_docs.sync.done', [
+                'project_id' => $project->id,
+                'status' => ProjectIndexableFilesResult::STATUS_EMPTY,
+                'indexed' => 0,
+                'failed' => 0,
+            ]);
+
+            return ProjectDocumentsSyncResult::empty();
         }
 
         $indexed = 0;
         $failed = 0;
 
-        foreach ($result->files as $index => $file) {
+        foreach ($files as $index => $file) {
             $position = $index + 1;
-            $total = count($result->files);
+            $total = count($files);
 
             Log::info('project_docs.sync.file.start', [
                 'project_id' => $project->id,
@@ -114,5 +131,12 @@ class ProjectDocumentsIndexer
             'indexed' => $indexed,
             'failed' => $failed,
         ]);
+
+        return ProjectDocumentsSyncResult::ok();
+    }
+
+    private function isMarkdownPath(string $path): bool
+    {
+        return str_ends_with(strtolower($path), '.md');
     }
 }

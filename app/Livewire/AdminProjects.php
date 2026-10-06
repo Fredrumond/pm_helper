@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Rules\GitHubBranch;
 use App\Rules\GitHubRepository;
 use App\Services\ProjectDocumentsIndexer;
+use App\Services\ProjectDocumentsSyncResult;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -30,6 +31,8 @@ class AdminProjects extends Component
 
     public ?string $statusMessage = null;
 
+    public ?string $errorMessage = null;
+
     public function mount(): void
     {
         $this->ensureAdmin();
@@ -40,6 +43,7 @@ class AdminProjects extends Component
         $this->ensureAdmin();
         $this->resetForm();
         $this->statusMessage = null;
+        $this->errorMessage = null;
         $this->showForm = true;
     }
 
@@ -54,6 +58,7 @@ class AdminProjects extends Component
         $this->repository = $project->repository;
         $this->branch = (string) $project->branch;
         $this->statusMessage = null;
+        $this->errorMessage = null;
         $this->showForm = true;
         $this->resetValidation();
     }
@@ -68,6 +73,8 @@ class AdminProjects extends Component
     {
         $this->ensureAdmin();
 
+        $this->statusMessage = null;
+        $this->errorMessage = null;
         $this->name = trim($this->name);
         $this->repository = GitHubRepository::normalize($this->repository);
         $this->branch = GitHubBranch::normalize($this->branch);
@@ -82,9 +89,8 @@ class AdminProjects extends Component
                 $this->statusMessage = 'Projeto atualizado.';
             } else {
                 $project = Project::query()->create($validated);
-                app(ProjectDocumentsIndexer::class)->index($project);
-
                 $this->statusMessage = 'Projeto cadastrado.';
+                $this->applySyncResult(app(ProjectDocumentsIndexer::class)->index($project));
             }
         } catch (UniqueConstraintViolationException) {
             $this->addError('repository', $this->repositoryConflictMessage());
@@ -93,6 +99,20 @@ class AdminProjects extends Component
         }
 
         $this->resetForm();
+    }
+
+    public function syncDocuments(int $projectId): void
+    {
+        $this->ensureAdmin();
+        $this->statusMessage = null;
+        $this->errorMessage = null;
+
+        $project = Project::query()->findOrFail($projectId);
+        $result = app(ProjectDocumentsIndexer::class)->index($project);
+
+        if ($this->applySyncResult($result)) {
+            $this->statusMessage = 'Sincronização concluída.';
+        }
     }
 
     public function deactivate(int $projectId): void
@@ -150,6 +170,17 @@ class AdminProjects extends Component
     private function repositoryConflictMessage(): string
     {
         return 'Já existe um projeto com este repositório, inclusive desativado. Edite o registro existente; não é possível cadastrar o mesmo owner/repo de novo.';
+    }
+
+    private function applySyncResult(ProjectDocumentsSyncResult $result): bool
+    {
+        if (! $result->isFailed()) {
+            return true;
+        }
+
+        $this->errorMessage = 'A sincronização falhou. Tente novamente mais tarde.';
+
+        return false;
     }
 
     private function resetForm(): void

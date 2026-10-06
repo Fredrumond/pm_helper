@@ -131,11 +131,11 @@ class GitHubMcpProjectDocsGatewayTest extends TestCase
             ['path' => 'docs/README.md', 'content' => 'Índice de regras'],
             ['path' => 'docs/adr/0001.md', 'content' => 'ADR 0001'],
             ['path' => 'docs/regras/desconto.md', 'content' => 'Desconto máximo 10%.'],
-            ['path' => 'docs/regras/notas.txt', 'content' => 'Qualquer arquivo de docs.'],
             ['path' => 'docs/regras/pagamento.md', 'content' => 'Pagamento obrigatório.'],
         ], $result->files);
         $this->assertNull($result->errorCode);
         $this->assertContains('README.md', array_column($mcp->calls, 'path'));
+        $this->assertNotContains('docs/regras/notas.txt', array_column($mcp->calls, 'path'));
         $this->assertSame(1, $mcp->initializeCount);
         $this->assertSame(1, $mcp->closeCount);
 
@@ -143,7 +143,7 @@ class GitHubMcpProjectDocsGatewayTest extends TestCase
             return $log->level === 'info'
                 && $log->message === 'project_docs.read_indexable'
                 && ($log->context['status'] ?? null) === ProjectIndexableFilesResult::STATUS_OK
-                && ($log->context['count'] ?? null) === 6;
+                && ($log->context['count'] ?? null) === 5;
         });
     }
 

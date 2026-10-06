@@ -7,6 +7,7 @@ use App\Services\ProjectDocsPathsResult;
 use App\Services\ProjectDocsResult;
 use App\Services\ProjectIndexableFilesResult;
 use RuntimeException;
+use Throwable;
 
 class FakeProjectDocsGateway implements ProjectDocsGateway
 {
@@ -34,6 +35,8 @@ class FakeProjectDocsGateway implements ProjectDocsGateway
     /** @var list<ProjectIndexableFilesResult> */
     private array $indexableResults = [];
 
+    public ?Throwable $indexableException = null;
+
     public function queue(ProjectDocsResult $result): self
     {
         $this->results[] = $result;
@@ -58,6 +61,13 @@ class FakeProjectDocsGateway implements ProjectDocsGateway
     public function queueIndexable(ProjectIndexableFilesResult $result): self
     {
         $this->indexableResults[] = $result;
+
+        return $this;
+    }
+
+    public function throwOnIndexable(Throwable $exception): self
+    {
+        $this->indexableException = $exception;
 
         return $this;
     }
@@ -111,6 +121,10 @@ class FakeProjectDocsGateway implements ProjectDocsGateway
             'repository' => $repository,
             'branch' => $branch,
         ];
+
+        if ($this->indexableException !== null) {
+            throw $this->indexableException;
+        }
 
         if ($this->indexableResults === []) {
             return ProjectIndexableFilesResult::empty();

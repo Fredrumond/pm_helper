@@ -415,7 +415,9 @@ class GitHubMcpProjectDocsGateway implements ProjectDocsGateway
             GitHubMcpFileResult::KIND_MISSING => null,
             GitHubMcpFileResult::KIND_BINARY, GitHubMcpFileResult::KIND_TOO_LARGE => $this->skippedNonText++,
             GitHubMcpFileResult::KIND_DIRECTORY => $this->collectIndexableDirectory($owner, $repo, $result->entries),
-            GitHubMcpFileResult::KIND_FILE => $this->storeIndexableFile($path, $result->text),
+            GitHubMcpFileResult::KIND_FILE => $this->isMarkdownPath($path)
+                ? $this->storeIndexableFile($path, $result->text)
+                : null,
             default => throw new GitHubIntegrationException(
                 ProjectDocsResult::ERROR_MCP,
                 'MCP returned an unknown file result.',
@@ -434,6 +436,12 @@ class GitHubMcpProjectDocsGateway implements ProjectDocsGateway
             $child = $this->normalizeIndexablePath($entry['path'] !== '' ? $entry['path'] : $entry['name']);
 
             if ($child === null) {
+                continue;
+            }
+
+            $isDirectory = in_array($entry['type'], ['dir', 'directory'], true);
+
+            if (! $isDirectory && ! $this->isMarkdownPath($child)) {
                 continue;
             }
 
@@ -563,6 +571,11 @@ class GitHubMcpProjectDocsGateway implements ProjectDocsGateway
         }
 
         return $this->normalizePath($path);
+    }
+
+    private function isMarkdownPath(string $path): bool
+    {
+        return str_ends_with(strtolower($path), '.md');
     }
 
     private function docsPath(): string
