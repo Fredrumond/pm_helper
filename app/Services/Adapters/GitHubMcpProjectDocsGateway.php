@@ -200,8 +200,11 @@ class GitHubMcpProjectDocsGateway implements ProjectDocsGateway
         );
     }
 
-    public function readIndexableFiles(string $repository, ?string $branch = null): ProjectIndexableFilesResult
-    {
+    public function readIndexableFiles(
+        string $repository,
+        ?string $branch = null,
+        ?array $collectionSpecs = null,
+    ): ProjectIndexableFilesResult {
         $this->reset();
         $this->ref = $this->normalizeRef($branch);
 
@@ -224,8 +227,10 @@ class GitHubMcpProjectDocsGateway implements ProjectDocsGateway
             $this->mcp->initialize($token);
 
             [$owner, $repo] = explode('/', $repository, 2);
-            $this->collectIndexable($owner, $repo, 'README.md');
-            $this->collectIndexable($owner, $repo, $this->docsPath());
+
+            foreach ($this->resolveIndexableCollectionSpecs($collectionSpecs) as $spec) {
+                $this->collectIndexableBySpec($owner, $repo, $spec['path'], $spec['scope']);
+            }
         } catch (GitHubIntegrationException $exception) {
             return $this->finishIndexable(
                 $repository,
@@ -397,6 +402,138 @@ class GitHubMcpProjectDocsGateway implements ProjectDocsGateway
                 'MCP returned an unknown file result.',
             ),
         };
+    }
+
+    /**
+     * @param  list<array{path: string, scope: string}>|null  $collectionSpecs
+     * @return list<array{path: string, scope: string}>
+     */
+    private function resolveIndexableCollectionSpecs(?array $collectionSpecs): array
+    {
+        if ($collectionSpecs === null || $collectionSpecs === []) {
+            return [
+                ['path' => 'README.md', 'scope' => 'file'],
+                ['path' => $this->docsPath(), 'scope' => 'recursive'],
+            ];
+        }
+
+        $resolved = [];
+
+        foreach ($collectionSpecs as $spec) {
+            if (! is_array($spec)) {
+                continue;
+            }
+
+            $path = $spec['path'] ?? null;
+            $scope = $spec['scope'] ?? null;
+
+            if (! is_string($path) || $path === '' || ! is_string($scope) || $scope === '') {
+                continue;
+            }
+
+            $resolved[] = ['path' => $path, 'scope' => $scope];
+        }
+
+        if ($resolved === []) {
+            return [
+                ['path' => 'README.md', 'scope' => 'file'],
+                ['path' => $this->docsPath(), 'scope' => 'recursive'],
+            ];
+        }
+
+        return $resolved;
+    }
+
+    private function collectIndexableBySpec(string $owner, string $repo, string $path, string $scope): void
+    {
+        match ($scope) {
+            'docs_root' => $this->collectIndexableDocsRoot($owner, $repo, $path),
+            'recursive' => $this->collectIndexable($owner, $repo, $path),
+            default => $this->collectIndexableFileOnly($owner, $repo, $path),
+        };
+    }
+
+    private function collectIndexableFileOnly(string $owner, string $repo, string $path): void
+    {
+        $path = $this->normalizeIndexablePath($path);
+
+        if ($path === null || isset($this->visited[$path])) {
+            return;
+        }
+
+        $this->visited[$path] = true;
+
+        $result = $this->mcp->getFileContents($owner, $repo, $path, $this->ref);
+
+        match ($result->kind) {
+            GitHubMcpFileResult::KIND_MISSING => null,
+            GitHubMcpFileResult::KIND_BINARY, GitHubMcpFileResult::KIND_TOO_LARGE => $this->skippedNonText++,
+            GitHubMcpFileResult::KIND_DIRECTORY => null,
+            GitHubMcpFileResult::KIND_FILE => $this->isMarkdownPath($path)
+                ? $this->storeIndexableFile($path, $result->text)
+                : null,
+            default => throw new GitHubIntegrationException(
+                ProjectDocsResult::ERROR_MCP,
+                'MCP returned an unknown file result.',
+            ),
+        };
+    }
+
+    private function collectIndexableDocsRoot(string $owner, string $repo, string $path): void
+    {
+        $path = $this->normalizeIndexablePath($path);
+
+        if ($path === null || isset($this->visited[$path])) {
+            return;
+        }
+
+        $this->visited[$path] = true;
+
+        $result = $this->mcp->getFileContents($owner, $repo, $path, $this->ref);
+
+        match ($result->kind) {
+            GitHubMcpFileResult::KIND_MISSING => null,
+            GitHubMcpFileResult::KIND_BINARY, GitHubMcpFileResult::KIND_TOO_LARGE => $this->skippedNonText++,
+            GitHubMcpFileResult::KIND_DIRECTORY => $this->collectIndexableDocsRootEntries($owner, $repo, $result->entries),
+            GitHubMcpFileResult::KIND_FILE => $this->isMarkdownPath($path)
+                ? $this->storeIndexableFile($path, $result->text)
+                : null,
+            default => throw new GitHubIntegrationException(
+                ProjectDocsResult::ERROR_MCP,
+                'MCP returned an unknown file result.',
+            ),
+        };
+    }
+
+    /**
+     * @param  list<array{type: string, name: string, path: string}>  $entries
+     */
+    private function collectIndexableDocsRootEntries(string $owner, string $repo, array $entries): void
+    {
+        usort($entries, fn (array $left, array $right): int => strcmp($left['path'], $right['path']));
+
+        foreach ($entries as $entry) {
+            if (in_array($entry['type'], ['dir', 'directory'], true)) {
+                continue;
+            }
+
+            $child = $this->normalizeIndexablePath($entry['path'] !== '' ? $entry['path'] : $entry['name']);
+
+            if ($child === null || isset($this->visited[$child]) || ! $this->isMarkdownPath($child)) {
+                continue;
+            }
+
+            $this->visited[$child] = true;
+
+            $fileResult = $this->mcp->getFileContents($owner, $repo, $child, $this->ref);
+
+            match ($fileResult->kind) {
+                GitHubMcpFileResult::KIND_MISSING => null,
+                GitHubMcpFileResult::KIND_BINARY, GitHubMcpFileResult::KIND_TOO_LARGE => $this->skippedNonText++,
+                GitHubMcpFileResult::KIND_FILE => $this->storeIndexableFile($child, $fileResult->text),
+                default => null,
+            };
+        }
     }
 
     private function collectIndexable(string $owner, string $repo, string $path): void

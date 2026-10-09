@@ -29,7 +29,7 @@ class FakeProjectDocsGateway implements ProjectDocsGateway
     /** @var list<ProjectDocsResult> */
     private array $readByPathResults = [];
 
-    /** @var list<array{repository: string, branch: ?string}> */
+    /** @var list<array{repository: string, branch: ?string, collectionSpecs: ?array}> */
     public array $indexableCalls = [];
 
     /** @var list<ProjectIndexableFilesResult> */
@@ -115,11 +115,15 @@ class FakeProjectDocsGateway implements ProjectDocsGateway
         return array_shift($this->readByPathResults);
     }
 
-    public function readIndexableFiles(string $repository, ?string $branch = null): ProjectIndexableFilesResult
-    {
+    public function readIndexableFiles(
+        string $repository,
+        ?string $branch = null,
+        ?array $collectionSpecs = null,
+    ): ProjectIndexableFilesResult {
         $this->indexableCalls[] = [
             'repository' => $repository,
             'branch' => $branch,
+            'collectionSpecs' => $collectionSpecs,
         ];
 
         if ($this->indexableException !== null) {

@@ -305,9 +305,34 @@ class AdminRagSettingsTest extends TestCase
         $audit = $audits->first();
         $this->assertSame('updated', $audit->event);
         $this->assertSame($admin->id, $audit->user_id);
-        $this->assertSame(['chunk_size' => RagConfig::DEFAULT_CHUNK_SIZE], $audit->old_values);
-        $this->assertSame(['chunk_size' => 640], $audit->new_values);
+        $this->assertSame(
+            ['chunk_size' => RagConfig::DEFAULT_CHUNK_SIZE, 'sync_sources' => null],
+            $audit->old_values,
+        );
+        $this->assertSame(640, $audit->new_values['chunk_size']);
+        $this->assertArrayHasKey('sync_sources', $audit->new_values);
         $this->assertSame(RagSetting::query()->value('id'), $audit->auditable_id);
+    }
+
+    public function test_admin_can_save_sync_sources_and_sees_sync_notice(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(AdminRagSettings::class)
+            ->assertSet('syncSources', RagConfig::SYNC_SOURCE_KEYS)
+            ->assertSee('Fontes de sincronização')
+            ->assertSee('docs/discovery/')
+            ->set('syncSources', [RagConfig::SYNC_SOURCE_README, RagConfig::SYNC_SOURCE_DOCS_ADR])
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSee(AdminRagSettings::SYNC_SOURCES_NOTICE)
+            ->assertSet('syncSources', [RagConfig::SYNC_SOURCE_README, RagConfig::SYNC_SOURCE_DOCS_ADR]);
+
+        $this->assertSame(
+            [RagConfig::SYNC_SOURCE_README, RagConfig::SYNC_SOURCE_DOCS_ADR],
+            RagSetting::query()->value('sync_sources'),
+        );
     }
 
     public function test_link_shows_for_admin_and_hides_from_product_manager_in_both_menus(): void

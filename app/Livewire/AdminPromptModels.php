@@ -23,6 +23,7 @@ class AdminPromptModels extends Component
         'docs_retrieval' => 'Retrieval de docs',
         'docs_briefing' => 'Briefing de docs',
         'card_generation' => 'Geração do card',
+        'explore' => 'Explore',
     ];
 
     /**

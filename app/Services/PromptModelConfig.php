@@ -7,6 +7,8 @@ use App\Support\ChatComposer;
 
 class PromptModelConfig
 {
+    public const EXPLORE_DEFAULT_MODEL = 'gpt-4o-mini';
+
     /**
      * @var list<string>
      */
@@ -15,6 +17,7 @@ class PromptModelConfig
         'docs_retrieval',
         'docs_briefing',
         'card_generation',
+        'explore',
     ];
 
     public function active(string $prompt): string
@@ -44,6 +47,10 @@ class PromptModelConfig
 
     private function fallback(string $prompt): string
     {
+        if ($prompt === 'explore') {
+            return self::EXPLORE_DEFAULT_MODEL;
+        }
+
         if (in_array($prompt, ['docs_retrieval', 'docs_briefing'], true)) {
             $configured = config("chat.prompts.{$prompt}.model");
             $configured = is_string($configured) ? $configured : '';

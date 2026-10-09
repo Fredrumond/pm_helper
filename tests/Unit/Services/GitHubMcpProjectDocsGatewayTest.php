@@ -9,6 +9,7 @@ use App\Services\GitHubAppInstallationTokenMinter;
 use App\Services\ProjectDocsPathsResult;
 use App\Services\ProjectDocsResult;
 use App\Services\ProjectIndexableFilesResult;
+use App\Services\RagConfig;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -145,6 +146,19 @@ class GitHubMcpProjectDocsGatewayTest extends TestCase
                 && ($log->context['status'] ?? null) === ProjectIndexableFilesResult::STATUS_OK
                 && ($log->context['count'] ?? null) === 5;
         });
+    }
+
+    public function test_read_indexable_files_with_docs_root_scope_reads_only_root_markdown_files(): void
+    {
+        $mcp = $this->mcpWithTree();
+        $result = $this->gateway($mcp)->readIndexableFiles('acme/checkout', 'main', [
+            ['path' => 'docs', 'scope' => RagConfig::SYNC_SCOPE_DOCS_ROOT],
+        ]);
+
+        $this->assertSame(ProjectIndexableFilesResult::STATUS_OK, $result->status);
+        $this->assertSame([
+            ['path' => 'docs/README.md', 'content' => 'Índice de regras'],
+        ], $result->files);
     }
 
     public function test_read_indexable_files_returns_empty_when_readme_and_docs_are_missing(): void

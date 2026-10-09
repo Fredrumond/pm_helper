@@ -96,7 +96,7 @@ sequenceDiagram
     participant L as LlmGateway
 
     U->>E: Envia mensagem no Explore
-    E->>R: ask(question, gpt-4o-mini)
+    E->>R: ask(question, modelo do Explore no painel)
     R->>S: search(question)
     S-->>R: top-K chunks mais similares
     R->>L: completePrompt([contexto + pergunta], "rag")
@@ -113,8 +113,8 @@ A referência do tooltip é `documents.name`: no upload, o nome original do arqu
 ```mermaid
 flowchart TD
     A[Usuário envia mensagem no Explore] --> B{Existem chunks\ncom embedding?}
-    B -- Não --> C[answerFromExplore\nLLM com system prompt explore/v1]
-    B -- Sim --> D[answerFromDocuments\nDocumentRag.ask com gpt-4o-mini]
+    B -- Não --> C[answerFromExplore\nexplore/v1 com o modelo\ndo Explore definido no painel]
+    B -- Sim --> D[answerFromDocuments\nDocumentRag.ask com o modelo\ndo Explore definido no painel]
     D --> E{Resposta não\nnula?}
     E -- Sim --> F[Retorna resposta baseada\nnos documentos]
     E -- Não --> C
@@ -161,8 +161,9 @@ erDiagram
 | Modelo de embedding | o definido no painel, escolhido no catálogo; até a primeira troca, `text-embedding-3-small` | `RagConfig` |
 | Top-K resultados | o definido no painel; até a primeira troca, 3 | `RagConfig` |
 | Score mínimo | o definido no painel; até a primeira troca, 0 (sem filtro). Acima de 0, a busca descarta trechos com similaridade menor | `RagConfig` |
+| Fontes de sincronização | checkboxes no painel (`README.md`, `docs/` na raiz, `docs/adr`, `docs/discovery`, `docs/references`, `docs/rules`); até a primeira troca, README + `docs` recursivo (comportamento anterior) | `RagConfig` → `ProjectDocumentsIndexer` |
 | Origem do trecho | título, nome do arquivo e, quando houver, caminho de seções. Entra no texto embeddado e em `document_chunks.heading_path` | `DocumentChunker` |
-| Modelo de resposta no Explore | `gpt-4o-mini` | `ExploreChat::MODEL` |
+| Modelo de resposta no Explore | o modelo do prompt `explore` no painel; até o admin salvar uma troca, `gpt-4o-mini` | `PromptModelConfig` (as duas saídas de resposta usam o mesmo valor) |
 | Versão do prompt RAG | `v2` | `config/chat.php` → `prompts.rag` |
 
 ---

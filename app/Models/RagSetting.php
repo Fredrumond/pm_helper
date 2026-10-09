@@ -16,10 +16,12 @@ class RagSetting extends Model implements AuditableContract
         'top_k',
         'chunk_strategy',
         'min_score',
+        'sync_sources',
     ];
 
     protected $casts = [
         'chunk_size' => 'integer',
         'top_k' => 'integer',
+        'sync_sources' => 'array',
     ];
 }

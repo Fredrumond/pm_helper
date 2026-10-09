@@ -34,8 +34,14 @@ interface ProjectDocsGateway
     public function readDocsByPaths(string $repository, array $paths, ?string $branch = null): ProjectDocsResult;
 
     /**
-     * Lê o README.md da raiz e os arquivos `.md` de `/docs` (recursivo)
-     * como arquivos individuais, para indexar como documentos.
+     * Lê arquivos `.md` indexáveis conforme as especificações de coleta.
+     * Sem especificações, usa README.md da raiz e `/docs` recursivo.
+     *
+     * @param  list<array{path: string, scope: string}>|null  $collectionSpecs
      */
-    public function readIndexableFiles(string $repository, ?string $branch = null): ProjectIndexableFilesResult;
+    public function readIndexableFiles(
+        string $repository,
+        ?string $branch = null,
+        ?array $collectionSpecs = null,
+    ): ProjectIndexableFilesResult;
 }

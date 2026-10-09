@@ -18,6 +18,8 @@ class AdminRagSettings extends Component
 {
     public const REINDEX_NOTICE = 'Os documentos já indexados precisam ser reindexados para a busca usar o valor novo.';
 
+    public const SYNC_SOURCES_NOTICE = 'A troca vale na próxima sincronização manual de cada projeto.';
+
     public string $chunkStrategy = '';
 
     public string $chunkSize = '';
@@ -31,6 +33,11 @@ class AdminRagSettings extends Component
     public ?string $statusMessage = null;
 
     public ?string $reindexNotice = null;
+
+    /** @var list<string> */
+    public array $syncSources = [];
+
+    public ?string $syncSourcesNotice = null;
 
     public function mount(RagConfig $rag): void
     {
@@ -47,13 +54,15 @@ class AdminRagSettings extends Component
         $previousChunk = $rag->chunkSize();
         $previousModel = $rag->embeddingModel();
         $previousStrategy = $rag->strategy();
+        $previousSyncSources = $rag->enabledSyncSourceKeys();
         $chunk = (int) $validated['chunkSize'];
         $model = $validated['embeddingModel'];
         $topK = (int) $validated['topK'];
         $strategy = $validated['chunkStrategy'];
         $minScore = (float) $validated['minScore'];
+        $syncSources = $rag->normalizeSyncSourceKeys($validated['syncSources'] ?? []);
 
-        if (! $rag->save($chunk, $model, $topK, $strategy, $minScore)) {
+        if (! $rag->save($chunk, $model, $topK, $strategy, $minScore, $syncSources)) {
             $this->addError('embeddingModel', 'Escolha um modelo da lista.');
 
             return;
@@ -64,9 +73,13 @@ class AdminRagSettings extends Component
         $this->topK = (string) $topK;
         $this->chunkStrategy = $strategy;
         $this->minScore = number_format($minScore, 2, '.', '');
+        $this->syncSources = $rag->enabledSyncSourceKeys();
         $this->statusMessage = 'Parâmetros atualizados.';
         $this->reindexNotice = ($chunk !== $previousChunk || $model !== $previousModel || $strategy !== $previousStrategy)
             ? self::REINDEX_NOTICE
+            : null;
+        $this->syncSourcesNotice = $this->syncSourcesChanged($previousSyncSources, $rag->enabledSyncSourceKeys())
+            ? self::SYNC_SOURCES_NOTICE
             : null;
     }
 
@@ -93,6 +106,10 @@ class AdminRagSettings extends Component
             'reindexLabel' => $this->indexParametersDiffer($rag)
                 ? self::REINDEX_NOTICE
                 : $this->reindexNotice,
+            'syncSourceCatalog' => RagConfig::syncSourceCatalog(),
+            'syncSourcesLabel' => $this->syncSourcesDiffer($rag)
+                ? self::SYNC_SOURCES_NOTICE
+                : $this->syncSourcesNotice,
         ]);
     }
 
@@ -109,6 +126,8 @@ class AdminRagSettings extends Component
             'embeddingModel' => ['required', 'string', Rule::in($ids)],
             'topK' => ['required', 'integer'],
             'minScore' => ['required', 'numeric', 'min:0', 'max:1'],
+            'syncSources' => ['array'],
+            'syncSources.*' => ['string', Rule::in(RagConfig::SYNC_SOURCE_KEYS)],
         ];
     }
 
@@ -140,6 +159,26 @@ class AdminRagSettings extends Component
         $this->embeddingModel = $rag->embeddingModel();
         $this->topK = (string) $rag->topK();
         $this->minScore = number_format($rag->minScore(), 2, '.', '');
+        $this->syncSources = $rag->enabledSyncSourceKeys();
+    }
+
+    /**
+     * @param  list<string>  $previous
+     * @param  list<string>  $current
+     */
+    private function syncSourcesChanged(array $previous, array $current): bool
+    {
+        sort($previous);
+        sort($current);
+
+        return $previous !== $current;
+    }
+
+    private function syncSourcesDiffer(RagConfig $rag): bool
+    {
+        $current = $rag->normalizeSyncSourceKeys($this->syncSources);
+
+        return $this->syncSourcesChanged($rag->enabledSyncSourceKeys(), $current);
     }
 
     private function indexParametersDiffer(RagConfig $rag): bool

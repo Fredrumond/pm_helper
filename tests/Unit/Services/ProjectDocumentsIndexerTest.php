@@ -5,12 +5,14 @@ namespace Tests\Unit\Services;
 use App\Models\Document;
 use App\Models\DocumentChunk;
 use App\Models\Project;
+use App\Models\RagSetting;
 use App\Services\DocumentChunker;
 use App\Services\EmbeddingService;
 use App\Services\ProjectDocsResult;
 use App\Services\ProjectDocumentsIndexer;
 use App\Services\ProjectDocumentsSyncResult;
 use App\Services\ProjectIndexableFilesResult;
+use App\Services\RagConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
@@ -51,7 +53,11 @@ class ProjectDocumentsIndexerTest extends TestCase
         $this->indexer($docs)->index($project);
 
         $this->assertSame([
-            ['repository' => 'acme/checkout', 'branch' => 'develop'],
+            [
+                'repository' => 'acme/checkout',
+                'branch' => 'develop',
+                'collectionSpecs' => app(RagConfig::class)->indexableCollectionSpecsForSync(),
+            ],
         ], $docs->indexableCalls);
         $this->assertDatabaseHas('documents', [
             'project_id' => $project->id,
@@ -270,11 +276,33 @@ class ProjectDocumentsIndexerTest extends TestCase
         });
     }
 
+    public function test_passes_partial_sync_sources_to_the_gateway(): void
+    {
+        $project = Project::factory()->create();
+        $docs = (new FakeProjectDocsGateway)->queueIndexable(ProjectIndexableFilesResult::empty());
+
+        RagSetting::query()->create([
+            'chunk_size' => RagConfig::DEFAULT_CHUNK_SIZE,
+            'embedding_model' => RagConfig::DEFAULT_EMBEDDING_MODEL,
+            'top_k' => RagConfig::DEFAULT_TOP_K,
+            'chunk_strategy' => RagConfig::DEFAULT_STRATEGY,
+            'min_score' => RagConfig::DEFAULT_MIN_SCORE,
+            'sync_sources' => [RagConfig::SYNC_SOURCE_README],
+        ]);
+
+        $this->indexer($docs)->index($project);
+
+        $this->assertSame([
+            ['path' => 'README.md', 'scope' => RagConfig::SYNC_SCOPE_FILE],
+        ], $docs->indexableCalls[0]['collectionSpecs']);
+    }
+
     private function indexer(FakeProjectDocsGateway $docs): ProjectDocumentsIndexer
     {
         return new ProjectDocumentsIndexer(
             $docs,
             new DocumentChunker(new EmbeddingService),
+            app(RagConfig::class),
         );
     }
 }

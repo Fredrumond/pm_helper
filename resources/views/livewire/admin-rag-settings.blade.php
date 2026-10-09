@@ -16,6 +16,12 @@
         </div>
     @endif
 
+    @if ($syncSourcesLabel)
+        <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900">
+            {{ $syncSourcesLabel }}
+        </div>
+    @endif
+
     <form wire:submit.prevent="save" class="bg-white border border-gray-200 rounded-xl px-5 py-5 space-y-6">
         <div>
             <div class="flex items-center gap-1.5">
@@ -115,6 +121,34 @@
                 class="mt-2 block w-full"
             />
             <x-input-error class="mt-2" :messages="$errors->get('minScore')" />
+        </div>
+
+        <div>
+            <div class="flex items-center gap-1.5">
+                <x-input-label value="Fontes de sincronização" />
+                <x-info-tip label="Informações sobre as fontes de sincronização">
+                    <p>Define quais caminhos do repositório entram na sincronização de documentos do projeto (RAG).</p>
+                    <p class="border-t border-gray-100 pt-3 text-gray-500">A troca vale na próxima sincronização manual de cada projeto.</p>
+                </x-info-tip>
+            </div>
+            <div class="mt-3 space-y-3 rounded-lg border border-gray-200 px-4 py-4">
+                @foreach ($syncSourceCatalog as $key => $source)
+                    <label class="flex items-start gap-3 text-sm text-gray-700">
+                        <input
+                            type="checkbox"
+                            wire:model.live="syncSources"
+                            value="{{ $key }}"
+                            class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                        />
+                        <span>
+                            <span class="font-medium text-gray-900">{{ $source['label'] }}</span>
+                            <span class="block text-gray-500">{{ $source['description'] }}</span>
+                        </span>
+                    </label>
+                @endforeach
+            </div>
+            <x-input-error class="mt-2" :messages="$errors->get('syncSources')" />
+            <x-input-error class="mt-2" :messages="$errors->get('syncSources.*')" />
         </div>
 
         <div>

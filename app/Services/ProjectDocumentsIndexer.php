@@ -13,6 +13,7 @@ class ProjectDocumentsIndexer
     public function __construct(
         private readonly ProjectDocsGateway $docs,
         private readonly DocumentChunker $chunker,
+        private readonly RagConfig $rag,
     ) {}
 
     public function index(Project $project): ProjectDocumentsSyncResult
@@ -25,7 +26,11 @@ class ProjectDocumentsIndexer
         ]);
 
         try {
-            $result = $this->docs->readIndexableFiles($project->repository, $project->branch);
+            $result = $this->docs->readIndexableFiles(
+                $project->repository,
+                $project->branch,
+                $this->rag->indexableCollectionSpecsForSync(),
+            );
         } catch (Throwable $exception) {
             Log::error('project_docs.sync.read_failed', [
                 'project_id' => $project->id,

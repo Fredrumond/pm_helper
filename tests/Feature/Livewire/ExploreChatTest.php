@@ -11,6 +11,7 @@ use App\Models\DocumentChunk;
 use App\Models\Project;
 use App\Models\User;
 use App\Prompts\SystemPromptCatalog;
+use App\Services\PromptModelConfig;
 use App\Services\RagConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -451,6 +452,76 @@ class ExploreChatTest extends TestCase
             ->assertDontSee('Pergunta solta do explorar');
 
         $this->assertTrue($interview->is($user->conversations()->interview()->first()));
+    }
+
+    public function test_configured_model_applies_on_the_next_message_of_an_open_exploration(): void
+    {
+        CatalogModels::seed([
+            ['id' => 'gpt-4o-mini', 'name' => 'GPT-4o Mini'],
+            ['id' => 'gpt-4o', 'name' => 'GPT-4o'],
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::createExploreFor($user);
+        $llm = $this->bindFakeLlmGateway()
+            ->queueComplete('Resposta com o padrão.')
+            ->queueComplete('Resposta com o modelo novo.');
+
+        $component = Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->set('input', 'Primeira pergunta')
+            ->call('sendMessage')
+            ->assertSee('Resposta com o padrão.');
+
+        $this->assertSame(ExploreChat::MODEL, $llm->completeCalls[0]['model']);
+        $this->assertSame('explore', $llm->completeCalls[0]['step']);
+
+        $this->assertTrue(app(PromptModelConfig::class)->save('explore', 'gpt-4o'));
+
+        $component
+            ->set('input', 'Segunda pergunta')
+            ->call('sendMessage')
+            ->assertSee('Resposta com o modelo novo.');
+
+        $this->assertSame('gpt-4o', $llm->completeCalls[1]['model']);
+        $this->assertSame('explore', $llm->completeCalls[1]['step']);
+    }
+
+    public function test_configured_model_is_used_when_the_answer_comes_from_documents(): void
+    {
+        config(['services.openai.api_key' => 'sk-test']);
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'data' => [
+                    ['embedding' => [1.0, 0.0]],
+                ],
+            ], 200),
+        ]);
+        CatalogModels::seed([
+            ['id' => 'gpt-4o', 'name' => 'GPT-4o'],
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::createExploreFor($user);
+        $document = Document::factory()->create(['name' => 'missao.md']);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Há exatamente 42 quilos de minério Lumina.',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+
+        $this->assertTrue(app(PromptModelConfig::class)->save('explore', 'gpt-4o'));
+        $llm = $this->bindFakeLlmGateway()->queueComplete('Há exatamente 42 quilos.');
+
+        Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quanto pesava o minério Lumina?')
+            ->call('sendMessage')
+            ->assertSee('Há exatamente 42 quilos.');
+
+        $this->assertSame('gpt-4o', $llm->completeCalls[0]['model']);
+        $this->assertSame('rag', $llm->completeCalls[0]['step']);
     }
 
     public function test_falls_back_to_explore_when_every_chunk_is_below_the_minimum_score(): void

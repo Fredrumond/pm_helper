@@ -46,6 +46,11 @@ class RagConfigTest extends TestCase
         $this->assertSame(RagConfig::DEFAULT_TOP_K, $this->config->topK());
         $this->assertSame(RagConfig::DEFAULT_STRATEGY, $this->config->strategy());
         $this->assertSame(RagConfig::DEFAULT_MIN_SCORE, $this->config->minScore());
+        $this->assertSame(RagConfig::SYNC_SOURCE_KEYS, $this->config->enabledSyncSourceKeys());
+        $this->assertSame([
+            ['path' => 'README.md', 'scope' => RagConfig::SYNC_SCOPE_FILE],
+            ['path' => 'docs', 'scope' => RagConfig::SYNC_SCOPE_RECURSIVE],
+        ], $this->config->indexableCollectionSpecsForSync());
         $this->assertDatabaseCount('rag_settings', 0);
     }
 
@@ -153,5 +158,67 @@ class RagConfigTest extends TestCase
 
         $this->assertSame(RagConfig::DEFAULT_STRATEGY, $this->config->strategy());
         $this->assertSame(RagConfig::DEFAULT_MIN_SCORE, $this->config->minScore());
+    }
+
+    public function test_save_persists_sync_sources_and_builds_partial_collection_specs(): void
+    {
+        $this->assertTrue($this->config->save(
+            800,
+            RagConfig::DEFAULT_EMBEDDING_MODEL,
+            4,
+            RagConfig::DEFAULT_STRATEGY,
+            0,
+            [RagConfig::SYNC_SOURCE_README, RagConfig::SYNC_SOURCE_DOCS_DISCOVERY],
+        ));
+
+        $this->assertSame(
+            [RagConfig::SYNC_SOURCE_README, RagConfig::SYNC_SOURCE_DOCS_DISCOVERY],
+            $this->config->enabledSyncSourceKeys(),
+        );
+        $this->assertSame([
+            ['path' => 'README.md', 'scope' => RagConfig::SYNC_SCOPE_FILE],
+            ['path' => 'docs/discovery', 'scope' => RagConfig::SYNC_SCOPE_RECURSIVE],
+        ], $this->config->indexableCollectionSpecsForSync());
+    }
+
+    public function test_empty_sync_sources_use_the_legacy_full_docs_collection(): void
+    {
+        RagSetting::query()->create([
+            'chunk_size' => 500,
+            'embedding_model' => RagConfig::DEFAULT_EMBEDDING_MODEL,
+            'top_k' => 3,
+            'chunk_strategy' => RagConfig::DEFAULT_STRATEGY,
+            'min_score' => 0,
+            'sync_sources' => [],
+        ]);
+
+        $this->assertSame(RagConfig::SYNC_SOURCE_KEYS, $this->config->enabledSyncSourceKeys());
+        $this->assertSame([
+            ['path' => 'README.md', 'scope' => RagConfig::SYNC_SCOPE_FILE],
+            ['path' => 'docs', 'scope' => RagConfig::SYNC_SCOPE_RECURSIVE],
+        ], $this->config->indexableCollectionSpecsForSync());
+    }
+
+    public function test_invalid_sync_source_key_is_not_stored(): void
+    {
+        $this->assertTrue($this->config->save(
+            800,
+            RagConfig::DEFAULT_EMBEDDING_MODEL,
+            4,
+            RagConfig::DEFAULT_STRATEGY,
+            0,
+            [RagConfig::SYNC_SOURCE_README],
+        ));
+
+        $this->assertFalse($this->config->save(
+            800,
+            RagConfig::DEFAULT_EMBEDDING_MODEL,
+            4,
+            RagConfig::DEFAULT_STRATEGY,
+            0,
+            ['pasta-invalida'],
+        ));
+
+        $this->assertSame([RagConfig::SYNC_SOURCE_README], $this->config->enabledSyncSourceKeys());
     }
 }

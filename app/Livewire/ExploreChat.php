@@ -10,6 +10,7 @@ use App\Models\Message;
 use App\Models\Project;
 use App\Prompts\SystemPromptCatalog;
 use App\Services\DocumentRag;
+use App\Services\PromptModelConfig;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -19,7 +20,7 @@ use Throwable;
 
 class ExploreChat extends Component
 {
-    public const MODEL = 'gpt-4o-mini';
+    public const MODEL = PromptModelConfig::EXPLORE_DEFAULT_MODEL;
 
     public Conversation $conversation;
 
@@ -88,12 +89,13 @@ class ExploreChat extends Component
             $this->conversation->refresh();
             $this->conversation->load('messages');
 
-            $fromDocuments = $this->answerFromDocuments($text);
+            $model = app(PromptModelConfig::class)->active('explore');
+            $fromDocuments = $this->answerFromDocuments($text, $model);
 
             Message::create([
                 'conversation_id' => $this->conversation->id,
                 'role' => 'assistant',
-                'content' => $fromDocuments['content'] ?? $this->answerFromExplore($llm, $prompts),
+                'content' => $fromDocuments['content'] ?? $this->answerFromExplore($llm, $prompts, $model),
                 'sources' => $fromDocuments['sources'] ?? null,
             ]);
         } catch (LlmTemporarilyUnavailableException $e) {
@@ -122,7 +124,7 @@ class ExploreChat extends Component
     /**
      * @return array{content: string, sources: list<string>|null}|null
      */
-    private function answerFromDocuments(string $question): ?array
+    private function answerFromDocuments(string $question, string $model): ?array
     {
         $projectId = $this->conversation->project_id;
 
@@ -141,7 +143,7 @@ class ExploreChat extends Component
             return null;
         }
 
-        $result = app(DocumentRag::class)->ask($question, self::MODEL, $this->conversation, true);
+        $result = app(DocumentRag::class)->ask($question, $model, $this->conversation, true);
 
         if ($result['answer'] === null) {
             return null;
@@ -172,7 +174,7 @@ class ExploreChat extends Component
         return $names === [] ? null : $names;
     }
 
-    private function answerFromExplore(LlmGateway $llm, SystemPromptCatalog $prompts): string
+    private function answerFromExplore(LlmGateway $llm, SystemPromptCatalog $prompts, string $model): string
     {
         $prompt = $prompts->current('explore');
 
@@ -181,7 +183,7 @@ class ExploreChat extends Component
                 [['role' => 'system', 'content' => $prompt->content]],
                 $this->conversation->toLlmHistory(),
             ),
-            self::MODEL,
+            $model,
             'explore',
             $this->conversation,
         );
