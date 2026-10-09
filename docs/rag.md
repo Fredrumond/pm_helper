@@ -102,8 +102,11 @@ sequenceDiagram
     R->>L: completePrompt([contexto + pergunta], "rag")
     L-->>R: resposta textual
     R-->>E: { matches[], answer }
-    E-->>U: Exibe resposta gerada pela LLM
+    E->>E: Grava na mensagem os nomes dos arquivos usados, cada um uma vez
+    E-->>U: Exibe a resposta e, no tooltip, o nome de cada arquivo como foi gravado
 ```
+
+A referência do tooltip é `documents.name`: no upload, o nome original do arquivo; na indexação do repositório, o caminho do arquivo. O tooltip não inclui trecho nem score. Resposta do fluxo padrão, sem documentos, não tem tooltip. O nome fica na mensagem e continua visível ao reabrir a exploração.
 
 ## Fluxo 4 — Prioridade RAG vs. Explore padrão
 

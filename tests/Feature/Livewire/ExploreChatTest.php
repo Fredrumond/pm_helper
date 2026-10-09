@@ -201,6 +201,88 @@ class ExploreChatTest extends TestCase
             'role' => 'assistant',
             'content' => 'Há exatamente 42 quilos.',
         ]);
+        $this->assertSame(
+            ['missao.md'],
+            $conversation->messages()->where('role', 'assistant')->first()->sources,
+        );
+    }
+
+    public function test_document_answer_tooltip_lists_each_saved_filename_once_and_keeps_it_on_reopen(): void
+    {
+        config(['services.openai.api_key' => 'sk-test']);
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'data' => [
+                    ['embedding' => [1.0, 0.0]],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::createExploreFor($user);
+        $mission = Document::factory()->create(['name' => 'missao.md']);
+        $rules = Document::factory()->create(['name' => 'docs/regras/pagamento.md']);
+        DocumentChunk::factory()->create([
+            'document_id' => $mission->id,
+            'content' => 'Trecho da missão sobre o minério.',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $mission->id,
+            'content' => 'Outro trecho da mesma missão.',
+            'chunk_index' => 1,
+            'embedding' => [1.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $rules->id,
+            'content' => 'Pagamento obrigatório no checkout.',
+            'chunk_index' => 0,
+            'embedding' => [0.0, 1.0],
+        ]);
+
+        $this->bindFakeLlmGateway()->queueComplete('Resposta com os dois arquivos.');
+
+        $tooltip = "missao.md\ndocs/regras/pagamento.md";
+
+        Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->set('input', 'O que os arquivos dizem?')
+            ->call('sendMessage')
+            ->assertSee('Resposta com os dois arquivos.')
+            ->assertSee($tooltip, false)
+            ->assertDontSee('Trecho da missão sobre o minério.')
+            ->assertDontSee('Outro trecho da mesma missão.')
+            ->assertDontSee('Pagamento obrigatório no checkout.');
+
+        $assistant = $conversation->messages()->where('role', 'assistant')->first();
+        $this->assertSame(['missao.md', 'docs/regras/pagamento.md'], $assistant->sources);
+        $this->assertSame($tooltip, $assistant->sourceTooltip());
+        $this->assertSame('Resposta com os dois arquivos.', $assistant->content);
+
+        Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation->fresh()])
+            ->assertSee('Resposta com os dois arquivos.')
+            ->assertSee($tooltip, false)
+            ->assertDontSee('Trecho da missão sobre o minério.');
+    }
+
+    public function test_explore_answer_without_documents_has_no_source_tooltip(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::createExploreFor($user);
+
+        $this->bindFakeLlmGateway()->queueComplete('Resposta livre.');
+
+        Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->set('input', 'Oi')
+            ->call('sendMessage')
+            ->assertSee('Resposta livre.');
+
+        $assistant = $conversation->messages()->where('role', 'assistant')->first();
+        $this->assertNull($assistant->sources);
+        $this->assertNull($assistant->sourceTooltip());
     }
 
     public function test_selecting_a_project_before_the_first_message_persists(): void
@@ -411,6 +493,9 @@ class ExploreChatTest extends TestCase
         $this->assertCount(1, $llm->completeCalls);
         $this->assertSame('explore', $llm->completeCalls[0]['step']);
         $this->assertStringNotContainsString('Trecho irrelevante.', $llm->completeCalls[0]['messages'][0]['content']);
+
+        $assistant = $conversation->messages()->where('role', 'assistant')->first();
+        $this->assertNull($assistant->sources);
     }
 
     private function bindFakeLlmGateway(): FakeLlmGateway

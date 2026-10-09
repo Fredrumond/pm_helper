@@ -30,10 +30,15 @@
                         </div>
                     @endif
 
-                    <div class="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed
-                        {{ $message->isFromUser()
-                            ? 'bg-indigo-600 text-white rounded-br-sm'
-                            : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm shadow-sm' }}">
+                    <div @class([
+                            'max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
+                            'bg-indigo-600 text-white rounded-br-sm' => $message->isFromUser(),
+                            'bg-white border border-gray-200 text-gray-800 rounded-bl-sm shadow-sm' => $message->isFromAssistant(),
+                        ])
+                        @if ($message->sourceTooltip())
+                            title="{{ $message->sourceTooltip() }}"
+                        @endif
+                    >
                         {!! nl2br(e($message->content)) !!}
                     </div>
                 </div>

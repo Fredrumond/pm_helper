@@ -88,13 +88,13 @@ class ExploreChat extends Component
             $this->conversation->refresh();
             $this->conversation->load('messages');
 
-            $assistantResponse = $this->answerFromDocuments($text)
-                ?? $this->answerFromExplore($llm, $prompts);
+            $fromDocuments = $this->answerFromDocuments($text);
 
             Message::create([
                 'conversation_id' => $this->conversation->id,
                 'role' => 'assistant',
-                'content' => $assistantResponse,
+                'content' => $fromDocuments['content'] ?? $this->answerFromExplore($llm, $prompts),
+                'sources' => $fromDocuments['sources'] ?? null,
             ]);
         } catch (LlmTemporarilyUnavailableException $e) {
             Message::create([
@@ -119,7 +119,10 @@ class ExploreChat extends Component
         $this->conversation->load('messages');
     }
 
-    private function answerFromDocuments(string $question): ?string
+    /**
+     * @return array{content: string, sources: list<string>|null}|null
+     */
+    private function answerFromDocuments(string $question): ?array
     {
         $projectId = $this->conversation->project_id;
 
@@ -138,7 +141,35 @@ class ExploreChat extends Component
             return null;
         }
 
-        return app(DocumentRag::class)->ask($question, self::MODEL, $this->conversation, true)['answer'];
+        $result = app(DocumentRag::class)->ask($question, self::MODEL, $this->conversation, true);
+
+        if ($result['answer'] === null) {
+            return null;
+        }
+
+        return [
+            'content' => $result['answer'],
+            'sources' => $this->savedFilenames($result['matches']),
+        ];
+    }
+
+    /**
+     * @param  list<array{document: string, chunk_index: int, content: string, score: float}>  $matches
+     * @return list<string>|null
+     */
+    private function savedFilenames(array $matches): ?array
+    {
+        $names = [];
+
+        foreach ($matches as $match) {
+            $name = $match['document'];
+
+            if ($name !== '' && ! in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+
+        return $names === [] ? null : $names;
     }
 
     private function answerFromExplore(LlmGateway $llm, SystemPromptCatalog $prompts): string
