@@ -11,6 +11,7 @@ use App\Models\DocumentChunk;
 use App\Models\Project;
 use App\Models\User;
 use App\Prompts\SystemPromptCatalog;
+use App\Services\RagConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -368,6 +369,48 @@ class ExploreChatTest extends TestCase
             ->assertDontSee('Pergunta solta do explorar');
 
         $this->assertTrue($interview->is($user->conversations()->interview()->first()));
+    }
+
+    public function test_falls_back_to_explore_when_every_chunk_is_below_the_minimum_score(): void
+    {
+        config(['services.openai.api_key' => 'sk-test']);
+        Http::fake([
+            'https://api.openai.com/v1/embeddings' => Http::response([
+                'data' => [
+                    ['embedding' => [1.0, 0.0]],
+                ],
+            ], 200),
+        ]);
+        CatalogModels::seedEmbeddingPrice();
+        $this->assertTrue(app(RagConfig::class)->save(
+            RagConfig::DEFAULT_CHUNK_SIZE,
+            RagConfig::DEFAULT_EMBEDDING_MODEL,
+            RagConfig::DEFAULT_TOP_K,
+            RagConfig::STRATEGY_SIZE,
+            0.30,
+        ));
+
+        $user = User::factory()->create();
+        $conversation = Conversation::createExploreFor($user);
+        $document = Document::factory()->create(['name' => 'missao.md']);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Trecho irrelevante.',
+            'chunk_index' => 0,
+            'embedding' => [0.0, 1.0],
+        ]);
+
+        $llm = $this->bindFakeLlmGateway()->queueComplete('Resposta do explorar.');
+
+        Livewire::actingAs($user)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->set('input', 'Quanto pesava o minério Lumina?')
+            ->call('sendMessage')
+            ->assertSee('Resposta do explorar.');
+
+        $this->assertCount(1, $llm->completeCalls);
+        $this->assertSame('explore', $llm->completeCalls[0]['step']);
+        $this->assertStringNotContainsString('Trecho irrelevante.', $llm->completeCalls[0]['messages'][0]['content']);
     }
 
     private function bindFakeLlmGateway(): FakeLlmGateway

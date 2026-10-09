@@ -6,11 +6,13 @@ use App\Livewire\Documents;
 use App\Models\Document;
 use App\Models\DocumentChunk;
 use App\Models\User;
+use App\Services\RagConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Tests\Support\CatalogModels;
 use Tests\TestCase;
 
 class DocumentsTest extends TestCase
@@ -62,7 +64,8 @@ class DocumentsTest extends TestCase
         ]);
         $this->assertDatabaseHas('document_chunks', [
             'chunk_index' => 0,
-            'content' => "# Guia\n\nConteúdo de teste.",
+            'heading_path' => null,
+            'content' => "Guia (guia.md)\n# Guia\n\nConteúdo de teste.",
         ]);
         $this->assertSame(
             [0.21, -0.43, 0.72],
@@ -92,12 +95,12 @@ class DocumentsTest extends TestCase
         $this->assertDatabaseHas('document_chunks', [
             'document_id' => $document->id,
             'chunk_index' => 0,
-            'content' => str_repeat('a', 500),
+            'content' => "longo.md (longo.md)\n".str_repeat('a', 500),
         ]);
         $this->assertDatabaseHas('document_chunks', [
             'document_id' => $document->id,
             'chunk_index' => 1,
-            'content' => str_repeat('b', 20),
+            'content' => "longo.md (longo.md)\n".str_repeat('b', 20),
         ]);
     }
 
@@ -214,6 +217,47 @@ class DocumentsTest extends TestCase
             ->set('question', '   ')
             ->call('search')
             ->assertHasErrors(['question']);
+    }
+
+    public function test_search_without_embeddings_keeps_the_empty_index_message(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(Documents::class)
+            ->set('question', 'algo sobre o projeto')
+            ->call('search')
+            ->assertSee('Nenhum chunk com embedding para comparar.')
+            ->assertDontSee('Nenhum trecho encontrado.');
+    }
+
+    public function test_search_says_when_no_chunk_reaches_the_minimum_score(): void
+    {
+        CatalogModels::seedEmbeddingPrice();
+        $this->assertTrue(app(RagConfig::class)->save(
+            RagConfig::DEFAULT_CHUNK_SIZE,
+            RagConfig::DEFAULT_EMBEDDING_MODEL,
+            RagConfig::DEFAULT_TOP_K,
+            RagConfig::STRATEGY_SIZE,
+            0.30,
+        ));
+
+        $user = User::factory()->create();
+        $document = Document::factory()->create(['name' => 'missao.md']);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Trecho irrelevante.',
+            'chunk_index' => 0,
+            'embedding' => [0.0, 1.0, 0.0],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(Documents::class)
+            ->set('question', 'quantos quilos de Lumina')
+            ->call('search')
+            ->assertSee('Nenhum trecho encontrado.')
+            ->assertDontSee('Nenhum chunk com embedding para comparar.')
+            ->assertDontSee('Trecho irrelevante.');
     }
 
     private function seedRankedChunks(): void

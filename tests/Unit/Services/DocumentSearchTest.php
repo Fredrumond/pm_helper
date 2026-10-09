@@ -200,6 +200,50 @@ class DocumentSearchTest extends TestCase
         $this->assertSame([], $matches);
     }
 
+    public function test_minimum_score_zero_keeps_a_negative_score_and_a_positive_minimum_drops_weaker_chunks(): void
+    {
+        $this->seedEmbeddingModel();
+        $document = Document::factory()->create(['name' => 'missao.md']);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Relevante',
+            'chunk_index' => 0,
+            'heading_path' => '3. Escopo',
+            'embedding' => [1.0, 0.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Fraco',
+            'chunk_index' => 1,
+            'embedding' => [1.0, 4.0],
+        ]);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'Oposto',
+            'chunk_index' => 2,
+            'embedding' => [-1.0, 0.0],
+        ]);
+
+        $search = new DocumentSearch(new EmbeddingService, new CosineSimilarity);
+        $kept = $search->search('pergunta');
+
+        $this->assertCount(3, $kept);
+        $this->assertSame('3. Escopo', $kept[0]['heading_path']);
+
+        $this->assertTrue(app(RagConfig::class)->save(
+            RagConfig::DEFAULT_CHUNK_SIZE,
+            RagConfig::DEFAULT_EMBEDDING_MODEL,
+            RagConfig::DEFAULT_TOP_K,
+            RagConfig::STRATEGY_SIZE,
+            0.30,
+        ));
+
+        $filtered = $search->search('pergunta');
+
+        $this->assertCount(1, $filtered);
+        $this->assertSame('Relevante', $filtered[0]['content']);
+    }
+
     private function seedEmbeddingModel(): void
     {
         CatalogModels::seed([[

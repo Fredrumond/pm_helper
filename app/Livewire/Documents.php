@@ -3,12 +3,14 @@
 namespace App\Livewire;
 
 use App\Models\Document;
+use App\Models\DocumentChunk;
 use App\Services\DocumentChunker;
 use App\Services\DocumentSearch;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
 #[Layout('layouts.app')]
@@ -27,7 +29,7 @@ class Documents extends Component
 
     public string $content = '';
 
-    /** @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null */
+    /** @var TemporaryUploadedFile|null */
     public $file = null;
 
     public string $question = '';
@@ -36,6 +38,8 @@ class Documents extends Component
     public array $matches = [];
 
     public bool $searched = false;
+
+    public bool $searchComparedEmbeddings = false;
 
     public function startCreate(): void
     {
@@ -104,6 +108,7 @@ class Documents extends Component
             'question.required' => 'Digite uma pergunta.',
         ]);
 
+        $this->searchComparedEmbeddings = DocumentChunk::query()->whereNotNull('embedding')->exists();
         $this->matches = app(DocumentSearch::class)->search($this->question);
         $this->searched = true;
     }

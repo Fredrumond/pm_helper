@@ -60,7 +60,7 @@ return [
             'version' => env('CHAT_EXPLORE_PROMPT_VERSION', 'v1'),
         ],
         'rag' => [
-            'version' => 'v1',
+            'version' => 'v2',
         ],
     ],
 

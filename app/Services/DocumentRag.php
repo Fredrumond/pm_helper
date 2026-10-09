@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\LlmGateway;
 use App\Models\Conversation;
+use App\Prompts\SystemPromptCatalog;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -12,10 +13,11 @@ class DocumentRag
     public function __construct(
         private readonly DocumentSearch $search,
         private readonly LlmGateway $llm,
+        private readonly ?SystemPromptCatalog $prompts = null,
     ) {}
 
     /**
-     * @return array{matches: list<array{document: string, chunk_index: int, content: string, score: float}>, answer: ?string}
+     * @return array{matches: list<array{document: string, chunk_index: int, content: string, heading_path: ?string, score: float}>, answer: ?string}
      */
     public function ask(string $question, ?string $model = null, ?Conversation $conversation = null, bool $scoped = false): array
     {
@@ -54,7 +56,7 @@ class DocumentRag
     }
 
     /**
-     * @param  list<array{document: string, chunk_index: int, content: string, score: float}>  $matches
+     * @param  list<array{document: string, chunk_index: int, content: string, heading_path: ?string, score: float}>  $matches
      */
     private function logConsulta(?Conversation $conversation, array $matches, bool $llm, ?string $model): void
     {
@@ -68,14 +70,25 @@ class DocumentRag
     }
 
     /**
-     * @param  list<array{document: string, chunk_index: int, content: string, score: float}>  $matches
+     * @param  list<array{document: string, chunk_index: int, content: string, heading_path: ?string, score: float}>  $matches
      */
     private function prompt(string $question, array $matches): string
     {
-        $context = implode("\n\n", array_column($matches, 'content'));
+        $instruction = $this->prompts()->current('rag')->content;
+        $blocks = array_map(function (array $match): string {
+            $label = $match['document'];
+            $path = $match['heading_path'] ?? null;
+
+            if (is_string($path) && $path !== '') {
+                $label .= ' › '.$path;
+            }
+
+            return '['.$label."]\n".$match['content'];
+        }, $matches);
+        $context = implode("\n\n", $blocks);
 
         return <<<TXT
-Responda usando somente o contexto.
+{$instruction}
 
 CONTEXTO:
 {$context}
@@ -83,5 +96,10 @@ CONTEXTO:
 PERGUNTA:
 {$question}
 TXT;
+    }
+
+    private function prompts(): SystemPromptCatalog
+    {
+        return $this->prompts ?? new SystemPromptCatalog;
     }
 }

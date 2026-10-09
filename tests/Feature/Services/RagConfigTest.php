@@ -44,6 +44,8 @@ class RagConfigTest extends TestCase
         $this->assertSame(RagConfig::DEFAULT_CHUNK_SIZE, $this->config->chunkSize());
         $this->assertSame(RagConfig::DEFAULT_EMBEDDING_MODEL, $this->config->embeddingModel());
         $this->assertSame(RagConfig::DEFAULT_TOP_K, $this->config->topK());
+        $this->assertSame(RagConfig::DEFAULT_STRATEGY, $this->config->strategy());
+        $this->assertSame(RagConfig::DEFAULT_MIN_SCORE, $this->config->minScore());
         $this->assertDatabaseCount('rag_settings', 0);
     }
 
@@ -84,5 +86,72 @@ class RagConfigTest extends TestCase
         $this->assertSame(RagConfig::DEFAULT_EMBEDDING_MODEL, $this->config->embeddingModel());
         $this->assertSame(6, $this->config->topK());
         $this->assertSame('text-embedding-3-large', RagSetting::query()->value('embedding_model'));
+    }
+
+    public function test_save_persists_strategy_and_minimum_score(): void
+    {
+        $this->assertTrue($this->config->save(
+            800,
+            RagConfig::DEFAULT_EMBEDDING_MODEL,
+            4,
+            RagConfig::STRATEGY_MARKDOWN,
+            0.30,
+        ));
+
+        $this->assertSame(RagConfig::STRATEGY_MARKDOWN, $this->config->strategy());
+        $this->assertEqualsWithDelta(0.30, $this->config->minScore(), 0.001);
+
+        $this->assertTrue($this->config->save(
+            800,
+            RagConfig::DEFAULT_EMBEDDING_MODEL,
+            4,
+            RagConfig::STRATEGY_PARAGRAPH,
+            0,
+        ));
+        $this->assertSame(RagConfig::STRATEGY_PARAGRAPH, $this->config->strategy());
+        $this->assertSame(0.0, $this->config->minScore());
+
+        $this->assertTrue($this->config->save(
+            800,
+            RagConfig::DEFAULT_EMBEDDING_MODEL,
+            4,
+            RagConfig::STRATEGY_SIZE,
+            1,
+        ));
+        $this->assertSame(1.0, $this->config->minScore());
+    }
+
+    public function test_invalid_strategy_or_score_is_not_stored(): void
+    {
+        $this->assertTrue($this->config->save(
+            800,
+            RagConfig::DEFAULT_EMBEDDING_MODEL,
+            4,
+            RagConfig::STRATEGY_MARKDOWN,
+            0.30,
+        ));
+
+        $this->assertFalse($this->config->save(900, RagConfig::DEFAULT_EMBEDDING_MODEL, 8, 'sentence', 0.30));
+        $this->assertFalse($this->config->save(900, RagConfig::DEFAULT_EMBEDDING_MODEL, 8, RagConfig::STRATEGY_MARKDOWN, -0.01));
+        $this->assertFalse($this->config->save(900, RagConfig::DEFAULT_EMBEDDING_MODEL, 8, RagConfig::STRATEGY_MARKDOWN, 1.01));
+
+        $this->assertSame(800, $this->config->chunkSize());
+        $this->assertSame(4, $this->config->topK());
+        $this->assertSame(RagConfig::STRATEGY_MARKDOWN, $this->config->strategy());
+        $this->assertEqualsWithDelta(0.30, $this->config->minScore(), 0.001);
+    }
+
+    public function test_unknown_strategy_and_missing_score_fall_back_to_defaults(): void
+    {
+        RagSetting::query()->create([
+            'chunk_size' => 12,
+            'embedding_model' => RagConfig::DEFAULT_EMBEDDING_MODEL,
+            'top_k' => 3,
+            'chunk_strategy' => 'frase',
+            'min_score' => null,
+        ]);
+
+        $this->assertSame(RagConfig::DEFAULT_STRATEGY, $this->config->strategy());
+        $this->assertSame(RagConfig::DEFAULT_MIN_SCORE, $this->config->minScore());
     }
 }

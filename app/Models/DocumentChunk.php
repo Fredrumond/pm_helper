@@ -16,6 +16,7 @@ class DocumentChunk extends Model
         'document_id',
         'content',
         'chunk_index',
+        'heading_path',
         'embedding',
     ];
 

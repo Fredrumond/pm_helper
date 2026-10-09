@@ -87,9 +87,19 @@ class AdminRagSettingsTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(AdminRagSettings::class)
+            ->assertSet('chunkStrategy', RagConfig::STRATEGY_SIZE)
             ->assertSet('chunkSize', (string) RagConfig::DEFAULT_CHUNK_SIZE)
             ->assertSet('embeddingModel', RagConfig::DEFAULT_EMBEDDING_MODEL)
-            ->assertSet('topK', (string) RagConfig::DEFAULT_TOP_K);
+            ->assertSet('topK', (string) RagConfig::DEFAULT_TOP_K)
+            ->assertSet('minScore', '0.00')
+            ->assertSee('Sugerido: 0,30')
+            ->assertSee('Informações sobre a estratégia de corte', false)
+            ->assertSee('Informações sobre o tamanho do trecho', false)
+            ->assertSee('Informações sobre o modelo de embedding', false)
+            ->assertSee('Informações sobre o top-K', false)
+            ->assertSee('Informações sobre o score mínimo', false)
+            ->assertSee('Tamanho do chunk')
+            ->assertDontSee('Tamanho máximo do trecho');
     }
 
     public function test_changing_chunk_size_shows_the_reindex_label_before_save_and_does_not_reindex(): void
@@ -135,6 +145,82 @@ class AdminRagSettingsTest extends TestCase
 
         $this->assertSame(9, app(RagConfig::class)->topK());
         $this->assertSame(RagConfig::DEFAULT_CHUNK_SIZE, app(RagConfig::class)->chunkSize());
+    }
+
+    public function test_admin_saves_strategy_and_minimum_score(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $document = Document::factory()->create(['content' => str_repeat('a', 40)]);
+        DocumentChunk::factory()->create([
+            'document_id' => $document->id,
+            'content' => 'trecho antigo',
+            'chunk_index' => 0,
+            'embedding' => [1.0, 0.0],
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(AdminRagSettings::class)
+            ->set('chunkStrategy', RagConfig::STRATEGY_MARKDOWN)
+            ->assertSee('Tamanho máximo do trecho')
+            ->assertSee(AdminRagSettings::REINDEX_NOTICE)
+            ->set('minScore', '0.30')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSee('Parâmetros atualizados.')
+            ->assertSee(AdminRagSettings::REINDEX_NOTICE);
+
+        $rag = app(RagConfig::class);
+        $this->assertSame(RagConfig::STRATEGY_MARKDOWN, $rag->strategy());
+        $this->assertEqualsWithDelta(0.30, $rag->minScore(), 0.001);
+        $this->assertDatabaseCount('document_chunks', 1);
+        $this->assertDatabaseHas('document_chunks', [
+            'document_id' => $document->id,
+            'content' => 'trecho antigo',
+        ]);
+    }
+
+    public function test_changing_only_the_minimum_score_does_not_show_the_reindex_label(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(AdminRagSettings::class)
+            ->set('minScore', '0.30')
+            ->assertDontSee(AdminRagSettings::REINDEX_NOTICE)
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSee('Parâmetros atualizados.')
+            ->assertDontSee(AdminRagSettings::REINDEX_NOTICE);
+
+        $this->assertEqualsWithDelta(0.30, app(RagConfig::class)->minScore(), 0.001);
+        $this->assertSame(RagConfig::STRATEGY_SIZE, app(RagConfig::class)->strategy());
+    }
+
+    public function test_invalid_strategy_or_score_is_rejected_and_not_stored(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(AdminRagSettings::class)
+            ->set('chunkStrategy', RagConfig::STRATEGY_MARKDOWN)
+            ->set('minScore', '0.30')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->set('chunkStrategy', 'sentence')
+            ->call('save')
+            ->assertHasErrors(['chunkStrategy']);
+
+        $this->assertSame(RagConfig::STRATEGY_MARKDOWN, app(RagConfig::class)->strategy());
+        $this->assertEqualsWithDelta(0.30, app(RagConfig::class)->minScore(), 0.001);
+
+        Livewire::actingAs($admin)
+            ->test(AdminRagSettings::class)
+            ->set('minScore', '1.5')
+            ->call('save')
+            ->assertHasErrors(['minScore']);
+
+        $this->assertSame(RagConfig::STRATEGY_MARKDOWN, app(RagConfig::class)->strategy());
+        $this->assertEqualsWithDelta(0.30, app(RagConfig::class)->minScore(), 0.001);
     }
 
     public function test_changing_the_embedding_model_shows_the_reindex_label(): void

@@ -53,7 +53,9 @@
 
         @if ($searched)
             @if (count($matches) === 0)
-                <p class="mt-5 text-sm text-gray-500">Nenhum chunk com embedding para comparar.</p>
+                <p class="mt-5 text-sm text-gray-500">
+                    {{ $searchComparedEmbeddings ? 'Nenhum trecho encontrado.' : 'Nenhum chunk com embedding para comparar.' }}
+                </p>
             @else
                 <ol class="mt-5 space-y-3">
                     @foreach ($matches as $match)

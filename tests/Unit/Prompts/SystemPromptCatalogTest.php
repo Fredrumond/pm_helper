@@ -35,6 +35,8 @@ class SystemPromptCatalogTest extends TestCase
         $this->assertContains('v1', $catalog->versions('docs_retrieval'));
         $this->assertContains('v1', $catalog->versions('docs_briefing'));
         $this->assertContains('v1', $catalog->versions('explore'));
+        $this->assertContains('v1', $catalog->versions('rag'));
+        $this->assertContains('v2', $catalog->versions('rag'));
     }
 
     public function test_loads_the_configured_interview_prompt(): void
@@ -115,6 +117,23 @@ class SystemPromptCatalogTest extends TestCase
         $this->assertStringNotContainsString('<INTERVIEW_COMPLETE>', $prompt->content);
         $this->assertStringNotContainsString('<CARD_JSON>', $prompt->content);
         $this->assertSame(hash('sha256', $prompt->content), $prompt->hash);
+    }
+
+    public function test_loads_the_configured_rag_prompt_and_keeps_v1(): void
+    {
+        $current = (new SystemPromptCatalog)->current('rag');
+
+        $this->assertSame('rag', $current->name);
+        $this->assertSame('v2', $current->version);
+        $this->assertSame('rag@v2', $current->identifier());
+        $this->assertStringContainsString('Responda usando somente o contexto.', $current->content);
+        $this->assertStringContainsString('seção de origem', $current->content);
+        $this->assertSame(hash('sha256', $current->content), $current->hash);
+
+        $previous = (new SystemPromptCatalog)->get('rag', 'v1');
+
+        $this->assertSame('v1', $previous->version);
+        $this->assertSame('Responda usando somente o contexto.', $previous->content);
     }
 
     public function test_throws_when_version_is_missing(): void

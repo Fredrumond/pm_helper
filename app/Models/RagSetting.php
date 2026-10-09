@@ -14,6 +14,8 @@ class RagSetting extends Model implements AuditableContract
         'chunk_size',
         'embedding_model',
         'top_k',
+        'chunk_strategy',
+        'min_score',
     ];
 
     protected $casts = [
