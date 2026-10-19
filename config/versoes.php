@@ -163,6 +163,44 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.10.0',
+            'data' => '2026-10-19',
+            'estado' => 'development',
+            'titulo' => 'Retrieval filtra documentos pelo status do frontmatter',
+            'resumo' => 'Os documentos indexados passam a ter o status do frontmatter persistido na coluna documents.status, com o bloco --- removido do conteúdo antes do chunking. O retrieval só considera documentos com status current, stable ou sem status (null equivale a stable); deprecated, draft e qualquer outro valor ficam fora da busca. Vale na sincronização do projeto e no cadastro manual de documentos. Documentos já indexados seguem com status nulo e continuam retornando até a próxima sincronização.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Documentos',
+                    'itens' => [
+                        ['titulo' => 'MarkdownFrontmatterParser extrai o status e devolve o corpo sem o bloco ---', 'estado' => 'development', 'nota' => 'Sem frontmatter ou sem o campo status, status fica null e o conteúdo é preservado'],
+                        ['titulo' => 'Coluna status (nullable) em documents', 'estado' => 'development', 'nota' => 'Migration 2026_10_09_204947_add_status_to_documents_table'],
+                        ['titulo' => 'Indexação e cadastro manual persistem status e conteúdo sem frontmatter', 'estado' => 'development', 'nota' => 'ProjectDocumentsIndexer e Livewire Documents; embeddings gerados só do conteúdo real'],
+                    ],
+                ],
+                [
+                    'nome' => 'Retrieval',
+                    'itens' => [
+                        ['titulo' => 'Document::scopeRetrievable aceita current, stable ou status nulo', 'estado' => 'development', 'nota' => 'RETRIEVABLE_STATUSES fixo em código; whitelist configurável pelo admin fica fora desta entrega'],
+                        ['titulo' => 'DocumentSearch aplica o filtro retrievable sempre, com ou sem escopo de projeto', 'estado' => 'development', 'nota' => 'Chunks de documentos não vigentes são excluídos antes do ranking por cosseno'],
+                    ],
+                ],
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'Discovery 0017 — filtrar retrieval por status do frontmatter', 'estado' => 'development', 'nota' => 'docs/discovery/0017-filtrar-retrieval-por-status-do-frontmatter.md'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'MarkdownFrontmatterParserTest, DocumentSearchTest e ProjectDocumentsIndexerTest cobrem parser, filtro e indexação', 'estado' => 'test'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.9.0',
             'data' => '2026-10-03',
             'estado' => 'development',

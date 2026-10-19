@@ -200,6 +200,31 @@ class DocumentSearchTest extends TestCase
         $this->assertSame([], $matches);
     }
 
+    public function test_excludes_chunks_from_documents_with_non_retrievable_status(): void
+    {
+        $current = Document::factory()->create(['name' => 'current.md', 'status' => 'current']);
+        $stable = Document::factory()->create(['name' => 'stable.md', 'status' => 'stable']);
+        $legacy = Document::factory()->create(['name' => 'legacy.md', 'status' => null]);
+        $deprecated = Document::factory()->create(['name' => 'old.md', 'status' => 'deprecated']);
+
+        foreach ([$current, $stable, $legacy, $deprecated] as $document) {
+            DocumentChunk::factory()->create([
+                'document_id' => $document->id,
+                'content' => 'Chunk '.$document->name,
+                'chunk_index' => 0,
+                'embedding' => [1.0, 0.0],
+            ]);
+        }
+
+        $matches = (new DocumentSearch(new EmbeddingService, new CosineSimilarity))
+            ->search('pergunta');
+
+        $this->assertSame(
+            ['Chunk current.md', 'Chunk stable.md', 'Chunk legacy.md'],
+            array_column($matches, 'content'),
+        );
+    }
+
     public function test_minimum_score_zero_keeps_a_negative_score_and_a_positive_minimum_drops_weaker_chunks(): void
     {
         $this->seedEmbeddingModel();

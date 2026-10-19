@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\RagSetting;
 use App\Services\DocumentChunker;
 use App\Services\EmbeddingService;
+use App\Services\MarkdownFrontmatterParser;
 use App\Services\ProjectDocsResult;
 use App\Services\ProjectDocumentsIndexer;
 use App\Services\ProjectDocumentsSyncResult;
@@ -297,12 +298,40 @@ class ProjectDocumentsIndexerTest extends TestCase
         ], $docs->indexableCalls[0]['collectionSpecs']);
     }
 
+    public function test_strips_frontmatter_and_persists_status_on_index(): void
+    {
+        $project = Project::factory()->create();
+        $raw = <<<'MD'
+---
+id: regra-exemplo
+status: current
+---
+
+# Regra vigente
+
+Conteúdo da regra.
+MD;
+        $docs = (new FakeProjectDocsGateway)->queueIndexable(ProjectIndexableFilesResult::ok([
+            ['path' => 'docs/rules/exemplo.md', 'content' => $raw],
+        ]));
+
+        $this->indexer($docs)->index($project);
+
+        $this->assertDatabaseHas('documents', [
+            'project_id' => $project->id,
+            'name' => 'docs/rules/exemplo.md',
+            'status' => 'current',
+            'content' => "# Regra vigente\n\nConteúdo da regra.",
+        ]);
+    }
+
     private function indexer(FakeProjectDocsGateway $docs): ProjectDocumentsIndexer
     {
         return new ProjectDocumentsIndexer(
             $docs,
             new DocumentChunker(new EmbeddingService),
             app(RagConfig::class),
+            new MarkdownFrontmatterParser,
         );
     }
 }

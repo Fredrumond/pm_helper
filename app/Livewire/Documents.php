@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\DocumentChunk;
 use App\Services\DocumentChunker;
 use App\Services\DocumentSearch;
+use App\Services\MarkdownFrontmatterParser;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -77,18 +78,22 @@ class Documents extends Component
             $this->validate($this->updateRules(), $this->messages());
         }
 
+        $parsed = app(MarkdownFrontmatterParser::class)->parse($this->content);
+
         if ($this->editingId !== null) {
             $document = Document::query()->findOrFail($this->editingId);
             $document->update([
                 'name' => $this->name,
-                'content' => $this->content,
+                'content' => $parsed['body'],
+                'status' => $parsed['status'],
             ]);
 
             $this->statusMessage = 'Documento atualizado.';
         } else {
             $document = Document::query()->create([
                 'name' => $this->name,
-                'content' => $this->content,
+                'content' => $parsed['body'],
+                'status' => $parsed['status'],
             ]);
 
             app(DocumentChunker::class)->chunk($document);

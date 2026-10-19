@@ -24,17 +24,20 @@ class DocumentSearch
 
         $chunks = DocumentChunk::query()
             ->whereNotNull('embedding')
-            ->with('document');
+            ->with('document')
+            ->whereHas('document', function ($documents) use ($projectId, $scoped): void {
+                $documents->retrievable();
 
-        if ($scoped) {
-            $chunks->whereHas('document', function ($documents) use ($projectId): void {
+                if (! $scoped) {
+                    return;
+                }
+
                 if ($projectId === null) {
                     $documents->whereNull('project_id');
                 } else {
                     $documents->where('project_id', $projectId);
                 }
             });
-        }
 
         $ranked = $chunks
             ->get()

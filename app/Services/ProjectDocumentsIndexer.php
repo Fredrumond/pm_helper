@@ -14,6 +14,7 @@ class ProjectDocumentsIndexer
         private readonly ProjectDocsGateway $docs,
         private readonly DocumentChunker $chunker,
         private readonly RagConfig $rag,
+        private readonly MarkdownFrontmatterParser $frontmatter,
     ) {}
 
     public function index(Project $project): ProjectDocumentsSyncResult
@@ -97,10 +98,13 @@ class ProjectDocumentsIndexer
                 'chars' => mb_strlen($file['content'], 'UTF-8'),
             ]);
 
+            $parsed = $this->frontmatter->parse($file['content']);
+
             $document = Document::query()->create([
                 'project_id' => $project->id,
                 'name' => $file['path'],
-                'content' => $file['content'],
+                'content' => $parsed['body'],
+                'status' => $parsed['status'],
             ]);
 
             try {
