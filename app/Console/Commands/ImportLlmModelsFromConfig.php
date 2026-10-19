@@ -79,6 +79,14 @@ class ImportLlmModelsFromConfig extends Command
             'price_cached' => 0.14,
             'price_output' => 2.20,
         ],
+        [
+            'model_id' => 'text-embedding-3-small',
+            'name' => 'text-embedding-3-small',
+            'tier' => LlmModel::TIER_PAID,
+            'provider' => LlmModel::PROVIDER_OPENAI,
+            'price_input' => 0.02,
+            'price_output' => 0,
+        ],
     ];
 
     /**
@@ -96,7 +104,12 @@ class ImportLlmModelsFromConfig extends Command
                 continue;
             }
 
-            $catalog->register($model);
+            $created = $catalog->register($model);
+
+            if ($model['model_id'] === 'text-embedding-3-small') {
+                $created->update(['active' => false]);
+            }
+
             $imported++;
         }
 

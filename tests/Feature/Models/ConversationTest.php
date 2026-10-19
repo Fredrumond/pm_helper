@@ -64,6 +64,29 @@ class ConversationTest extends TestCase
         $this->assertSame('Checkout', $conversation->fresh()->project?->name);
     }
 
+    public function test_create_explore_opens_a_new_thread_each_time(): void
+    {
+        $user = User::factory()->create();
+
+        $first = Conversation::createExploreFor($user);
+        $second = Conversation::createExploreFor($user);
+
+        $this->assertFalse($first->is($second));
+        $this->assertTrue($first->isExplore());
+        $this->assertTrue($second->isExplore());
+        $this->assertSame(Conversation::PROMPT_EXPLORE, $first->prompt_name);
+        $this->assertSame(2, $user->conversations()->explore()->count());
+    }
+
+    public function test_interview_scope_excludes_explore_conversations(): void
+    {
+        $user = User::factory()->create();
+        $interview = $user->conversations()->create(['title' => 'Interview']);
+        Conversation::createExploreFor($user);
+
+        $this->assertSame([$interview->id], $user->conversations()->interview()->pluck('id')->all());
+    }
+
     public function test_cards_table_has_no_project_id_column(): void
     {
         $this->assertFalse(Schema::hasColumn('cards', 'project_id'));

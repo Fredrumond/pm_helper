@@ -15,8 +15,14 @@
                     <x-nav-link :href="route('conversations.index')" :active="request()->routeIs('conversations.*')">
                         Conversas
                     </x-nav-link>
+                    <x-nav-link :href="route('explorar.index')" :active="request()->routeIs('explorar.*')">
+                        Explorar
+                    </x-nav-link>
                     <x-nav-link :href="route('cards.index')" :active="request()->routeIs('cards.*')">
                         Cards
+                    </x-nav-link>
+                    <x-nav-link :href="route('documents.index')" :active="request()->routeIs('documents.*')">
+                        Documentos
                     </x-nav-link>
                     @if (Auth::user()->can('admin'))
                         <x-nav-link :href="route('admin.projects.index')" :active="request()->routeIs('admin.projects.*')">
@@ -24,6 +30,9 @@
                         </x-nav-link>
                         <x-nav-link :href="route('admin.prompts.index')" :active="request()->routeIs('admin.prompts.*')">
                             Modelos dos prompts
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.rag.index')" :active="request()->routeIs('admin.rag.*')">
+                            Parâmetros do RAG
                         </x-nav-link>
                         <x-nav-link :href="route('admin.models.index')" :active="request()->routeIs('admin.models.*')">
                             Modelos LLM
@@ -94,8 +103,14 @@
             <x-responsive-nav-link :href="route('conversations.index')" :active="request()->routeIs('conversations.*')">
                 Conversas
             </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('explorar.index')" :active="request()->routeIs('explorar.*')">
+                Explorar
+            </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('cards.index')" :active="request()->routeIs('cards.*')">
                 Cards
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('documents.index')" :active="request()->routeIs('documents.*')">
+                Documentos
             </x-responsive-nav-link>
             @if (Auth::user()->can('admin'))
                 <x-responsive-nav-link :href="route('admin.projects.index')" :active="request()->routeIs('admin.projects.*')">
@@ -103,6 +118,9 @@
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.prompts.index')" :active="request()->routeIs('admin.prompts.*')">
                     Modelos dos prompts
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.rag.index')" :active="request()->routeIs('admin.rag.*')">
+                    Parâmetros do RAG
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.models.index')" :active="request()->routeIs('admin.models.*')">
                     Modelos LLM

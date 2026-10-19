@@ -2,12 +2,15 @@
 
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\ConversationController;
+use App\Http\Controllers\ExploreController;
 use App\Http\Controllers\MetricsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\VersoesController;
 use App\Livewire\AdminLlmModels;
 use App\Livewire\AdminProjects;
 use App\Livewire\AdminPromptModels;
+use App\Livewire\AdminRagSettings;
+use App\Livewire\Documents;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('conversations.index'));
@@ -28,15 +31,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show'])->name('conversations.show');
     Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
 
+    Route::get('/explorar', [ExploreController::class, 'index'])->name('explorar.index');
+    Route::post('/explorar', [ExploreController::class, 'store'])->name('explorar.store');
+    Route::get('/explorar/{conversation}', [ExploreController::class, 'show'])->name('explorar.show');
+    Route::delete('/explorar/{conversation}', [ExploreController::class, 'destroy'])->name('explorar.destroy');
+
     // Cards
     Route::get('/cards', [CardController::class, 'index'])->name('cards.index');
     Route::get('/cards/{card}', [CardController::class, 'show'])->name('cards.show');
+
+    Route::get('/documentos', Documents::class)->name('documents.index');
 
     Route::middleware('admin')->group(function () {
         Route::get('/metrics', [MetricsController::class, 'index'])->name('metrics.index');
         Route::get('/versoes', [VersoesController::class, 'index'])->name('versoes.index');
         Route::get('/admin/projetos', AdminProjects::class)->name('admin.projects.index');
         Route::get('/admin/prompts', AdminPromptModels::class)->name('admin.prompts.index');
+        Route::get('/admin/rag', AdminRagSettings::class)->name('admin.rag.index');
         Route::get('/admin/modelos', AdminLlmModels::class)->name('admin.models.index');
     });
 

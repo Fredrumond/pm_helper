@@ -69,9 +69,27 @@ tests/
 ### Testes
 - **Sempre rodar dentro do container Docker**, nunca localmente.
 - Comando: `docker compose exec app composer test`
-- Rode os testes antes de concluir qualquer tarefa.
 - **A execução de testes não precisa de aprovação do usuário.** Rode `docker compose exec app composer test` (e filtros PHPUnit equivalentes) imediatamente, sem pedir confirmação no chat e sem esperar autorização do script. Peça as permissões de sandbox/Docker necessárias no próprio comando. Isso vale **somente para testes** — qualquer outro script continua sujeito a aprovação.
 - Testes de serviços/adapters em `tests/Feature/Services/` ou `tests/Unit/Services/`; de Livewire em `tests/Feature/Livewire/`.
+
+#### Quando rodar os testes
+
+Use o bom senso — **não rode a suite completa em toda mudança**. O objetivo é velocidade sem abrir mão de segurança.
+
+| Situação | Ação recomendada |
+|---|---|
+| Alteração só de texto em Blade (label, cópia, tradução) | **Não rodar** — risco zero de regressão |
+| Adição de item de menu ou link estático | **Não rodar** |
+| Alteração de CSS / Tailwind / layout visual | **Não rodar** |
+| Alteração em config, `.env.example`, docs | **Não rodar** |
+| Nova rota ou controller simples sem lógica de negócio | Rodar só o(s) teste(s) do arquivo afetado: `--filter` |
+| Alteração em Service, Adapter, Model ou Livewire component | Rodar os testes do módulo afetado: `--filter` |
+| Alteração em prompt ou `SystemPromptCatalog` | Rodar `tests/Unit/Prompts` |
+| Migração nova ou alteração de schema | Rodar `tests/Feature` completo |
+| Refactor amplo ou mudança de contrato (interface/método público) | Rodar a suite completa |
+| Antes de criar um commit com entrega significativa | Rodar a suite completa |
+
+> **Regra geral:** se a mudança não toca PHP com lógica (services, models, livewire, adapters) e não altera schema, não rode os testes. Se tocar lógica, prefira `--filter` no escopo afetado antes de decidir rodar tudo.
 
 ### Docker
 - O ambiente de desenvolvimento roda via `docker-compose up`.

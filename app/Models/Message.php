@@ -14,7 +14,30 @@ class Message extends Model
         'conversation_id',
         'role',
         'content',
+        'sources',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'sources' => 'array',
+        ];
+    }
+
+    /**
+     * Nomes dos arquivos gravados que originaram a resposta, um por linha.
+     */
+    public function sourceTooltip(): ?string
+    {
+        if (! is_array($this->sources) || $this->sources === []) {
+            return null;
+        }
+
+        return implode("\n", $this->sources);
+    }
 
     public function conversation(): BelongsTo
     {

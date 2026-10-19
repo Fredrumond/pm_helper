@@ -8,6 +8,8 @@ use App\Services\Adapters\GitHubMcpProjectDocsGateway;
 use App\Services\GitHubAppInstallationTokenMinter;
 use App\Services\ProjectDocsPathsResult;
 use App\Services\ProjectDocsResult;
+use App\Services\ProjectIndexableFilesResult;
+use App\Services\RagConfig;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -26,6 +28,7 @@ class GitHubMcpProjectDocsGatewayTest extends TestCase
             'docs/README.md',
             'docs/adr/0001.md',
             'docs/regras/desconto.md',
+            'docs/regras/notas.txt',
             'docs/regras/pagamento.md',
         ], $result->paths);
         $this->assertNull($result->errorCode);
@@ -42,7 +45,7 @@ class GitHubMcpProjectDocsGatewayTest extends TestCase
             return $log->level === 'info'
                 && $log->message === 'project_docs.list_paths'
                 && ($log->context['status'] ?? null) === ProjectDocsPathsResult::STATUS_OK
-                && ($log->context['count'] ?? null) === 4
+                && ($log->context['count'] ?? null) === 5
                 && array_key_exists('errorCode', $log->context)
                 && $log->context['errorCode'] === null;
         });
@@ -116,6 +119,68 @@ class GitHubMcpProjectDocsGatewayTest extends TestCase
         $this->assertSame(['docs/regras/pagamento.md'], array_column($mcp->calls, 'path'));
     }
 
+    public function test_read_indexable_files_returns_readme_and_docs_tree_as_individual_files(): void
+    {
+        Event::fake([MessageLogged::class]);
+
+        $mcp = $this->mcpWithTree();
+        $result = $this->gateway($mcp)->readIndexableFiles('acme/checkout', 'main');
+
+        $this->assertSame(ProjectIndexableFilesResult::STATUS_OK, $result->status);
+        $this->assertSame([
+            ['path' => 'README.md', 'content' => 'Raiz do repositório'],
+            ['path' => 'docs/README.md', 'content' => 'Índice de regras'],
+            ['path' => 'docs/adr/0001.md', 'content' => 'ADR 0001'],
+            ['path' => 'docs/regras/desconto.md', 'content' => 'Desconto máximo 10%.'],
+            ['path' => 'docs/regras/pagamento.md', 'content' => 'Pagamento obrigatório.'],
+        ], $result->files);
+        $this->assertNull($result->errorCode);
+        $this->assertContains('README.md', array_column($mcp->calls, 'path'));
+        $this->assertNotContains('docs/regras/notas.txt', array_column($mcp->calls, 'path'));
+        $this->assertSame(1, $mcp->initializeCount);
+        $this->assertSame(1, $mcp->closeCount);
+
+        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log): bool {
+            return $log->level === 'info'
+                && $log->message === 'project_docs.read_indexable'
+                && ($log->context['status'] ?? null) === ProjectIndexableFilesResult::STATUS_OK
+                && ($log->context['count'] ?? null) === 5;
+        });
+    }
+
+    public function test_read_indexable_files_with_docs_root_scope_reads_only_root_markdown_files(): void
+    {
+        $mcp = $this->mcpWithTree();
+        $result = $this->gateway($mcp)->readIndexableFiles('acme/checkout', 'main', [
+            ['path' => 'docs', 'scope' => RagConfig::SYNC_SCOPE_DOCS_ROOT],
+        ]);
+
+        $this->assertSame(ProjectIndexableFilesResult::STATUS_OK, $result->status);
+        $this->assertSame([
+            ['path' => 'docs/README.md', 'content' => 'Índice de regras'],
+        ], $result->files);
+    }
+
+    public function test_read_indexable_files_returns_empty_when_readme_and_docs_are_missing(): void
+    {
+        $mcp = new FakeGitHubMcpClient;
+        $result = $this->gateway($mcp)->readIndexableFiles('acme/checkout');
+
+        $this->assertSame(ProjectIndexableFilesResult::STATUS_EMPTY, $result->status);
+        $this->assertSame([], $result->files);
+    }
+
+    public function test_read_indexable_files_fails_without_calling_mcp_when_credentials_are_missing(): void
+    {
+        $mcp = $this->mcpWithTree();
+        $result = $this->gateway($mcp, hasCredentials: false)->readIndexableFiles('acme/checkout');
+
+        $this->assertSame(ProjectIndexableFilesResult::STATUS_FAILED, $result->status);
+        $this->assertSame([], $result->files);
+        $this->assertSame(ProjectDocsResult::ERROR_MISSING_CREDENTIALS, $result->errorCode);
+        $this->assertSame([], $mcp->calls);
+    }
+
     public function test_list_docs_paths_fails_without_calling_mcp_when_credentials_are_missing(): void
     {
         $mcp = $this->mcpWithTree();
@@ -140,6 +205,7 @@ class GitHubMcpProjectDocsGatewayTest extends TestCase
     {
         $mcp = new FakeGitHubMcpClient;
         $mcp->results = [
+            'README.md' => GitHubMcpFileResult::file('Raiz do repositório', 'text/plain'),
             'docs' => GitHubMcpFileResult::directory([
                 ['type' => 'file', 'name' => 'README.md', 'path' => 'docs/README.md'],
                 ['type' => 'dir', 'name' => 'adr', 'path' => 'docs/adr'],
@@ -151,11 +217,13 @@ class GitHubMcpProjectDocsGatewayTest extends TestCase
             'docs/regras' => GitHubMcpFileResult::directory([
                 ['type' => 'file', 'name' => 'pagamento.md', 'path' => 'docs/regras/pagamento.md'],
                 ['type' => 'file', 'name' => 'desconto.md', 'path' => 'docs/regras/desconto.md'],
+                ['type' => 'file', 'name' => 'notas.txt', 'path' => 'docs/regras/notas.txt'],
             ]),
             'docs/README.md' => GitHubMcpFileResult::file('Índice de regras', 'text/plain'),
             'docs/adr/0001.md' => GitHubMcpFileResult::file('ADR 0001', 'text/plain'),
             'docs/regras/pagamento.md' => GitHubMcpFileResult::file('Pagamento obrigatório.', 'text/plain'),
             'docs/regras/desconto.md' => GitHubMcpFileResult::file('Desconto máximo 10%.', 'text/plain'),
+            'docs/regras/notas.txt' => GitHubMcpFileResult::file('Qualquer arquivo de docs.', 'text/plain'),
         ];
 
         return $mcp;

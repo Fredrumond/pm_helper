@@ -39,6 +39,7 @@ class AdminPromptModelsTest extends TestCase
             ['id' => 'openai/gpt-4o-mini', 'name' => 'Mini Slice2'],
             ['id' => 'openai/gpt-4o', 'name' => 'GPT-4o Slice2'],
             ['id' => 'anthropic/claude-slice2', 'name' => 'Claude Slice2'],
+            ['id' => 'gpt-4o-mini', 'name' => 'Nativo Mini'],
         ]);
     }
 
@@ -86,7 +87,7 @@ class AdminPromptModelsTest extends TestCase
         }
 
         foreach (array_column(ChatComposer::models(), 'name') as $name) {
-            $this->assertSame(4, substr_count($html, $name));
+            $this->assertSame(count(PromptModelConfig::PROMPTS), substr_count($html, $name));
         }
 
         Livewire::actingAs($admin)
@@ -94,7 +95,9 @@ class AdminPromptModelsTest extends TestCase
             ->assertSet('models.interview', 'openai/gpt-4o')
             ->assertSet('models.docs_retrieval', 'anthropic/claude-slice2')
             ->assertSet('models.docs_briefing', 'openai/gpt-4o-mini')
-            ->assertSet('models.card_generation', 'openai/gpt-4o');
+            ->assertSet('models.card_generation', 'openai/gpt-4o')
+            ->assertSet('models.explore', 'gpt-4o-mini')
+            ->assertSee('Explore');
     }
 
     public function test_admin_save_persists_choices_including_the_same_id_on_two_prompts(): void
@@ -109,6 +112,7 @@ class AdminPromptModelsTest extends TestCase
             ->set('models.docs_retrieval', 'openai/gpt-4o')
             ->set('models.docs_briefing', 'anthropic/claude-slice2')
             ->set('models.card_generation', 'openai/gpt-4o-mini')
+            ->set('models.explore', 'openai/gpt-4o')
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('Modelos atualizados.')
@@ -121,6 +125,7 @@ class AdminPromptModelsTest extends TestCase
         $this->assertSame('openai/gpt-4o', $promptModels->active('docs_retrieval'));
         $this->assertSame('anthropic/claude-slice2', $promptModels->active('docs_briefing'));
         $this->assertSame('openai/gpt-4o-mini', $promptModels->active('card_generation'));
+        $this->assertSame('openai/gpt-4o', $promptModels->active('explore'));
 
         Event::assertNotDispatched(MessageLogged::class, function (MessageLogged $log): bool {
             return $log->message === 'Modelos dos prompts atualizados.';
@@ -139,6 +144,7 @@ class AdminPromptModelsTest extends TestCase
         $promptModels->save('docs_retrieval', 'openai/gpt-4o-mini');
         $promptModels->save('docs_briefing', 'anthropic/claude-slice2');
         $promptModels->save('card_generation', 'openai/gpt-4o-mini');
+        $promptModels->save('explore', 'gpt-4o-mini');
 
         Audit::query()->delete();
 
@@ -148,6 +154,7 @@ class AdminPromptModelsTest extends TestCase
             ->set('models.docs_retrieval', 'openai/gpt-4o-mini')
             ->set('models.docs_briefing', 'anthropic/claude-slice2')
             ->set('models.card_generation', 'openai/gpt-4o-mini')
+            ->set('models.explore', 'gpt-4o-mini')
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('Modelos atualizados.');
@@ -187,6 +194,7 @@ class AdminPromptModelsTest extends TestCase
             ->set('models.docs_retrieval', 'anthropic/claude-slice2')
             ->set('models.docs_briefing', 'openai/gpt-4o-mini')
             ->set('models.card_generation', 'openai/gpt-4o')
+            ->set('models.explore', 'gpt-4o-mini')
             ->call('save')
             ->assertHasErrors(['models.interview']);
 

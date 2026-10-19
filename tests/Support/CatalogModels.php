@@ -37,4 +37,20 @@ final class CatalogModels
             'price_output' => 0.60,
         ]]);
     }
+
+    public static function seedEmbeddingPrice(): void
+    {
+        LlmModel::query()->updateOrCreate(
+            ['model_id' => 'text-embedding-3-small'],
+            [
+                'name' => 'text-embedding-3-small',
+                'tier' => LlmModel::TIER_PAID,
+                'provider' => LlmModel::PROVIDER_OPENAI,
+                'active' => false,
+                'price_input' => 0.02,
+                'price_cached' => null,
+                'price_output' => 0,
+            ],
+        );
+    }
 }
