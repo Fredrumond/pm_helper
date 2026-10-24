@@ -119,6 +119,34 @@ class MetricsPageTest extends TestCase
             ->assertDontSee('$9.99');
     }
 
+    public function test_shows_cost_of_soft_deleted_conversation_without_linking_to_it(): void
+    {
+        $user = User::factory()->admin()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout excluído',
+            'status' => 'completed',
+            'prompt_version' => 'v1',
+        ]);
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'model' => 'test/model',
+            'prompt_tokens' => 10,
+            'completion_tokens' => 5,
+            'total_tokens' => 15,
+            'cost' => 0.25,
+        ]);
+
+        $conversation->delete();
+
+        $this->actingAs($user)
+            ->get(route('metrics.index'))
+            ->assertOk()
+            ->assertSee('Checkout excluído')
+            ->assertSee('$0.25')
+            ->assertDontSee('href="'.route('conversations.show', $conversation).'"', false);
+    }
+
     public function test_shows_estimated_openai_cost_and_pricing_table_note(): void
     {
         CatalogModels::seedGpt4oMiniPrice();

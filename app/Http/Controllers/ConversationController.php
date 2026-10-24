@@ -23,6 +23,17 @@ class ConversationController extends Controller
 
     public function store(): RedirectResponse
     {
+        $existing = Auth::user()
+            ->conversations()
+            ->interview()
+            ->doesntHave('messages')
+            ->latest('id')
+            ->first();
+
+        if ($existing) {
+            return redirect()->route('conversations.show', $existing);
+        }
+
         $conversation = Auth::user()->conversations()->create([
             'title' => 'Nova conversa',
             'status' => 'in_progress',

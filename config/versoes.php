@@ -163,6 +163,54 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.11.0',
+            'data' => '2026-10-24',
+            'estado' => 'development',
+            'titulo' => 'Higiene de conversas e reativação de projeto',
+            'resumo' => 'Nova conversa reabre a entrevista vazia do PM em vez de criar outra. Excluir entrevista some conversa e card da UI, mas mensagens, card e custo ficam no banco e as métricas continuam corretas. Na lista de projetos o admin vê o desativado e pode reativar o mesmo owner/repo, sem cadastrar de novo.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Conversas',
+                    'itens' => [
+                        ['titulo' => 'Nova conversa reusa a entrevista vazia mais recente do PM', 'estado' => 'development', 'nota' => 'Explore e conversa de outro usuário não entram no reuso'],
+                        ['titulo' => 'Exclusão lógica da entrevista (soft delete)', 'estado' => 'development', 'nota' => 'Conversa e card somem da UI; sem desfazer; Explore continua exclusão física'],
+                    ],
+                ],
+                [
+                    'nome' => 'Cards',
+                    'itens' => [
+                        ['titulo' => 'Card da conversa excluída some da lista, do show e do preview', 'estado' => 'development', 'nota' => 'Show e preview respondem 404 quando a conversa está excluída'],
+                    ],
+                ],
+                [
+                    'nome' => 'Métricas',
+                    'itens' => [
+                        ['titulo' => 'Custo da conversa excluída permanece nas agregações', 'estado' => 'development', 'nota' => 'ConsumptionMetrics e PromptMetrics usam withTrashed; chamadas recentes mostram o título sem link'],
+                    ],
+                ],
+                [
+                    'nome' => 'Projetos',
+                    'itens' => [
+                        ['titulo' => 'Lista admin mostra desativados com badge e botão Reativar', 'estado' => 'development', 'nota' => 'restore() do SoftDeletes; unicidade de owner/repo se mantém'],
+                    ],
+                ],
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'Discovery 0018 — higiene de conversas e reativação de projeto', 'estado' => 'development', 'nota' => 'docs/discovery/0018-higiene-conversas-e-reativacao-de-projeto.md'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'ConversationStoreTest, ConversationDestroyTest, métricas com soft delete e AdminProjects de reativação', 'estado' => 'test'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.10.0',
             'data' => '2026-10-19',
             'estado' => 'development',

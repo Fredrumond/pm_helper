@@ -188,4 +188,35 @@ class PromptMetricsTest extends TestCase
         $this->assertSame(1, $metrics['docs_briefing']['calls']);
         $this->assertSame(50.0, $metrics['docs_briefing']['avg_tokens']);
     }
+
+    public function test_compare_includes_soft_deleted_conversations(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'status' => 'completed',
+            'prompt_version' => 'v1',
+        ]);
+        $conversation->messages()->create(['role' => 'user', 'content' => 'Quero pagar']);
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'model' => 'test/model',
+            'step' => 'interview',
+            'prompt_version' => 'v1',
+            'total_tokens' => 40,
+            'cost' => 0.08,
+        ]);
+
+        $conversation->delete();
+
+        $byVersion = (new PromptMetrics)->compare($user)->keyBy('version');
+        $byStep = (new PromptMetrics)->compareByStep($user)->keyBy('step');
+
+        $this->assertSame(1, $byVersion['v1']['conversations']);
+        $this->assertSame(1, $byVersion['v1']['completed']);
+        $this->assertEqualsWithDelta(0.08, $byVersion['v1']['avg_cost'], 0.0000001);
+        $this->assertSame(1, $byStep['interview']['conversations']);
+        $this->assertSame(40, $byStep['interview']['total_tokens']);
+    }
 }

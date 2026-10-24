@@ -26,6 +26,7 @@ class PromptMetrics
     public function compare(?User $user = null): Collection
     {
         $conversations = Conversation::query()
+            ->withTrashed()
             ->whereNotNull('prompt_version')
             ->when($user, fn ($query) => $query->where('user_id', $user->id))
             ->withCount('messages')
@@ -72,7 +73,7 @@ class PromptMetrics
                 $query->where(function ($query) use ($user): void {
                     $query->whereIn(
                         'conversation_id',
-                        Conversation::query()->where('user_id', $user->id)->select('id')
+                        Conversation::query()->withTrashed()->where('user_id', $user->id)->select('id')
                     )->orWhere('user_id', $user->id);
                 });
             })
