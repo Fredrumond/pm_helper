@@ -59,6 +59,33 @@
                     </div>
                     @if ($documentHtml)
                         <div class="discovery-markdown mt-3 text-sm text-gray-800">{!! $documentHtml !!}</div>
+                        @if (count($questions) > 0)
+                            <div class="mt-4 space-y-3 border-t border-gray-200 pt-3">
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Dúvidas</p>
+                                @foreach ($questions as $index => $question)
+                                    <label class="block" wire:key="discovery-answer-{{ $index }}">
+                                        <span class="block text-sm font-medium text-gray-800 mb-1">{{ $question }}</span>
+                                        <textarea
+                                            data-discovery-answer
+                                            wire:model.blur="answers.{{ $index }}"
+                                            rows="2"
+                                            @disabled($answersLocked)
+                                            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-200 {{ $answersLocked ? 'bg-gray-50 text-gray-500' : '' }}"
+                                        >{{ $answers[$index] ?? '' }}</textarea>
+                                    </label>
+                                @endforeach
+                                @if ($canRegenerateWithAnswers)
+                                    <button type="button"
+                                            wire:click="regenerateWithAnswers"
+                                            wire:loading.attr="disabled"
+                                            wire:target="regenerateWithAnswers"
+                                            class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                                        <span wire:loading.remove wire:target="regenerateWithAnswers">Gerar de novo com respostas</span>
+                                        <span wire:loading wire:target="regenerateWithAnswers">Solicitando…</span>
+                                    </button>
+                                @endif
+                            </div>
+                        @endif
                     @endif
                 </div>
             @endif

@@ -8,6 +8,7 @@ use App\Models\CardDiscovery;
 use App\Models\User;
 use App\Services\CardDiscoveryService;
 use App\Support\DiscoveryMarkdown;
+use App\Support\DiscoveryQuestions;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -18,6 +19,11 @@ class CardDiscoveryPanel extends Component
     public Card $card;
 
     public bool $documentOpen = false;
+
+    /** @var list<string> */
+    public array $answers = [];
+
+    public string $answersSyncKey = '';
 
     public function mount(Card $card): void
     {
@@ -41,6 +47,42 @@ class CardDiscoveryPanel extends Component
         $this->card->refresh();
     }
 
+    public function regenerateWithAnswers(CardDiscoveryService $service): void
+    {
+        $this->authorizeOwner();
+
+        $actor = Auth::user();
+        abort_unless($actor instanceof User, 403);
+
+        $card = $this->card->fresh() ?? $this->card;
+        $discovery = $card->discovery;
+        $markdown = $discovery ? $this->readDocument($discovery) : null;
+        $questions = $markdown !== null ? DiscoveryQuestions::fromMarkdown($markdown) : [];
+        $pairs = [];
+        foreach ($questions as $index => $question) {
+            $answer = trim((string) ($this->answers[$index] ?? ''));
+            if ($answer === '') {
+                continue;
+            }
+            $pairs[] = ['question' => $question, 'answer' => $answer];
+        }
+
+        if ($pairs === []) {
+            $this->addError('discovery', 'Informe ao menos uma resposta para regenerar o Discovery.');
+            $this->card->refresh();
+
+            return;
+        }
+
+        try {
+            $service->requestWithAnswers($card, $actor, $pairs);
+        } catch (CardDiscoveryNotAllowed $exception) {
+            $this->addError('discovery', $exception->getMessage());
+        }
+
+        $this->card->refresh();
+    }
+
     public function toggleDocument(): void
     {
         $this->authorizeOwner();
@@ -52,18 +94,68 @@ class CardDiscoveryPanel extends Component
         $this->card->load(['discovery', 'conversation.project']);
         $discovery = $this->card->discovery;
         $markdown = $discovery ? $this->readDocument($discovery) : null;
+        $questions = $markdown !== null ? DiscoveryQuestions::fromMarkdown($markdown) : [];
+        $this->syncAnswers($questions, $discovery);
+        $inProgress = $discovery?->isInProgress() ?? false;
 
         return view('livewire.card-discovery-panel', [
             'discovery' => $discovery,
             'visible' => $this->eligible() || $discovery !== null,
-            'canGenerate' => $this->eligible() && ($discovery === null || ! $discovery->isInProgress()),
+            'canGenerate' => $this->eligible() && ($discovery === null || ! $inProgress),
             'buttonLabel' => ($discovery !== null && ($discovery->isTerminal() || $markdown !== null))
                 ? 'Gerar de novo'
                 : 'Gerar Discovery',
             'attachmentTitle' => $markdown !== null ? DiscoveryMarkdown::title($markdown) : null,
             'documentHtml' => ($markdown !== null && $this->documentOpen) ? DiscoveryMarkdown::toHtml($markdown) : null,
             'hasDocument' => $markdown !== null,
+            'questions' => $questions,
+            'answersLocked' => $inProgress,
+            'canRegenerateWithAnswers' => $markdown !== null && $questions !== [] && ! $inProgress && $this->hasFilledAnswer(),
         ]);
+    }
+
+    /**
+     * @param  list<string>  $questions
+     */
+    private function syncAnswers(array $questions, ?CardDiscovery $discovery): void
+    {
+        $key = ($discovery?->id ?? '0')
+            .'|'.($discovery?->status ?? '')
+            .'|'.($discovery?->updated_at?->getTimestamp() ?? '0')
+            .'|'.implode("\n", $questions);
+
+        if ($this->answersSyncKey === $key) {
+            return;
+        }
+
+        $stored = [];
+        foreach ($discovery?->pending_answers ?? [] as $pair) {
+            if (! is_array($pair)) {
+                continue;
+            }
+            $question = trim((string) ($pair['question'] ?? ''));
+            if ($question === '') {
+                continue;
+            }
+            $stored[$question] = (string) ($pair['answer'] ?? '');
+        }
+
+        $this->answers = [];
+        foreach ($questions as $question) {
+            $this->answers[] = $stored[$question] ?? '';
+        }
+        $this->answersSyncKey = $key;
+    }
+
+    private function hasFilledAnswer(): bool
+    {
+        foreach ($this->answers as $answer) {
+            if (trim((string) $answer) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function eligible(): bool

@@ -5,6 +5,7 @@ namespace Tests\Feature\Livewire;
 use App\Contracts\AgentGateway;
 use App\Jobs\AdvanceCardDiscovery;
 use App\Livewire\CardDiscoveryPanel;
+use App\Models\Card;
 use App\Models\CardDiscovery;
 use App\Models\Project;
 use App\Models\User;
@@ -237,6 +238,174 @@ MD);
             ->assertSee('Em andamento')
             ->assertSee('O Discovery anterior continua disponível até a nova geração concluir com sucesso.')
             ->assertDontSee('Gerar de novo');
+    }
+
+    public function test_owner_sees_one_field_per_question_and_regenerates_only_after_an_answer(): void
+    {
+        Queue::fake();
+        Storage::fake('discoveries');
+        $this->fakeAgents();
+        $user = User::factory()->create();
+        $card = $this->createCard($user, Project::factory()->create());
+        $this->storeDiscovery($card, <<<'MD'
+# Aviso de duplicata
+
+## 6. Dúvidas
+
+- Onde mostrar o aviso? — Confirmar a tela
+- A demanda cobre a API? — Impacta o contrato
+
+## 7. Informações ausentes
+
+- Lacuna que não vira campo
+MD);
+
+        Livewire::actingAs($user)
+            ->test(CardDiscoveryPanel::class, ['card' => $card])
+            ->assertDontSee('data-discovery-answer', false)
+            ->call('toggleDocument')
+            ->assertSee('Onde mostrar o aviso?')
+            ->assertSee('A demanda cobre a API?')
+            ->assertSee('Lacuna que não vira campo')
+            ->assertDontSee('Gerar de novo com respostas')
+            ->tap(function ($component): void {
+                $this->assertSame(2, substr_count($component->html(), 'data-discovery-answer'));
+                $this->assertGreaterThan(
+                    strpos($component->html(), 'discovery-markdown'),
+                    strpos($component->html(), 'data-discovery-answer'),
+                );
+            })
+            ->set('answers.0', 'Na tela de criar')
+            ->assertSee('Gerar de novo com respostas')
+            ->call('regenerateWithAnswers')
+            ->assertSee('Solicitado')
+            ->assertDontSee('Gerar de novo com respostas');
+
+        Queue::assertPushed(AdvanceCardDiscovery::class, 1);
+        $discovery = $card->fresh()->discovery;
+        $this->assertSame(CardDiscovery::STATUS_REQUESTED, $discovery->status);
+        $this->assertSame([
+            ['question' => 'Onde mostrar o aviso?', 'answer' => 'Na tela de criar'],
+        ], $discovery->pending_answers);
+    }
+
+    public function test_failed_discovery_reopens_with_the_saved_answers(): void
+    {
+        Storage::fake('discoveries');
+        $user = User::factory()->create();
+        $card = $this->createCard($user, Project::factory()->create());
+        $this->storeDiscovery($card, <<<'MD'
+# Aviso de duplicata
+
+Versao anterior.
+
+## 6. Dúvidas
+
+- Qual o prazo? — importa
+- Cobre a API? — contrato
+MD, CardDiscovery::STATUS_FAILED, [
+            ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+        ], 'O agente não concluiu o Discovery.');
+
+        Livewire::actingAs($user)
+            ->test(CardDiscoveryPanel::class, ['card' => $card])
+            ->call('toggleDocument')
+            ->assertSet('answers.0', 'Duas semanas')
+            ->assertSet('answers.1', '')
+            ->assertSee('Duas semanas')
+            ->assertSee('Versao anterior.')
+            ->assertSee('Gerar de novo com respostas');
+    }
+
+    public function test_in_progress_discovery_does_not_dispatch_generate_or_regenerate(): void
+    {
+        Queue::fake();
+        Storage::fake('discoveries');
+        $this->fakeAgents();
+        $user = User::factory()->create();
+        $card = $this->createCard($user, Project::factory()->create());
+        $this->storeDiscovery($card, <<<'MD'
+# Aviso de duplicata
+
+## 6. Dúvidas
+
+- Qual o prazo? — importa
+MD, CardDiscovery::STATUS_RUNNING, [
+            ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CardDiscoveryPanel::class, ['card' => $card])
+            ->call('toggleDocument')
+            ->assertDontSee('Gerar de novo')
+            ->tap(function ($component): void {
+                $this->assertMatchesRegularExpression(
+                    '/<textarea(?=[^>]*data-discovery-answer)(?=[^>]*\sdisabled[\s>])[^>]*>/',
+                    $component->html(),
+                );
+            })
+            ->set('answers.0', 'Três semanas')
+            ->call('regenerateWithAnswers')
+            ->call('generate')
+            ->assertHasErrors(['discovery']);
+
+        Queue::assertNothingPushed();
+        $this->assertSame('Duas semanas', $card->fresh()->discovery->pending_answers[0]['answer']);
+    }
+
+    public function test_generate_again_does_not_send_the_pending_answers(): void
+    {
+        Storage::fake('discoveries');
+        $gateway = $this->fakeAgents();
+        $gateway->snapshots = [DiscoveryAgentSnapshot::finished("# Novo\n\nDocumento novo.")];
+        $user = User::factory()->create();
+        $card = $this->createCard($user, Project::factory()->create());
+        $this->storeDiscovery($card, <<<'MD'
+# Aviso de duplicata
+
+## 6. Dúvidas
+
+- Qual o prazo? — importa
+MD, CardDiscovery::STATUS_COMPLETED, [
+            ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CardDiscoveryPanel::class, ['card' => $card])
+            ->call('toggleDocument')
+            ->assertSet('answers.0', 'Duas semanas')
+            ->assertSee('Gerar de novo')
+            ->call('generate');
+
+        $prompt = (string) $gateway->lastRequest?->prompt;
+        $this->assertStringNotContainsString('Duas semanas', $prompt);
+        $this->assertStringNotContainsString('Contexto da regeneração', $prompt);
+        $this->assertStringContainsString('Somente leitura', $prompt);
+        $this->assertStringContainsString('Avisar card parecido', $prompt);
+    }
+
+    /**
+     * @param  list<array{question: string, answer: string}>|null  $answers
+     */
+    private function storeDiscovery(
+        Card $card,
+        string $markdown,
+        string $status = CardDiscovery::STATUS_COMPLETED,
+        ?array $answers = null,
+        ?string $error = null,
+    ): void {
+        $path = 'cards/'.$card->id.'/discovery.md';
+        Storage::disk('discoveries')->put($path, $markdown);
+        CardDiscovery::query()->create([
+            'card_id' => $card->id,
+            'provider' => 'cursor',
+            'status' => $status,
+            'error_message' => $error,
+            'document_disk' => 'discoveries',
+            'document_path' => $path,
+            'pending_answers' => $answers,
+            'deadline_at' => now()->addMinutes(20),
+        ]);
     }
 
     private function fakeAgents(): FakeAgentGateway
