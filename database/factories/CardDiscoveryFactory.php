@@ -38,6 +38,7 @@ class CardDiscoveryFactory extends Factory
             'card_id' => $card->id,
             'provider' => 'cursor',
             'status' => CardDiscovery::STATUS_REQUESTED,
+            'pending_answers' => null,
             'deadline_at' => now()->addMinutes(20),
         ];
     }

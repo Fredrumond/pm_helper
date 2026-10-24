@@ -29,12 +29,14 @@ class CardDiscovery extends Model
         'error_message',
         'document_disk',
         'document_path',
+        'pending_answers',
         'started_at',
         'finished_at',
         'deadline_at',
     ];
 
     protected $casts = [
+        'pending_answers' => 'array',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
         'deadline_at' => 'datetime',

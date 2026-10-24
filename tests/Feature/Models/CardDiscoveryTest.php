@@ -47,4 +47,23 @@ class CardDiscoveryTest extends TestCase
         $this->assertTrue($failed->isFailed());
         $this->assertFalse($running->isTerminal());
     }
+
+    public function test_pending_answers_are_stored_and_reread_as_pairs(): void
+    {
+        $pairs = [
+            ['question' => 'Onde mostrar o aviso?', 'answer' => 'Na tela de criar tarefa'],
+            ['question' => 'A demanda cobre a API?', 'answer' => 'Só a web'],
+        ];
+
+        $discovery = CardDiscovery::factory()->create([
+            'pending_answers' => $pairs,
+        ]);
+
+        $this->assertTrue(Schema::hasColumn('card_discoveries', 'pending_answers'));
+        $this->assertSame($pairs, $discovery->fresh()->pending_answers);
+
+        $discovery->update(['pending_answers' => null]);
+
+        $this->assertNull($discovery->fresh()->pending_answers);
+    }
 }
