@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Card extends Model
 {
@@ -44,14 +45,19 @@ class Card extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function discovery(): HasOne
+    {
+        return $this->hasOne(CardDiscovery::class);
+    }
+
     public function priorityLabel(): string
     {
-        return match($this->priority) {
-            'low'      => 'Baixa',
-            'medium'   => 'Média',
-            'high'     => 'Alta',
+        return match ($this->priority) {
+            'low' => 'Baixa',
+            'medium' => 'Média',
+            'high' => 'Alta',
             'critical' => 'Crítica',
-            default    => $this->priority,
+            default => $this->priority,
         };
     }
 
