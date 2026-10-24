@@ -26,6 +26,7 @@ class CardController extends Controller
         $card->load([
             'conversation.llmUsages',
             'conversation.project',
+            'discovery',
         ]);
 
         return view('cards.show', compact('card'));

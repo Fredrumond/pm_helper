@@ -131,6 +131,10 @@
                     </section>
                 @endif
 
+                @if (($card->isApproved() && $card->conversation?->project?->repository && $card->conversation?->project?->branch) || $card->discovery)
+                    @livewire('card-discovery-panel', ['card' => $card])
+                @endif
+
                 <x-session-usage :conversation="$card->conversation" />
 
             </div>
