@@ -267,16 +267,23 @@ MD);
             ->assertSee('Onde mostrar o aviso?')
             ->assertSee('A demanda cobre a API?')
             ->assertSee('Lacuna que não vira campo')
-            ->assertDontSee('Gerar de novo com respostas')
+            ->assertSee('Gerar de novo com respostas')
             ->tap(function ($component): void {
-                $this->assertSame(2, substr_count($component->html(), 'data-discovery-answer'));
+                $html = $component->html();
+                $this->assertSame(2, substr_count($html, 'data-discovery-answer'));
                 $this->assertGreaterThan(
-                    strpos($component->html(), 'discovery-markdown'),
-                    strpos($component->html(), 'data-discovery-answer'),
+                    strpos($html, 'discovery-markdown'),
+                    strpos($html, 'data-discovery-answer'),
                 );
+                $this->assertStringContainsString('data-regenerate-ready="0"', $html);
             })
+            ->call('regenerateWithAnswers')
+            ->assertHasErrors('discovery')
             ->set('answers.0', 'Na tela de criar')
             ->assertSee('Gerar de novo com respostas')
+            ->tap(function ($component): void {
+                $this->assertStringContainsString('data-regenerate-ready="1"', $component->html());
+            })
             ->call('regenerateWithAnswers')
             ->assertSee('Solicitado')
             ->assertDontSee('Gerar de novo com respostas');

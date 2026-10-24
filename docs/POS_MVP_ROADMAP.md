@@ -1,39 +1,90 @@
 # PM Helper — Roteiro Pós-MVP
 
-> **Base:** versão 0.8.0 (23/09/2026) · [`MVP_LAUNCH_GUIDE.md`](./MVP_LAUNCH_GUIDE.md)
-> **Objetivo deste documento:** organizar, por trilha e prioridade, o que fica para depois do MVP — com atenção especial ao pipeline de contexto de projeto (`/docs`), hoje a etapa mais simples e mais cara do fluxo. Conversa vazia, exclusão lógica e reativar projeto também ficam depois do lançamento, na [Trilha A](#4-trilha-a--produto-e-fluxo-itens-já-listados-no-launch-guide-em-ondas).
+> **Base:** produto atual (0.10.0 + Discovery no card, 24/10/2026) · [`MVP_LAUNCH_GUIDE.md`](./MVP_LAUNCH_GUIDE.md)
+> **Baseline anterior:** 0.10.0 (19/10/2026) · Explorar/RAG
+> **Objetivo deste documento:** organizar, por trilha e prioridade, o que fica **depois** do fechamento do MVP. Índice/Explorar e Discovery no card já saíram. O foco pós-teste é a [Trilha A](#4-trilha-a--produto-e-fluxo-itens-já-listados-no-launch-guide-em-ondas) (fricção do fluxo) e ligar o índice ao **card** (Trilha B · entrevista). Plano de teste: [`E2E_MANUAL_TEST_PLAN.md`](./E2E_MANUAL_TEST_PLAN.md).
+
+Legenda usada daqui em diante: **Concluído** · **Parcial** · **Em aberto**.
+
+---
+
+## Situação atual (fechamento do MVP)
+
+A 0.9.0/0.10.0 entregaram o **Explorar** e o índice. Em seguida entrou o **Discovery por agente** no card aprovado (0010) e a regeneração com respostas às dúvidas (0011). O card da entrevista **continua** no pipeline ao vivo de `/docs` (índice não alimenta briefing/card).
+
+### Em aberto — o que ainda dói
+
+| Onde | Item |
+|---|---|
+| Trilha A | Reusar conversa vazia, exclusão lógica, reativar projeto |
+| Trilha A · Onda 1 | Editar card, exportar, desmembrar épico |
+| Trilha A · Onda 2 | Comentários, notificações, dashboard de cards por status |
+| Trilha A · Onda 3 | Histórico de versões do card, busca em cards antigos, custo por squad (e custo do agente fora de `LlmUsage`) |
+| Trilha B · entrevista | O índice **não** entra no briefing nem no card. Seguem as duas chamadas (`docs_retrieval` + `docs_briefing`), o teto em caracteres, a leitura repetida a cada entrevista e o alerta de duplicidade só com o que está em `/docs` |
+| Trilha B · 1b | Nota de contexto do projeto, fonte fora do GitHub, busca no código, entrevista que aprofunda "como funciona hoje" sem doc, selo de card sem contexto verificado |
+| Trilha B · memória de cards | `FULLTEXT` e embedding dos cards; mencionar um card no chat (2a e 2b) |
+| Trilha B · índice | Busca por palavra, RRF, hash incremental, fila, agenda e webhook (o que o Explorar ainda não faz da escada 3a–3c). Motor dedicado (3d), grafo/drift (Fase 4) e federação (Fase 5) |
+
+### Parcial
+
+| Item do roteiro | O que a 0.10.0 já cobre | O que falta |
+|---|---|---|
+| Fase 1a — README | `README.md` entra no índice do Explorar junto com `/docs` | `ARCHITECTURE.md` e `AGENTS.md`. A entrevista não consulta o índice nem avisa que a doc é fraca |
+| Fase 1a — contexto manual | Upload de `.md` na tela Documentos, sem projeto; o Explorar sem projeto busca esses arquivos | Campo na entrevista e uso desse texto no `card_generation` |
+| Fase 1b · item 2 — outra fonte | O admin escolhe caminhos **dentro** do GitHub (`README.md`, `docs/`, `docs/adr/`, `docs/discovery/`, `docs/references/`, `docs/rules/`) | Notion, Confluence, Google Docs, PDF |
+| 3a — trechos de `/docs` | Corte por seção, parágrafo ou tamanho, com caminho da seção gravado no trecho | `FULLTEXT`, `content_hash` e a saída do `docs_retrieval` na entrevista. O padrão do corte, até o admin trocar, continua por tamanho |
+| 3b — embedding | Cosseno em PHP no Explorar, score mínimo, modelo de embedding no painel, `LlmUsage` da chamada | RRF com busca por palavra. A entrevista não mede proximidade do resumo |
+| 3c — reindexar | Botão **Sincronizar** na lista de projetos: em sucesso apaga o índice daquele projeto e gera de novo, só `.md`, com o admin na tela | Fila, agenda, webhook e pular arquivo cujo conteúdo não mudou |
+| Onda 2 — retomar entrevista | Reabrir a conversa devolve as mensagens e a entrevista segue | O bloco bruto de `/docs` do **Gerar Card** continua na sessão |
+
+### Concluído (não reabrir como pendência)
+
+| Entrega | Onde |
+|---|---|
+| Chat Explorar, sem gerar card, com projeto opcional | 0.9.0 |
+| CRUD de `.md` e indexação de `/docs` + `README.md` no primeiro salvamento | 0.9.0 |
+| Modelo do Explorar, parâmetros do índice, sync, corte, score, fontes, filtro de status | 0.9.0 → 0.10.0 |
+| Discovery por agente no card aprovado (disparo, estados, anexo) | discovery 0010 |
+| Responder dúvidas do Discovery e regenerar | discovery 0011 |
 
 ---
 
 ## 1. Onde estamos (baseline honesto)
 
-O MVP cobre qualificação de demanda (entrevista → resumo → card) com contexto opcional de `/docs`. Na 0.8.0 o admin passou a definir o modelo de cada prompt, o catálogo de LLM (lista, provedor e preço) vive no banco e as alterações administrativas são auditadas. Duas trilhas emergem do que já existe:
+O MVP cobre qualificação (entrevista → resumo → card), Explorar com índice, e Discovery por agente no card aprovado (com regeneração por dúvidas). O admin define modelo por prompt; o catálogo LLM e a auditoria admin estão no banco. A busca do Explorar ignora documento que não está vigente.
 
-- **Trilha A — Produto/fluxo:** o que o launch guide marca como [fora do escopo do MVP](MVP_LAUNCH_GUIDE.md#-fora-do-escopo-do-mvp) (correções do fluxo atual, editar card, mencionar card, exportar, comentários, notificações, dashboard...).
-- **Trilha B — Contexto de projeto (`/docs`):** o pipeline que lê o repositório para embasar o card. É o foco principal deste documento, porque:
+Duas trilhas seguem **depois** do e2e de fechamento:
 
-### O que o pipeline de `/docs` faz hoje
+- **Trilha A — Produto/fluxo:** correções do fluxo, editar card, mencionar card, exportar, comentários, notificações, dashboard. Quase toda **em aberto**; a retomada da conversa está **parcial**.
+- **Trilha B — Contexto de projeto:** o pipeline que embasa o **card** continua o foco, porque o índice atende o Explorar e deixa a entrevista no caminho antigo.
+
+### O que a entrevista faz com `/docs` — em aberto, igual à 0.8.0
 
 1. `listDocsPaths` — lista só os caminhos de `/docs` via MCP GitHub.
 2. `docs_retrieval@v1` — 1ª chamada LLM: escolhe até 10 arquivos relevantes a partir do resumo da entrevista.
 3. `readDocsByPaths` — lê só o subset (teto `GITHUB_MCP_MAX_CHARS`, hoje 80k chars).
 4. `docs_briefing@v2` — 2ª chamada LLM: gera o texto humanizado para o PM.
-5. `card_generation@v3` — usa o conteúdo original de `/docs` (não o briefing) para gerar o card.
+5. `card_generation@v3` — usa o conteúdo original de `/docs` (não o briefing, e não os trechos do índice) para gerar o card.
 
-### Limitações conhecidas (ADR 0004, ADR 0005 e código)
+### O que o índice faz — concluído para o Explorar
 
-| Limitação | Impacto |
-|---|---|
-| **2 chamadas LLM extras por entrevista** (retrieval + briefing), além da geração do card | Custo e latência somados ao fluxo principal, mesmo quando `/docs` é pequeno ou óbvio |
-| **Depende de `/docs` existir e estar bem estruturado** no repositório | Projeto sem essa pasta (ou com docs fora dela) fica sem contexto — o card sai "cego" |
-| **Sem cache** — cada entrevista relê e reprocessa tudo do zero | Repete custo mesmo se ninguém mudou nada em `/docs` desde a última conversa |
-| **Fallback é o dump completo da árvore** | Em repositórios grandes, aborta por teto (`too_large`) em vez de degradar graciosamente |
-| **Seleção de arquivos por prompt, não por relevância semântica real** | Escolhe arquivo inteiro ou nada; não existe busca por trecho/chunk |
-| **"Alerta de demanda já coberta" depende só do que está em `/docs`** | Se a doc não existe ou está desatualizada, o PM Helper não percebe duplicidade — mesmo que o time já tenha gerado um card parecido dentro do próprio PM Helper |
+1. No primeiro salvamento do projeto, e de novo no botão **Sincronizar**, lê os caminhos marcados no painel (padrão: `README.md` e `docs/`, inclusive subpastas), só `.md`.
+2. Grava o documento, tira o frontmatter, corta em trechos e gera embedding.
+3. O Explorar busca os trechos mais próximos daquele projeto (ou, sem projeto, os documentos sem projeto), acima do score mínimo, e descarta status que não seja `current`, `stable` ou vazio.
+4. A resposta cita o arquivo no tooltip.
 
-Esses pontos são o motivo de existir uma trilha dedicada (Seção 3) em vez de só empilhar mais prompts.
+### Limitações que seguem na entrevista (ADR 0004, ADR 0005 e código)
 
-O lançamento da 0.8.0 segue com o comportamento atual de conversa e de projeto. Reusar a conversa vazia, exclusão lógica e reativar projeto desativado saíram do pré-lançamento e estão nas [correções do fluxo](#correções-do-fluxo-atual) da Trilha A.
+| Limitação | Impacto | Situação |
+|---|---|---|
+| **2 chamadas LLM extras por entrevista** (retrieval + briefing), além da geração do card | Custo e latência no fluxo do card, mesmo quando `/docs` é pequeno | **Em aberto** na entrevista. O Explorar não faz essas duas chamadas |
+| **Depende de `/docs` existir e estar bem estruturado** | Projeto sem essa pasta fica sem contexto no card | **Em aberto** na entrevista. O índice também lê o `README.md`, só para o Explorar |
+| **Sem cache na entrevista** — cada fechamento relê `/docs` | Repete custo mesmo se a doc não mudou | **Em aberto**. O índice evita reler na pergunta do Explorar; a sincronização ainda reprocessa o projeto inteiro |
+| **Fallback é o dump completo da árvore** | Em repositórios grandes, aborta por teto (`too_large`) | **Em aberto** na entrevista |
+| **Seleção de arquivos por prompt** | A entrevista escolhe arquivo inteiro ou nada | **Em aberto** na entrevista. O Explorar já busca trecho |
+| **"Alerta de demanda já coberta" depende só do que está em `/docs`** | Card parecido já gerado no PM Helper passa batido | **Em aberto** (degraus 2a e 2b) |
+
+O lançamento segue com esse comportamento de conversa e de projeto. Reusar a conversa vazia, exclusão lógica e reativar projeto desativado estão nas [correções do fluxo](#correções-do-fluxo-atual) da Trilha A, todas **em aberto**.
 
 ---
 
@@ -54,50 +105,58 @@ Inspirada em conceitos do [`my-memory`](https://github.com/FelipeMiiller/my-memo
 
 ### Fase 1a — Quick wins, sem infraestrutura nova
 
+> **Situação: parcial.** O `README.md` já entra no índice do Explorar. O restante desta fase, inclusive tudo o que baratearia a **entrevista**, está **em aberto**.
+
 Resolve o caso "não tenho `/docs` documentado" e corta custo óbvio, sem tocar em arquitetura.
 
-- **Fallback quando `/docs` não existe ou vem vazio:** ler `README.md` da raiz e, se existir, um `ARCHITECTURE.md`/`AGENTS.md` do repositório — trata como contexto "fraco" e avisa o PM que a documentação é limitada, em vez de silenciar.
-- **Contexto manual colado pelo PM:** campo opcional no chat para colar um trecho de doc, ticket ou spec quando o repositório não tem nada — mesmo prompt de `card_generation`, sem depender do MCP.
-- **Pular o `docs_retrieval` quando a árvore é pequena:** se `listDocsPaths` devolve poucos arquivos (ex.: ≤ 3), ler tudo direto e economizar a 1ª chamada LLM.
-- **Cache por commit/branch:** guardar o resultado de `listDocsPaths` (e opcionalmente o conteúdo lido) por `repository@branch@commit_sha`, invalidando só quando o SHA muda. Evita reprocessar `/docs` a cada conversa nova do mesmo projeto.
-- **Orçamento por tokens, não por caracteres:** trocar `GITHUB_MCP_MAX_CHARS` por um teto de tokens estimados, alinhado ao modelo em uso — hoje o teto é arbitrário em relação ao que a LLM realmente aceita.
+- **Parcial — Fallback quando `/docs` não existe ou vem vazio.** O que entrou: `README.md` da raiz é indexado junto com `/docs` para o Explorar (0.9.0). **Em aberto:** `ARCHITECTURE.md` e `AGENTS.md`; tratar isso como contexto fraco e avisar o PM na entrevista.
+- **Parcial — Contexto manual colado pelo PM.** O que entrou: upload de `.md` na tela Documentos, sem projeto, consultável no Explorar sem projeto. **Em aberto:** campo no chat da entrevista e uso desse texto no `card_generation`.
+- **Em aberto — Pular o `docs_retrieval` quando a árvore é pequena:** se `listDocsPaths` devolve poucos arquivos (ex.: ≤ 3), ler tudo direto e economizar a 1ª chamada LLM.
+- **Em aberto — Cache por commit/branch:** guardar o resultado de `listDocsPaths` (e opcionalmente o conteúdo lido) por `repository@branch@commit_sha`, invalidando só quando o SHA muda. A sincronização do índice reprocessa o projeto inteiro; não olha o SHA.
+- **Em aberto — Orçamento por tokens, não por caracteres:** trocar `GITHUB_MCP_MAX_CHARS` por um teto de tokens estimados, alinhado ao modelo em uso — o teto da entrevista continua arbitrário em relação ao que a LLM realmente aceita.
 
 **Esforço:** baixo · **Depende de:** nada novo · **Resolve:** custo repetido + projetos sem `/docs`.
 
 ### Fase 1b — Cascata de contexto quando nem `/docs` nem `README` bastam
 
-Este é o buraco que sobra depois da Fase 1a: repositório sem `/docs`, com `README` vazio, genérico ou desatualizado. Simplesmente seguir "sem contexto" gera um card às cegas, sem sinalizar o risco. A resposta é uma escada de alternativas, da mais barata para a mais cara, aplicada nessa ordem antes de desistir:
+> **Situação: em aberto**, com uma entrega vizinha já no ar. O painel escolhe quais caminhos do GitHub entram no índice (discovery 0016). Isso não é fonte fora do repositório e não muda o card.
 
-1. **Nota de contexto persistente por projeto (não por conversa).** Hoje o `Project` só guarda nome, repositório e branch. Adicionar um campo de "contexto do produto" preenchido uma vez (pelo admin ou por qualquer PM) e reaproveitado em toda entrevista daquele projeto — resolve o retrabalho de colar o mesmo contexto manual (Fase 1a) a cada conversa nova.
-2. **Fonte alternativa de docs fora do repositório de código.** Muitos times mantêm a spec em Notion, Confluence ou Google Docs — nunca em `/docs`. Generalizar o port `ProjectDocsGateway` para aceitar uma segunda implementação por projeto (link público, export `.md`, PDF colado); o `DocsRetrievalService` não muda de forma, só ganha uma fonte extra quando o GitHub vier vazio.
-3. **Busca de código sob demanda, sem indexar nada.** Antes de desistir, buscar por palavras-chave do resumo da entrevista direto no repositório (code search do próprio MCP GitHub, ou `grep` via API), trazendo trechos de rotas/controllers com nomes parecidos. É busca literal e barata, que às vezes acha sinal suficiente para não gerar o card totalmente sem base. Embedding fica para os degraus 2b e 3b, e só se essa busca (ou o `FULLTEXT` dos degraus 2a/3a) não achar o que o PM precisa.
-4. **Entrevista se adapta à ausência de contexto.** Quando nenhuma fonte de `/docs` está disponível — o que já se sabe antes da 1ª pergunta —, o prompt de `interview` passa a aprofundar deliberadamente a fase "Como funciona hoje" em vez de assumir que `/docs` vai preencher a lacuna depois. Hoje o prompt não distingue os dois cenários.
-5. **Selo "gerado sem contexto de projeto verificado" no card.** Se nada acima resolver, o card sai marcado — na lista e no preview — avisando que ninguém confrontou o card com `/docs`, README, nota de projeto, fonte alternativa ou busca de código. O revisor humano sabe que precisa checar duplicidade e comportamento manualmente, em vez de confiar cegamente no card.
+Este é o buraco que sobra depois da Fase 1a: repositório sem `/docs`, com `README` vazio, genérico ou desatualizado. Seguir sem contexto gera um card às cegas, sem sinalizar o risco. A resposta é uma escada de alternativas, da mais barata para a mais cara, aplicada nessa ordem antes de desistir:
+
+1. **Em aberto — Nota de contexto persistente por projeto (não por conversa).** O `Project` guarda nome, repositório e branch. Falta um campo de "contexto do produto" preenchido uma vez (pelo admin ou por qualquer PM) e reaproveitado em toda entrevista daquele projeto.
+2. **Em aberto — Fonte alternativa de docs fora do repositório de código.** Spec em Notion, Confluence ou Google Docs. **Concluído ao lado, e é outra coisa:** checkboxes de caminhos do próprio GitHub (`README.md`, `docs/`, `docs/adr/`, `docs/discovery/`, `docs/references/`, `docs/rules/`). PDF e link público continuam fora.
+3. **Em aberto — Busca de código sob demanda, sem indexar nada.** Antes de desistir, buscar por palavras-chave do resumo da entrevista direto no repositório (code search do próprio MCP GitHub, ou `grep` via API), trazendo trechos de rotas/controllers com nomes parecidos. Embedding fica para os degraus 2b e 3b, e só se essa busca (ou o `FULLTEXT` dos degraus 2a/3a) não achar o que o PM precisa.
+4. **Em aberto — Entrevista se adapta à ausência de contexto.** Quando nenhuma fonte de `/docs` está disponível — o que já se sabe antes da 1ª pergunta —, o prompt de `interview` passa a aprofundar deliberadamente a fase "Como funciona hoje". O prompt trata os dois cenários do mesmo jeito.
+5. **Em aberto — Selo "gerado sem contexto de projeto verificado" no card.** Se nada acima resolver, o card sai marcado — na lista e no preview — avisando que ninguém confrontou o card com `/docs`, README, nota de projeto, fonte alternativa ou busca de código.
 
 **Esforço:** médio (item 2 é o mais custoso; itens 1, 4 e 5 são baratos e podem entrar isolados) · **Depende de:** Fase 1a (README/ARCHITECTURE já resolve parte dos casos antes de chegar aqui) · **Resolve:** a lacuna real da pergunta "e se não tiver nada, nem `/docs` nem README suficiente?" — sem isso, o PM Helper hoje simplesmente segue sem avisar.
 
 ### Escada da indexação
 
-Indexar é o passo em que o PM Helper passa a guardar trechos e consultá-los na entrevista, em vez de reler a fonte toda vez. A Fase 2 indexa o que o próprio PM Helper já gerou (cards e resumos). A Fase 3 indexa `/docs`. As duas sobem a mesma escada. **O 2a e o 3a são as portas de entrada, cada um com a sua dor. Embedding (2b, 3b), fila (3c) e motor dedicado (3d) só abrem Discovery quando o degrau de baixo, na mesma trilha, mostrar que não bastou.**
+> **Situação: a escada da entrevista segue em aberto. O Explorar subiu um atalho.** Há trechos e embedding de `/docs` consultados no Explorar (cosseno, sem `FULLTEXT` e sem RRF). Cards e resumos não têm índice. A entrevista relê `/docs` a cada fechamento.
+
+Indexar, neste roteiro, é guardar trechos e consultá-los na **entrevista**, em vez de reler a fonte toda vez. A Fase 2 indexa o que o próprio PM Helper já gerou (cards e resumos). A Fase 3 indexa `/docs` para o card. As duas sobem a mesma escada. O Explorar já tem o embedding de `/docs`; isso não fecha o 3a nem o 3b, porque falta a busca por palavra, o RRF e o uso no briefing e no card.
 
 O contrato não muda entre degraus: uma tabela de trechos por projeto, o GitHub (ou o card salvo) continua sendo a fonte da verdade, e a busca filtra por `project_id` antes de ranquear. O embedding entra como coluna nessa mesma tabela. Fila e motor externo entram depois, sem trocar o que a tabela guarda.
 
-| Degrau | O que se implementa | Dor que justifica | O que causa essa dor | Pode esperar enquanto |
+| Degrau | Situação | O que se implementa | Dor que justifica | Pode esperar enquanto |
 |---|---|---|---|---|
-| **2a** | `FULLTEXT` do MySQL em `interview_summary` e nos campos do `Card`, por projeto | O alerta de "demanda já coberta" não dispara, e o time só descobre a duplicata no refinamento | Já existem vários cards no mesmo projeto e `/docs` não menciona a demanda anterior — o histórico está no PM Helper, invisível para o fluxo | Poucos cards por projeto, e o PM ainda reconhece o histórico de cabeça |
-| **2b** | Embedding desses mesmos cards, cosseno em PHP | A busca do 2a volta vazia (ou lixo) para uma demanda que o time já pediu | O card antigo e o resumo novo não compartilham palavras: "validar documento fiscal" contra "checar CPF" | O 2a acha as duplicatas que o PM esperava achar |
-| **3a** | Chunk por heading `##` + `content_hash` + `FULLTEXT` sobre `/docs` | O retrieval custa caro em toda entrevista, o arquivo inteiro polui o briefing, ou o fluxo aborta por `too_large` | `/docs` cresceu: muitos arquivos, ou arquivos longos com várias seções, e a LLM escolhe o arquivo todo | A árvore cabe no atalho da Fase 1a (poucos arquivos) e o `docs_retrieval@v1` acerta o arquivo certo |
-| **3b** | Coluna `embedding` na mesma tabela, RRF com o ranking do 3a | O briefing ignora a seção certa, e um `grep` manual no doc acha o assunto por outra palavra | O PM parafraseia: o resumo não repete o vocabulário de `/docs` | As palavras do resumo já aparecem na seção que deveria entrar |
-| **3c** | Fila (`queue:work`), botão "Reindexar", depois agenda e webhook | O card cita trecho que já mudou no GitHub, ou arquivo novo nunca entra na busca | Ninguém reindexa, ou a indexação na requisição passa a travar a entrevista (docs grandes, ou a API de embedding do 3b) | O SHA muda pouco e um reindex manual (ou na primeira entrevista daquele SHA) ainda é instantâneo |
-| **3d** | Meilisearch, Typesense ou Qdrant no lugar da busca em PHP | A busca é sentida na latência da entrevista | Milhares de trechos: muitos projetos ou `/docs` muito grande, e o cosseno em PHP sai da casa de décimos de segundo | A busca do 3b continua imperceptível ao lado da chamada de briefing |
+| **2a** | **Em aberto** | `FULLTEXT` do MySQL em `interview_summary` e nos campos do `Card`, por projeto | O alerta de "demanda já coberta" não olha os cards já gerados | Poucos cards por projeto, e o PM ainda reconhece o histórico de cabeça |
+| **2b** | **Em aberto** | Embedding desses mesmos cards, cosseno em PHP | A busca do 2a volta vazia para uma demanda que o time já pediu, dita com outras palavras | O 2a acha as duplicatas que o PM esperava achar |
+| **3a** | **Parcial** no Explorar | Chunk por heading `##` + `content_hash` + `FULLTEXT` sobre `/docs`. **No ar:** corte por seção no índice do Explorar, com caminho da seção. **Em aberto:** `FULLTEXT`, hash e uso na entrevista | O retrieval da entrevista custa caro, o arquivo inteiro polui o briefing, ou o fluxo aborta por `too_large` | A árvore cabe no atalho da Fase 1a e o `docs_retrieval@v1` acerta o arquivo certo |
+| **3b** | **Parcial** no Explorar | Coluna `embedding` + RRF com o ranking do 3a. **No ar:** embedding e cosseno no Explorar, score mínimo. **Em aberto:** RRF e a entrevista | O briefing ignora a seção certa quando o resumo não repete as palavras do doc | As palavras do resumo já aparecem na seção que deveria entrar |
+| **3c** | **Parcial** | Fila, botão "Reindexar", agenda e webhook. **No ar:** botão Sincronizar, substituição completa, síncrona. **Em aberto:** fila, hash, agenda e webhook | O índice cita trecho velho, ou a indexação trava a tela | Um reindex manual ainda é aceitável e alguém percebe quando `/docs` mudou |
+| **3d** | **Em aberto** | Meilisearch, Typesense ou Qdrant no lugar da busca em PHP | A busca é sentida na latência | O cosseno em PHP, filtrado por projeto, continua na casa de décimos de segundo |
 
 Quem gera o embedding (OpenAI ou Ollama) e o ADR que autoriza persistir trecho de `/docs` no MySQL — hoje o [ADR 0004](adr/0004-ler-docs-via-mcp-github.md) mantém esse conteúdo só na sessão — entram junto com o **primeiro degrau que grava texto de `/docs` (3a)** ou que chama API de embedding (**2b** ou **3b**). O detalhe de custo, worker e privacidade está no [anexo](#7-anexo--indexação-explicada-do-zero).
 
 ### Fase 2 — Memória própria do PM Helper (independe do repositório ter `/docs`)
 
+> **Situação: em aberto.** Nenhum índice em cards nem em resumos. O alerta de demanda já coberta continua só com o `/docs` lido na entrevista.
+
 O PM Helper acumula conhecimento a partir do que ele mesmo já gerou. O alerta de "demanda já coberta" passa a considerar o histórico de cards do time, mesmo quando o repositório não tem `/docs`. Começa por busca de palavra nos dados que já estão no MySQL. Embedding é o degrau seguinte, se essa busca errar por vocabulário.
 
-#### 2a — Busca por palavra nos cards e resumos
+#### 2a — Busca por palavra nos cards e resumos · em aberto
 
 - Índice `FULLTEXT` em `interview_summary` e nos campos do `Card`, sempre filtrado por projeto.
 - Antes de fechar o card, buscar cards e resumos do mesmo projeto com as palavras do resumo da entrevista.
@@ -108,7 +167,7 @@ O PM Helper acumula conhecimento a partir do que ele mesmo já gerou. O alerta d
 **Pode esperar enquanto:** o volume por projeto é baixo e o PM ainda vê a repetição na lista.
 **Esforço:** baixo · **Depende de:** cards já salvos naquele projeto · **Resolve:** duplicidade óbvia, por palavra igual.
 
-#### 2b — Busca por significado nos cards
+#### 2b — Busca por significado nos cards · em aberto
 
 - Mesmos registros do 2a ganham `embedding` e `embedding_model`.
 - A entrevista gera o embedding do resumo e mede proximidade em PHP. O RRF junta esse ranking com o `FULLTEXT` do 2a.
@@ -120,11 +179,15 @@ O PM Helper acumula conhecimento a partir do que ele mesmo já gerou. O alerta d
 
 ### Fase 3 — Indexação de `/docs` em degraus
 
-Para quando `/docs` existe e o pipeline atual (LLM escolhe arquivos inteiros) deixa de ser suficiente. O destino, se todas as dores aparecerem, é o `memory_search` do my-memory: pedaços de texto, busca por palavra e por significado, combinadas por RRF, reindexando só o arquivo cujo `content_hash` mudou. A implementação começa bem antes disso.
+> **Situação: parcial no Explorar, em aberto na entrevista.** O índice guarda trechos com embedding e o Explorar busca por cosseno. A entrevista ainda pede para uma LLM escolher arquivos inteiros. Faltam `FULLTEXT`, RRF, hash incremental e o uso desses trechos no briefing e no card.
+
+Para quando `/docs` existe e o pipeline da entrevista (LLM escolhe arquivos inteiros) deixa de ser suficiente. O destino, se todas as dores aparecerem, é o `memory_search` do my-memory: pedaços de texto, busca por palavra e por significado, combinadas por RRF, reindexando só o arquivo cujo `content_hash` mudou. A implementação da entrevista começa bem antes disso. O Explorar já ocupa o miolo do 3b (embedding e cosseno), sem o 3a léxico e sem ligar o resultado ao card.
 
 > Nunca trabalhou com indexação? O [Anexo — Indexação explicada do zero](#7-anexo--indexação-explicada-do-zero) descreve o mecanismo completo (é o degrau 3b). Chunking, hash e `FULLTEXT` já valem no 3a; embedding, RRF e worker entram nos degraus seguintes.
 
-#### 3a — Índice de texto, sem embedding
+#### 3a — Índice de texto, sem embedding · parcial no Explorar, em aberto na entrevista
+
+**Na 0.10.0:** o Explorar já corta por seção do Markdown (ou por parágrafo, ou por tamanho), grava o caminho da seção e busca esses trechos por significado. O alvo abaixo, para a entrevista, segue **em aberto**.
 
 - Cortar cada arquivo de `/docs` nos títulos `##` (~300–500 tokens, overlap se a seção estourar o teto), guardando `path`, `heading`, `content` e `content_hash`.
 - Índice `FULLTEXT` sobre o conteúdo. A entrevista busca pelas palavras do resumo e manda os trechos ao `docs_briefing` e ao `card_generation`.
@@ -135,7 +198,9 @@ Para quando `/docs` existe e o pipeline atual (LLM escolhe arquivos inteiros) de
 **Pode esperar enquanto:** `/docs` é pequeno (o atalho da Fase 1a já lê tudo e pula o retrieval) e a seleção por arquivo acerta.
 **Esforço:** médio · **Depende de:** Fase 1a (o cache por commit já diz se o SHA mudou) · **Resolve:** custo estrutural do retrieval e o teto de arquivo inteiro, para busca por palavra.
 
-#### 3b — Embedding e busca híbrida
+#### 3b — Embedding e busca híbrida · parcial no Explorar, em aberto na entrevista
+
+**Na 0.10.0:** o Explorar já gera embedding, mede cosseno em PHP e descarta trecho abaixo do score mínimo. O modelo de embedding sai do painel. **Em aberto:** RRF com busca por palavra, e usar o resumo da entrevista para escolher trechos do briefing e do card. Trocar o modelo avisa que a reindexação fica pendente; não reindexa sozinha.
 
 - A mesma tabela ganha `embedding` e `embedding_model`. Trechos antigos ficam com a coluna vazia até serem reindexados.
 - No fim da entrevista: embedding do resumo, k-NN em PHP, RRF com o ranking `FULLTEXT` do 3a. O briefing recebe os mesmos 5–8 trechos, agora também quando o resumo não repete as palavras do doc.
@@ -145,21 +210,21 @@ Para quando `/docs` existe e o pipeline atual (LLM escolhe arquivos inteiros) de
 **Pode esperar enquanto:** as palavras do resumo já caem na seção certa.
 **Esforço:** médio · **Depende de:** 3a estável e a dor de paráfrase confirmada · **Resolve:** recall quando o vocabulário do PM e o de `/docs` divergem.
 
-#### 3c — Cadência: fila, agenda, webhook
+#### 3c — Cadência: fila, agenda, webhook · parcial
 
 Indexar deixa de competir com a tela do PM. Três disparos, do mais simples ao mais automático — cada um sobe só se o anterior falhar na prática:
 
-1. Botão "Reindexar /docs" no cadastro do projeto.
-2. Comando agendado (ex.: de madrugada), que só reprocessa hash diferente.
-3. Webhook do GitHub a cada push na branch. A GitHub App já existe (Discovery 0002).
+1. **Concluído, numa forma mais simples** — botão **Sincronizar** na lista de projetos. Em sucesso apaga os documentos daquele projeto e indexa de novo, só `.md`, com o admin esperando na tela. Não compara hash.
+2. **Em aberto** — comando agendado (ex.: de madrugada), que só reprocessa hash diferente.
+3. **Em aberto** — webhook do GitHub a cada push na branch. A GitHub App já existe (Discovery 0002).
 
 A fila é `QUEUE_CONNECTION=database` (tabela no MySQL que já existe) e um `php artisan queue:work` com a mesma imagem do `app`. Redis não entra.
 
-**Implementar quando:** o índice mente (trecho antigo ou arquivo novo ausente) ou a indexação segura a resposta da entrevista. O botão pode nascer com o 3a; worker e webhook passam a ser necessários no 3b, porque a API de embedding não cabe na requisição.
+**Implementar quando:** o índice mente (trecho antigo ou arquivo novo ausente) ou a sincronização segura a tela. O botão já existe. Fila, agenda e webhook sobem quando esse botão reprocessar projeto grande demais, ou quando ninguém lembrar de sincronizar depois de um push.
 **Pode esperar enquanto:** reindexar na primeira entrevista de um SHA novo ainda é instantâneo e alguém percebe quando `/docs` mudou.
 **Esforço:** médio · **Depende de:** 3a (e, na prática, 3b) · **Resolve:** índice fresco sem travar o chat.
 
-#### 3d — Motor de busca dedicado
+#### 3d — Motor de busca dedicado · em aberto
 
 Meilisearch, Typesense ou Qdrant passam a responder BM25 + vetorial + RRF. O contrato dos trechos continua o mesmo; muda só quem executa a busca. PostgreSQL + pgvector só entraria se o projeto migrasse de banco por outro motivo.
 
@@ -303,9 +368,11 @@ O 3a não passa por aqui: usa o `FULLTEXT` do MySQL. A escolha abaixo é de quem
 
 A comparação completa, com recomendação, está no [anexo](#78-vamos-precisar-de-outro-banco).
 
-#### O que muda em relação ao pipeline atual
+#### O que muda em relação ao pipeline da entrevista
 
-| | Hoje (`docs_retrieval@v1`) | Degrau 3a | Degrau 3b |
+O Explorar já busca trecho por cosseno. A coluna "Entrevista hoje" é o que o card ainda faz.
+
+| | Entrevista hoje (`docs_retrieval@v1`) | Degrau 3a | Degrau 3b |
 |---|---|---|---|
 | Quem escolhe o que ler | LLM, por prompt, escolhendo **arquivos inteiros** | `FULLTEXT` em **trechos** | `FULLTEXT` + vetorial, combinados por RRF |
 | Chamadas LLM no processo | 2 (`docs_retrieval` + `docs_briefing`) | 1 (só `docs_briefing`) | 1 briefing + 1 embedding do resumo |
@@ -315,7 +382,7 @@ A comparação completa, com recomendação, está no [anexo](#78-vamos-precisar
 
 O esforço de cada degrau está na [escada](#escada-da-indexação). Nenhum deles herda o "esforço alto" do pacote inteiro.
 
-### Fase 4 — Grafo de conhecimento e detecção de divergência (drift)
+### Fase 4 — Grafo de conhecimento e detecção de divergência (drift) · em aberto
 
 - Linkar ADRs, discovery docs e cards gerados como nós relacionados (referência cruzada por projeto/tema), inspirado no grafo estilo Obsidian do my-memory — sem precisar do parser de wikilinks completo, um relacionamento simples por `project_id` + tags já ajuda.
 - **Staleness/drift:** comparar a data do último commit em `/docs` com a data dos cards gerados para aquele projeto e sinalizar ao PM quando a doc usada pode estar desatualizada em relação ao código.
@@ -323,7 +390,7 @@ O esforço de cada degrau está na [escada](#escada-da-indexação). Nenhum dele
 
 **Esforço:** alto · **Depende de:** os degraus que já tiverem subido. Tags por `project_id` nascem com cards salvos (nem precisa do 2a). Drift fica confiável com o 3c, quando o índice acompanha o commit de `/docs`.
 
-### Fase 5 — Federação multi-projeto (avaliar só se o time crescer)
+### Fase 5 — Federação multi-projeto (avaliar só se o time crescer) · em aberto
 
 - Base de padrões compartilhados entre squads/projetos (equivalente ao "Cofre Central" do my-memory), útil se o PM Helper passar a atender vários times com convenções comuns.
 - Servidor MCP próprio do PM Helper, expondo a memória (cards + docs indexados) para outros agentes de IA consultarem (Cursor, Claude Code) — fecha o loop com a [metodologia em evolução](https://github.com/Fredrumond/skills-metodologia) citada no README.
@@ -343,75 +410,82 @@ Para não superdimensionar a infraestrutura em relação ao estágio do PM Helpe
 
 ## 4. Trilha A — Produto e fluxo (itens já listados no launch guide, em ondas)
 
-Reaproveita a tabela "Fora do escopo do MVP" do [`MVP_LAUNCH_GUIDE.md`](./MVP_LAUNCH_GUIDE.md#-fora-do-escopo-do-mvp), organizada por onda de entrega. Prioridade final depende do feedback real dos PMs testando o MVP — isto é um ponto de partida, não uma decisão fechada.
+Reaproveita a tabela [do guia de lançamento](./MVP_LAUNCH_GUIDE.md#o-que-ficou-para-depois-do-mvp), organizada por onda de entrega. Prioridade final depende do feedback real dos PMs — isto é um ponto de partida, não uma decisão fechada.
+
+> **Situação da trilha: em aberto**, exceto a retomada da conversa, que está **parcial**.
 
 ### Correções do fluxo atual
 
-Correção do que o lançamento já faz (lista de conversas, métricas, cadastro de projetos). Entram logo após o lançamento, antes das ondas de capacidade nova.
+Correção do que o lançamento já faz (lista de conversas, métricas, cadastro de projetos). Continuam na frente das ondas de capacidade nova.
 
-| Item | Situação hoje | Solução |
+| Item | Situação | Solução |
 |---|---|---|
-| **"Nova conversa" sem uso** | `ConversationController::store` grava a linha na hora. Cada clique vira um "Nova conversa" vazio | Reusar a conversa do PM que ainda não tem mensagem. Gravar só na primeira mensagem é melhoria posterior |
-| **Exclusão lógica de conversa** | `destroy` faz hard delete. `messages`, `cards` e `llm_usages` têm `cascadeOnDelete` | `SoftDeletes` em `Conversation`. Soft delete no Laravel não apaga filhos. Preview do card lê `conversation()` com `withTrashed()`. Sem tela de lixeira nesta entrega |
-| **Reativar projeto desativado** | Soft delete já existe; a tela só lista ativos e só tem **Desativar**. O `repository` único vale também para desativado | Bloco "Desativados" + **Reativar**. O teste do model já descreve restore em vez de duplicar |
+| **"Nova conversa" sem uso** | **Em aberto.** `ConversationController::store` grava a linha na hora. Cada clique vira um "Nova conversa" vazio | Reusar a conversa do PM que ainda não tem mensagem. Gravar só na primeira mensagem é melhoria posterior |
+| **Exclusão lógica de conversa** | **Em aberto.** `destroy` faz hard delete. `messages`, `cards` e `llm_usages` têm `cascadeOnDelete` | `SoftDeletes` em `Conversation`. Soft delete no Laravel não apaga filhos. Preview do card lê `conversation()` com `withTrashed()`. Sem tela de lixeira nesta entrega |
+| **Reativar projeto desativado** | **Em aberto.** Soft delete já existe; a tela só lista ativos e só tem **Desativar**. O `repository` único vale também para desativado | Bloco "Desativados" + **Reativar**. O teste do model já descreve restore em vez de duplicar |
 
-### Onda 1 — Fricção do dia a dia (alta probabilidade de pedido)
+### Onda 1 — Fricção do dia a dia · em aberto
 
-| Item | Por quê primeiro |
-|---|---|
-| Editar card rascunho **e** aprovado | Card sai com lacunas; hoje o preview só mostra e aprova — os dois status ficam congelados |
-| Exportar card (Jira, Linear, Notion, CSV) | Sem isso, o card gerado não chega ao backlog real do time |
-| Desmembrar épico em cards | Hoje o PM Helper só recusa escopo amplo; falta o caminho de quebrar |
+| Item | Situação | Por quê primeiro |
+|---|---|---|
+| Editar card rascunho **e** aprovado | **Em aberto** | Card sai com lacunas; o preview mostra e aprova — os dois status ficam congelados |
+| Exportar card (Jira, Linear, Notion, CSV) | **Em aberto** | O card gerado não chega sozinho ao backlog do time |
+| Desmembrar épico em cards | **Em aberto** | O PM Helper recusa escopo amplo; falta o caminho de quebrar |
 
-### Onda 2 — Visibilidade e processo
+### Onda 2 — Visibilidade e processo · em aberto, retomada parcial
 
-| Item | Por quê depois |
-|---|---|
-| Comentários no card | O botão **Aprovar** já existe; faltam comentários e o fluxo em volta. Depende de card editável (Onda 1) fazer sentido primeiro |
-| Retomar entrevista interrompida | Hoje o contexto se perde ao fechar — melhora retenção, mas não bloqueia o uso |
-| Dashboard de cards por status | Ganha valor conforme o volume de cards gerados cresce |
-| Notificações (e-mail/Slack) | Depende de haver volume que justifique não ficar recarregando a tela |
+| Item | Situação | Por quê depois |
+|---|---|---|
+| Comentários no card | **Em aberto** | O botão **Aprovar** já existe; faltam comentários e o fluxo em volta. Depende de card editável (Onda 1) fazer sentido primeiro |
+| Retomar entrevista interrompida | **Parcial** | Reabrir a conversa devolve as mensagens e a entrevista segue. O bloco bruto de `/docs` usado no **Gerar Card** continua na sessão e se perde se o navegador fechar antes |
+| Dashboard de cards por status | **Em aberto** | Ganha valor conforme o volume de cards gerados cresce |
+| Notificações (e-mail/Slack) | **Em aberto** | Depende de haver volume que justifique não ficar recarregando a tela |
 
-### Onda 3 — Escala e maturidade
+### Onda 3 — Escala e maturidade · em aberto
 
-| Item | Conecta com a Trilha B |
-|---|---|
-| Histórico de versões do card | Complementar à Fase 4 (grafo/drift) da trilha de docs |
-| Busca semântica em cards antigos | A UI de busca reusa a escada da Fase 2: lista por palavra no 2a, por significado no 2b. Não é um índice à parte |
-| Relatório de custo por squad | Só relevante ao escalar para vários times — junto com a Fase 5 da Trilha B |
+| Item | Situação | Conecta com a Trilha B |
+|---|---|---|
+| Histórico de versões do card | **Em aberto** | Complementar à Fase 4 (grafo/drift) da trilha de docs |
+| Busca semântica em cards antigos | **Em aberto** | A UI de busca reusa a escada da Fase 2: lista por palavra no 2a, por significado no 2b. Não é um índice à parte |
+| Relatório de custo por squad | **Em aberto** | Só relevante ao escalar para vários times — junto com a Fase 5 da Trilha B |
 
 ---
 
 ## 5. Sequenciamento sugerido
 
-As etapas 1–4 são o caminho padrão, porque a dor já está descrita no baseline. Da 5 em diante, a coluna **Sobe quando** é a condição para abrir o Discovery. Entregar a linha anterior não compromete a seguinte.
+As etapas 1–4 continuam o caminho padrão do que a entrevista ainda não resolve. Da 5 em diante, a coluna **Sobe quando** é a condição para abrir o Discovery. Entregar a linha anterior não compromete a seguinte. Itens **parciais** sobem de novo só pelo que falta.
 
-| Etapa | Trilha | Entrega | Sobe quando | Depende de |
-|---|---|---|---|---|
-| 1 | A — Correções do fluxo | Reusar conversa vazia, exclusão lógica, reativar projeto | Logo após o lançamento | Nada |
-| 2 | B — Fase 1a | Fallback sem `/docs`, contexto colado, cache por commit, orçamento por tokens | Já: custo repetido e projeto sem `/docs` | Nada |
-| 3 | A — Onda 1 | Editar card (draft e approved), exportar, desmembrar épico | O PM pede para editar, exportar ou quebrar épico no uso do MVP | Nada |
-| 4 | B — Fase 1b (barato) | Nota de contexto por projeto + selo "sem contexto verificado" | O card sai cego e o PM não vê o risco | Fase 1a |
-| 5 | B — 2a | `FULLTEXT` em cards e resumos + mencionar card no chat | Duplicata de card escapa, ou o PM quer reusar um card existente na entrevista | Volume de cards no projeto |
-| 6 | A — Onda 2 | Aprovação, retomar entrevista, dashboard, notificações | Aprovação, retomada ou fila de cards passa a doer no dia a dia | Onda 1 |
-| 7 | B — Fase 1b (resto) | Fonte alternativa (Notion/Confluence/PDF) + busca de código sob demanda | README e nota de projeto não bastam, e a spec vive fora do repositório | Fase 1b (itens baratos) |
-| 8 | B — 3a | Chunks de `/docs` + `FULLTEXT`, sem embedding | Retrieval caro em toda entrevista, arquivo inteiro polui o briefing, ou aborto `too_large` | Fase 1a (cache por commit) |
-| 9 | B — 2b | Embedding dos cards + RRF com o 2a | O 2a erra porque o card antigo e o resumo novo não compartilham palavras | 2a em uso, dor de paráfrase confirmada |
-| 10 | B — 3b | Embedding dos chunks de `/docs` + RRF com o 3a | O 3a perde a seção que um `grep` acha por outra palavra | 3a estável, dor de paráfrase confirmada |
-| 11 | B — 3c | Fila, botão "Reindexar", depois agenda e webhook | O índice cita trecho velho, arquivo novo não entra, ou a indexação trava a entrevista | 3a; worker na prática junto com o 3b |
-| 12 | A — Onda 3 + B — Fase 4 | Histórico de versão, busca de cards na UI (reusa 2a/2b), grafo/drift | Volume de cards e doc defasada em relação ao card | Os degraus 2 e 3 que já tiverem subido |
-| 13 | B — 3d | Meilisearch, Typesense ou Qdrant | A busca do 3b fica perceptível na entrevista | 3b com milhares de trechos medidos |
-| 14 | B — Fase 5 | Federação multi-projeto, MCP próprio do PM Helper | Vários times com convenções comuns | Demanda real de múltiplos times |
+| Etapa | Trilha | Entrega | Situação | Sobe quando | Depende de |
+|---|---|---|---|---|---|
+| 0 | — | E2e manual + fechar MVP | **Em curso** | Agora — [`E2E_MANUAL_TEST_PLAN.md`](./E2E_MANUAL_TEST_PLAN.md) | Merge main (RAG) + develop (Discovery) |
+| 1 | A — Correções do fluxo | Reusar conversa vazia, exclusão lógica, reativar projeto | **Em aberto** | Depois do e2e / dor confirmada | Nada |
+| 2 | B — Fase 1a | Fallback sem `/docs`, contexto colado, cache por commit, orçamento por tokens | **Parcial** — README e upload de `.md` só no Explorar | Custo repetido da entrevista e projeto sem `/docs` | Nada |
+| 3 | A — Onda 1 | Editar card (draft e approved), exportar, desmembrar épico | **Em aberto** | O PM pede para editar, exportar ou quebrar épico | Nada |
+| 4 | B — Fase 1b (barato) | Nota de contexto por projeto + selo "sem contexto verificado" | **Em aberto** | O card sai cego e o PM não vê o risco | Fase 1a |
+| 5 | B — 2a | `FULLTEXT` em cards e resumos + mencionar card no chat | **Em aberto** | Duplicata de card escapa, ou o PM quer reusar um card existente na entrevista | Volume de cards no projeto |
+| 6 | A — Onda 2 | Comentários, dashboard, notificações. Retomada da conversa já grava o histórico | **Em aberto**, retomada **parcial** | Aprovação ou fila de cards passa a doer no dia a dia | Onda 1 |
+| 7 | B — Fase 1b (resto) | Fonte alternativa (Notion/Confluence/PDF) + busca de código sob demanda | **Em aberto.** Caminhos do GitHub no painel já estão **concluídos** e são outra entrega | README e nota de projeto não bastam, e a spec vive fora do repositório | Fase 1b (itens baratos) |
+| 8 | B — 3a | Chunks de `/docs` + `FULLTEXT` na entrevista | **Parcial** no Explorar (corte por seção, sem `FULLTEXT`) | Retrieval caro em toda entrevista, arquivo inteiro polui o briefing, ou aborto `too_large` | Fase 1a (cache por commit) |
+| 9 | B — 2b | Embedding dos cards + RRF com o 2a | **Em aberto** | O 2a erra porque o card antigo e o resumo novo não compartilham palavras | 2a em uso, dor de paráfrase confirmada |
+| 10 | B — 3b | RRF do índice com a busca por palavra, ligado ao briefing e ao card | **Parcial** — cosseno já roda no Explorar | A entrevista perde a seção que um `grep` acha por outra palavra | 3a estável na entrevista, dor de paráfrase confirmada |
+| 11 | B — 3c | Fila, agenda e webhook. O botão de sincronizar já existe | **Parcial** | O índice cita trecho velho, ou a sincronização trava a tela | 3a; worker na prática junto com o embedding |
+| 12 | A — Onda 3 + B — Fase 4 | Histórico de versão, busca de cards na UI (reusa 2a/2b), grafo/drift | **Em aberto** | Volume de cards e doc defasada em relação ao card | Os degraus 2 e 3 que já tiverem subido |
+| 13 | B — 3d | Meilisearch, Typesense ou Qdrant | **Em aberto** | A busca do Explorar ou da entrevista fica perceptível | Volume medido em milhares de trechos |
+| 14 | B — Fase 5 | Federação multi-projeto, MCP próprio do PM Helper | **Em aberto** | Vários times com convenções comuns | Demanda real de múltiplos times |
 
 ---
 
 ## 6. Próximos passos imediatos
 
-1. Tratar a 0.8.0 como lançamento do MVP. As [correções do fluxo](#correções-do-fluxo-atual) (conversa vazia, exclusão lógica, reativar projeto) entram logo depois, na Trilha A — não bloqueiam o lançamento.
-2. Validar com os PMs testando o MVP quais itens da Onda 1 (Trilha A) doem mais na prática — o launch guide já pede esse feedback via `#pm-helper-feedback`.
-3. Abrir um **Discovery** para a Fase 1a da Trilha B (fallback sem `/docs` + cache por commit) — é a entrega mais barata e ataca diretamente a queixa "nem todo projeto tem `/docs`".
-4. Logo em seguida, abrir Discovery para os itens baratos da **Fase 1b** (nota de contexto por projeto + selo "sem contexto verificado" no card) — resolve o cenário "nem `/docs` nem README bastam" sem esperar por infraestrutura nova.
-5. Só depois de Fase 1a/1b e Onda 1 entregues, decidir o próximo Discovery pela dor que aparecer: duplicata de card ou mencionar card no chat (degrau 2a), spec fora do repositório (resto da 1b), `/docs` grande ou retrieval caro (degrau 3a), ou comentários no card (Onda 2). Embedding (2b, 3b), fila (3c) e motor dedicado (3d) ficam fechados até o sintoma da [escada](#escada-da-indexação) mostrar que o degrau anterior não bastou.
+Explorar/RAG e Discovery no card já saíram. **Antes de priorizar código novo:** rodar o [`E2E_MANUAL_TEST_PLAN.md`](./E2E_MANUAL_TEST_PLAN.md), fechar o MVP e usar o feedback para reordenar as ondas.
+
+Ordem sugerida **depois** do teste (ajustável pelo que doer no e2e):
+
+1. **Correções do fluxo** (conversa vazia, exclusão lógica, reativar projeto) — alta fricção, esforço baixo.
+2. **Onda 1** conforme o feedback — editar card, exportar ou desmembrar épico.
+3. **Ligar o índice ao card** (Trilha B) — briefing/`card_generation` ainda leem `/docs` ao vivo (duas chamadas + teto de chars).
+4. Itens baratos da Fase 1b: nota de contexto por projeto e selo "sem contexto verificado".
+5. Próximo Discovery de índice **só se a dor aparecer** no uso real: duplicata de card (2a), spec fora do repo, `FULLTEXT`/RRF na entrevista, fila/webhook no sync. Motor (3d) e federação (Fase 5) fechados até o sintoma da [escada](#escada-da-indexação).
 
 Este documento não substitui ADRs nem Discoveries — cada fase, ao entrar em desenvolvimento, gera seu próprio Discovery (`docs/discovery/`) e, se houver decisão de arquitetura, seu ADR (`docs/adr/`), seguindo a numeração sequencial já em uso.
 
@@ -419,14 +493,16 @@ Este documento não substitui ADRs nem Discoveries — cada fase, ao entrar em d
 
 ## 7. Anexo — Indexação explicada do zero
 
-Este anexo é para quem nunca trabalhou com indexação. Ele explica o mecanismo completo — o estado do degrau 3b (e do 2b, a mesma técnica sobre cards). Chunking, hash e busca por palavra já existem no degrau anterior (3a / 2a). Embedding, RRF e worker são os degraus seguintes, e só entram se a [escada](#escada-da-indexação) mostrar a dor.
+Este anexo descreve o **alvo** da entrevista: busca por palavra e por significado, juntas, com hash e worker. O Explorar, na 0.10.0, já faz um pedaço — corta o documento, gera embedding e ranqueia por cosseno. Ainda não faz busca por palavra, RRF, hash incremental nem entrega esses trechos ao card.
+
+Ele explica o mecanismo completo — o estado do degrau 3b (e do 2b, a mesma técnica sobre cards). Chunking por seção já existe no índice do Explorar. Hash, `FULLTEXT` e RRF seguem **em aberto**, e só entram na entrevista se a [escada](#escada-da-indexação) mostrar a dor.
 
 ### 7.1 A analogia: o índice remissivo de um livro
 
 Imagine um livro técnico de 800 páginas e a pergunta *"o que o livro diz sobre CPF?"*.
 
-- **Sem índice:** você lê as 800 páginas toda vez que alguém pergunta. É o que o PM Helper faz hoje: a cada entrevista, lê `/docs` de novo e ainda pede para uma LLM escolher o que importa.
-- **Com índice remissivo:** alguém lê o livro **uma vez**, anota "CPF → páginas 112, 340" e, quando a pergunta chega, você abre direto nessas páginas.
+- **Sem índice:** você lê as 800 páginas toda vez que alguém pergunta. É o que a **entrevista** faz: a cada fechamento, lê `/docs` de novo e pede para uma LLM escolher o que importa.
+- **Com índice remissivo:** alguém lê o livro **uma vez**, anota "CPF → páginas 112, 340" e, quando a pergunta chega, você abre direto nessas páginas. O **Explorar** já trabalha assim, por significado do trecho.
 
 **Indexar é montar esse índice antes. Buscar é consultá-lo na hora.** O resto deste anexo é só o detalhe de como o índice é montado e consultado.
 
@@ -459,7 +535,7 @@ flowchart LR
     style CONS fill:#f0fdf4,stroke:#16a34a
 ```
 
-A preparação é a parte "cara", mas acontece raramente, só quando alguém edita `/docs`. A consulta é barata e acontece em toda entrevista. Hoje o PM Helper faz a parte cara em toda entrevista.
+A preparação é a parte "cara", mas acontece raramente, só quando alguém edita `/docs`. A consulta é barata e acontece em toda entrevista. A entrevista ainda faz a parte cara a cada fechamento. O Explorar já consulta o índice pronto.
 
 ### 7.3 Passo 1 — Cortar em pedaços (chunking)
 
@@ -680,13 +756,13 @@ O que é novo na opção A: **uma tabela** (não um banco) e **um processo de wo
 
 ### 7.9 Outras informações básicas
 
-**Fila e worker são o degrau 3c.** Com `/docs` pequeno, chunking e `FULLTEXT` (3a) cabem na primeira entrevista daquele SHA. A fila entra quando isso passa a travar a tela, e na prática junto com o 3b, porque a API de embedding não cabe na requisição. Aí o trabalho vira um Job do Laravel. Com `QUEUE_CONNECTION=database`, a fila usa uma tabela do próprio MySQL, sem Redis. Falta um processo `php artisan queue:work`, serviço a mais no `docker-compose` com a mesma imagem do `app`.
+**Fila e worker são o que falta do degrau 3c.** O botão de sincronizar já roda na requisição do admin e reprocessa o projeto inteiro. A fila entra quando isso travar a tela. Aí o trabalho vira um Job do Laravel. Com `QUEUE_CONNECTION=database`, a fila usa uma tabela do próprio MySQL, sem Redis. Falta um processo `php artisan queue:work`, serviço a mais no `docker-compose` com a mesma imagem do `app`.
 
-**Quem dispara a indexação.** As três opções abaixo são o miolo do degrau 3c, da mais simples para a mais automática. O botão pode nascer com o 3a; agenda e webhook esperam a dor de índice velho:
+**Quem dispara a indexação.** As três opções abaixo são o miolo do degrau 3c, da mais simples para a mais automática. Agenda e webhook esperam a dor de índice velho:
 
-1. Botão "Reindexar /docs" no cadastro do projeto (admin).
-2. Comando agendado (ex.: toda madrugada), que só reprocessa o que mudou graças ao `content_hash`.
-3. Webhook do GitHub a cada push na branch do projeto. A GitHub App já existe (Discovery 0002).
+1. **Concluído** — botão **Sincronizar** na lista de projetos (admin). Substitui o índice inteiro; não olha hash.
+2. **Em aberto** — comando agendado (ex.: toda madrugada), que só reprocessa o que mudou graças ao `content_hash`.
+3. **Em aberto** — webhook do GitHub a cada push na branch do projeto. A GitHub App já existe (Discovery 0002).
 
 **Qual modelo de embedding.** Duas opções:
 
@@ -701,13 +777,13 @@ O que é novo na opção A: **uma tabela** (não um banco) e **um processo de wo
 | Indexar um `/docs` grande (2.000 trechos) | ~800 mil | ~US$ 0,016 |
 | Embedding do resumo, por entrevista | ~300 | desprezível |
 
-Pela convenção do `AGENTS.md`, a chamada de embedding também precisa gravar `LlmUsage` (com um step próprio, ex.: `docs_indexing`) e ter preço cadastrado em `config/llm.php`. Sem isso as métricas não enxergam o custo.
+A chamada de embedding do índice já grava `LlmUsage` (0.9.0). Preço no catálogo de modelos continua necessário quando a API não devolve custo.
 
 **Trocar de modelo exige reindexar tudo.** Vetores de modelos diferentes não se comparam, são "mapas" diferentes. Por isso a tabela guarda `embedding_model`. Se o modelo mudar, todos os trechos do projeto são refeitos.
 
-**O índice não é a fonte da verdade.** O texto oficial continua no GitHub. A tabela `project_doc_chunks` é uma cópia derivada: se corromper ou ficar estranha, apaga e reconstrói. Nada se perde.
+**O índice não é a fonte da verdade.** O texto oficial continua no GitHub. No Explorar a cópia mora em `documents` e `document_chunks`. O nome `project_doc_chunks` neste anexo é o esboço do índice da entrevista, que ainda não existe. Se a cópia corromper, apaga e reconstrói. Nada se perde.
 
-**Muda uma decisão de segurança já tomada.** O [ADR 0004](adr/0004-ler-docs-via-mcp-github.md) definiu que o conteúdo de `/docs` fica só na **sessão** e não vai para o MySQL. Indexar significa **persistir** trechos de `/docs` no banco. É uma mudança consciente, que precisa de um ADR novo substituindo essa parte do 0004, com três definições:
+**A persistência no Explorar já aconteceu; a entrevista segue o ADR 0004.** O [ADR 0004](adr/0004-ler-docs-via-mcp-github.md) mantém o conteúdo lido no fechamento da entrevista só na **sessão**. O índice do Explorar já grava trechos de `/docs` no MySQL e envia o texto ao provedor de embeddings. Falta um ADR que registre essa exceção. Três definições continuam em aberto:
 
 - quem pode ler a tabela (só o próprio app, nunca exposta ao PM crua);
 - como os trechos são apagados quando o projeto é desativado;
