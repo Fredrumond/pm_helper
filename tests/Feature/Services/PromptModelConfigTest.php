@@ -39,6 +39,7 @@ class PromptModelConfigTest extends TestCase
     {
         $this->assertSame(ChatComposer::defaultModel(), $this->config->active('interview'));
         $this->assertSame(ChatComposer::defaultModel(), $this->config->active('card_generation'));
+        $this->assertSame(PromptModelConfig::EXPLORE_DEFAULT_MODEL, $this->config->active('explore'));
         $this->assertContains($this->config->active('interview'), array_column(ChatComposer::models(), 'id'));
     }
 
@@ -75,11 +76,13 @@ class PromptModelConfigTest extends TestCase
         $this->assertTrue($this->config->save('card_generation', 'anthropic/claude'));
         $this->assertTrue($this->config->save('docs_retrieval', 'openai/gpt-4o-mini'));
         $this->assertTrue($this->config->save('docs_briefing', 'openai/gpt-4o'));
+        $this->assertTrue($this->config->save('explore', 'anthropic/claude'));
 
         $this->assertSame('openai/gpt-4o', $this->config->active('interview'));
         $this->assertSame('anthropic/claude', $this->config->active('card_generation'));
         $this->assertSame('openai/gpt-4o-mini', $this->config->active('docs_retrieval'));
         $this->assertSame('openai/gpt-4o', $this->config->active('docs_briefing'));
+        $this->assertSame('anthropic/claude', $this->config->active('explore'));
 
         $this->assertTrue($this->config->save('interview', 'anthropic/claude'));
         $this->assertSame(1, PromptModel::query()->where('prompt', 'interview')->count());
@@ -101,6 +104,7 @@ class PromptModelConfigTest extends TestCase
         $this->assertTrue($this->config->save('interview', 'openai/gpt-4o'));
 
         $this->assertFalse($this->config->save('discovery', 'openai/gpt-4o'));
+        $this->assertFalse($this->config->save('explore', 'modelo-fora-do-catalogo'));
         $this->assertFalse($this->config->save('interview', 'modelo-fora-do-catalogo'));
         $this->assertFalse($this->config->save('', 'openai/gpt-4o'));
         $this->assertSame(ChatComposer::defaultModel(), $this->config->active('discovery'));
@@ -121,6 +125,7 @@ class PromptModelConfigTest extends TestCase
         $this->config->save('card_generation', 'anthropic/claude');
         $this->config->save('docs_retrieval', 'anthropic/claude');
         $this->config->save('docs_briefing', 'anthropic/claude');
+        $this->config->save('explore', 'anthropic/claude');
 
         LlmModel::query()->where('model_id', 'anthropic/claude')->update(['active' => false]);
 
@@ -134,6 +139,7 @@ class PromptModelConfigTest extends TestCase
         $this->assertSame(ChatComposer::defaultModel(), $this->config->active('card_generation'));
         $this->assertSame('openai/gpt-4o', $this->config->active('docs_retrieval'));
         $this->assertSame(ChatComposer::defaultModel(), $this->config->active('docs_briefing'));
+        $this->assertSame(PromptModelConfig::EXPLORE_DEFAULT_MODEL, $this->config->active('explore'));
         $this->assertNotSame('openai/gpt-4o', ChatComposer::defaultModel());
     }
 }

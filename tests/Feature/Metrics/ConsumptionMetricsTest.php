@@ -117,4 +117,44 @@ class ConsumptionMetricsTest extends TestCase
         $this->assertTrue($usage->isEstimatedCost());
         $this->assertSame('$0.0002418', $usage->formattedCost());
     }
+
+    public function test_includes_embedding_usage_attributed_to_the_user_without_conversation(): void
+    {
+        CatalogModels::seedEmbeddingPrice();
+
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+
+        LlmUsage::query()->create([
+            'conversation_id' => null,
+            'user_id' => $user->id,
+            'model' => 'text-embedding-3-small',
+            'step' => LlmUsage::STEP_EMBEDDING,
+            'provider' => 'openai',
+            'prompt_tokens' => 1000,
+            'completion_tokens' => 0,
+            'total_tokens' => 1000,
+            'cached_tokens' => 0,
+            'cost' => 0.00002,
+        ]);
+        LlmUsage::query()->create([
+            'conversation_id' => null,
+            'user_id' => $other->id,
+            'model' => 'text-embedding-3-small',
+            'step' => LlmUsage::STEP_EMBEDDING,
+            'prompt_tokens' => 5000,
+            'total_tokens' => 5000,
+            'cost' => 0.0001,
+        ]);
+
+        $metrics = new ConsumptionMetrics;
+        $summary = $metrics->summary($user);
+        $byModel = $metrics->byModel($user)->keyBy('model');
+
+        $this->assertSame(1, $summary['calls']);
+        $this->assertSame(1000, $summary['total_tokens']);
+        $this->assertEqualsWithDelta(0.00002, $summary['cost'], 0.00000001);
+        $this->assertSame(1, $byModel['text-embedding-3-small']['calls']);
+        $this->assertSame('$0.00002', $byModel['text-embedding-3-small']['formatted_cost']);
+    }
 }

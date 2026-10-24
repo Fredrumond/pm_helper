@@ -361,9 +361,17 @@ class LlmModelCatalogTest extends TestCase
             'price_cached' => 0.14,
             'price_output' => 2.20,
         ]);
+        $this->assertDatabaseHas('llm_models', [
+            'model_id' => 'text-embedding-3-small',
+            'tier' => 'paid',
+            'provider' => 'openai',
+            'active' => false,
+            'price_input' => 0.02,
+            'price_output' => 0,
+        ]);
 
         Artisan::call(ImportLlmModelsFromConfig::class);
 
-        $this->assertSame(8, LlmModel::query()->count());
+        $this->assertSame(9, LlmModel::query()->count());
     }
 }

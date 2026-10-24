@@ -69,10 +69,12 @@ class PromptMetrics
         $usages = LlmUsage::query()
             ->whereNotNull('step')
             ->when($user, function ($query) use ($user) {
-                $query->whereIn(
-                    'conversation_id',
-                    Conversation::query()->where('user_id', $user->id)->select('id')
-                );
+                $query->where(function ($query) use ($user): void {
+                    $query->whereIn(
+                        'conversation_id',
+                        Conversation::query()->where('user_id', $user->id)->select('id')
+                    )->orWhere('user_id', $user->id);
+                });
             })
             ->get()
             ->groupBy(fn (LlmUsage $usage) => $usage->step.'@'.($usage->prompt_version ?? ''));

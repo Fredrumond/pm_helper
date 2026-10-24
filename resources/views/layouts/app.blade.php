@@ -18,7 +18,7 @@
     <body class="font-sans antialiased">
         <div @class([
             'min-h-screen bg-gray-100',
-            'h-screen flex flex-col overflow-hidden' => request()->routeIs('conversations.show'),
+            'h-screen flex flex-col overflow-hidden' => request()->routeIs('conversations.show', 'explorar.show'),
         ])>
             @include('layouts.navigation')
 
@@ -32,7 +32,7 @@
             @endisset
 
             <!-- Page Content -->
-            <main @class(['flex-1 overflow-hidden min-h-0' => request()->routeIs('conversations.show')])>
+            <main @class(['flex-1 overflow-hidden min-h-0' => request()->routeIs('conversations.show', 'explorar.show')])>
                 {{ $slot }}
             </main>
         </div>

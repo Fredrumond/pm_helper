@@ -88,9 +88,9 @@ class ConsumptionMetrics
      */
     private function usagesFor(User $user): Builder
     {
-        return LlmUsage::query()->whereIn(
-            'conversation_id',
-            $user->conversations()->select('id')
-        );
+        return LlmUsage::query()->where(function (Builder $query) use ($user): void {
+            $query->whereIn('conversation_id', $user->conversations()->select('id'))
+                ->orWhere('user_id', $user->id);
+        });
     }
 }

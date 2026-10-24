@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Conversation extends Model
 {
     use HasFactory;
+
+    public const PROMPT_EXPLORE = 'explore';
+
+    public const EXPLORE_TITLE = 'Explorar';
 
     protected $fillable = [
         'user_id',
@@ -50,6 +55,43 @@ class Conversation extends Model
     public function llmUsages(): HasMany
     {
         return $this->hasMany(LlmUsage::class)->orderBy('created_at');
+    }
+
+    public function isExplore(): bool
+    {
+        return $this->prompt_name === self::PROMPT_EXPLORE;
+    }
+
+    /**
+     * @param  Builder<Conversation>  $query
+     * @return Builder<Conversation>
+     */
+    public function scopeInterview(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->whereNull('prompt_name')
+                ->orWhere('prompt_name', '!=', self::PROMPT_EXPLORE);
+        });
+    }
+
+    /**
+     * @param  Builder<Conversation>  $query
+     * @return Builder<Conversation>
+     */
+    public function scopeExplore(Builder $query): Builder
+    {
+        return $query->where('prompt_name', self::PROMPT_EXPLORE);
+    }
+
+    public static function createExploreFor(User $user): self
+    {
+        return $user->conversations()->create([
+            'title' => self::EXPLORE_TITLE,
+            'status' => 'in_progress',
+            'prompt_name' => self::PROMPT_EXPLORE,
+            'prompt_version' => 'v1',
+            'current_step' => self::PROMPT_EXPLORE,
+        ]);
     }
 
     public function isCompleted(): bool

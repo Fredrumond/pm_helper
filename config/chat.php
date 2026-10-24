@@ -56,6 +56,12 @@ return [
             'version' => env('CHAT_DOCS_BRIEFING_PROMPT_VERSION', 'v2'),
             'model' => env('CHAT_DOCS_BRIEFING_MODEL'),
         ],
+        'explore' => [
+            'version' => env('CHAT_EXPLORE_PROMPT_VERSION', 'v1'),
+        ],
+        'rag' => [
+            'version' => 'v2',
+        ],
     ],
 
     /*
