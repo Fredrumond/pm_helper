@@ -33,6 +33,79 @@ class CardDiscoveryService
         private readonly DiscoveryPromptBuilder $prompts,
     ) {}
 
+    /**
+     * @param  list<array{question?: string, answer?: string}>  $answers
+     */
+    public function requestWithAnswers(Card $card, User $actor, array $answers): CardDiscovery
+    {
+        if ($card->user_id !== $actor->id) {
+            Log::warning('card_discovery.forbidden', [
+                'card_id' => $card->id,
+                'user_id' => $actor->id,
+            ]);
+            abort(403);
+        }
+
+        $card->loadMissing('conversation.project');
+        $project = $card->conversation?->project;
+
+        if (! $card->isApproved()) {
+            throw new CardDiscoveryNotAllowed('O Discovery só pode ser gerado em card aprovado.');
+        }
+
+        if ($project === null || trim((string) $project->repository) === '' || trim((string) $project->branch) === '') {
+            throw new CardDiscoveryNotAllowed('O Discovery exige um projeto com repositório na conversa.');
+        }
+
+        $pairs = $this->filledAnswers($answers);
+        if ($pairs === []) {
+            throw new CardDiscoveryNotAllowed('Informe ao menos uma resposta para regenerar o Discovery.');
+        }
+
+        try {
+            $discovery = DB::transaction(function () use ($card, $pairs): CardDiscovery {
+                $current = CardDiscovery::query()->where('card_id', $card->id)->lockForUpdate()->first();
+
+                if ($current !== null && $current->isInProgress()) {
+                    throw new CardDiscoveryNotAllowed('Já existe um Discovery em andamento para este card.');
+                }
+
+                if ($this->previousMarkdown($current) === null) {
+                    throw new CardDiscoveryNotAllowed('A regeneração com respostas exige o Discovery anterior.');
+                }
+
+                return CardDiscovery::query()->updateOrCreate(
+                    ['card_id' => $card->id],
+                    [
+                        'provider' => $this->agents->provider(),
+                        'status' => CardDiscovery::STATUS_REQUESTED,
+                        'external_agent_id' => null,
+                        'external_run_id' => null,
+                        'error_message' => null,
+                        'pending_answers' => $pairs,
+                        'started_at' => now(),
+                        'finished_at' => null,
+                        'deadline_at' => now()->addMinutes(max(1, (int) config('services.cursor.timeout_minutes'))),
+                    ],
+                );
+            });
+        } catch (UniqueConstraintViolationException) {
+            throw new CardDiscoveryNotAllowed('Já existe um Discovery em andamento para este card.');
+        }
+
+        Log::info('card_discovery.requested', [
+            'card_id' => $card->id,
+            'card_discovery_id' => $discovery->id,
+            'provider' => $discovery->provider,
+            'user_id' => $actor->id,
+            'answers_count' => count($pairs),
+        ]);
+
+        AdvanceCardDiscovery::dispatch($discovery->id);
+
+        return $discovery->fresh() ?? $discovery;
+    }
+
     public function request(Card $card, User $actor): CardDiscovery
     {
         if ($card->user_id !== $actor->id) {
@@ -70,6 +143,7 @@ class CardDiscoveryService
                         'external_agent_id' => null,
                         'external_run_id' => null,
                         'error_message' => null,
+                        'pending_answers' => null,
                         'started_at' => now(),
                         'finished_at' => null,
                         'deadline_at' => now()->addMinutes(max(1, (int) config('services.cursor.timeout_minutes'))),
@@ -185,9 +259,18 @@ class CardDiscoveryService
             throw new AgentProviderException('missing_project');
         }
 
+        $answers = $this->filledAnswers(is_array($discovery->pending_answers) ? $discovery->pending_answers : []);
+        $previous = null;
+        if ($answers !== []) {
+            $previous = $this->previousMarkdown($discovery);
+            if ($previous === null) {
+                throw new AgentProviderException('missing_previous_discovery');
+            }
+        }
+
         $handle = $this->agents->start(new DiscoveryAgentRequest(
             name: 'Discovery: '.mb_substr($card->title, 0, 80),
-            prompt: $this->prompts->build($card),
+            prompt: $this->prompts->build($card, $previous, $answers),
             repository: (string) $project->repository,
             branch: (string) $project->branch,
         ));
@@ -216,6 +299,7 @@ class CardDiscoveryService
             'error_message' => null,
             'document_disk' => 'discoveries',
             'document_path' => $path,
+            'pending_answers' => null,
             'finished_at' => now(),
         ])->save();
 
@@ -245,5 +329,50 @@ class CardDiscoveryService
     private function deadlinePassed(CardDiscovery $discovery): bool
     {
         return $discovery->deadline_at !== null && now()->greaterThan($discovery->deadline_at);
+    }
+
+    /**
+     * @param  array<int, mixed>  $answers
+     * @return list<array{question: string, answer: string}>
+     */
+    private function filledAnswers(array $answers): array
+    {
+        $pairs = [];
+        foreach ($answers as $pair) {
+            if (! is_array($pair)) {
+                continue;
+            }
+
+            $question = trim((string) ($pair['question'] ?? ''));
+            $answer = trim((string) ($pair['answer'] ?? ''));
+            if ($question === '' || $answer === '') {
+                continue;
+            }
+
+            $pairs[] = ['question' => $question, 'answer' => $answer];
+        }
+
+        return $pairs;
+    }
+
+    private function previousMarkdown(?CardDiscovery $discovery): ?string
+    {
+        if ($discovery === null || $discovery->document_disk !== 'discoveries' || ! is_string($discovery->document_path)) {
+            return null;
+        }
+
+        $path = $discovery->document_path;
+        if ($path === '' || str_contains($path, '..')) {
+            return null;
+        }
+
+        $disk = Storage::disk('discoveries');
+        if (! $disk->exists($path)) {
+            return null;
+        }
+
+        $markdown = $disk->get($path);
+
+        return is_string($markdown) && trim($markdown) !== '' ? $markdown : null;
     }
 }

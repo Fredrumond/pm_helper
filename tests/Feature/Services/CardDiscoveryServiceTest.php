@@ -304,6 +304,218 @@ class CardDiscoveryServiceTest extends TestCase
         $this->assertFalse($syncJob->job->isReleased());
     }
 
+    public function test_request_with_one_answer_persists_the_pairs_and_dispatches_one_job(): void
+    {
+        Queue::fake();
+        Event::fake([MessageLogged::class]);
+        Storage::fake('discoveries');
+        $this->fakeAgents();
+        [$user, $card] = $this->approvedCard();
+        $this->storePreviousDiscovery($card, "# Antigo\n\n## 6. Dúvidas\n\n- Qual o prazo? — importa");
+
+        $discovery = app(CardDiscoveryService::class)->requestWithAnswers($card, $user, [
+            ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+            ['question' => 'Cobre a API?', 'answer' => '   '],
+        ]);
+
+        $this->assertSame(CardDiscovery::STATUS_REQUESTED, $discovery->status);
+        $this->assertSame([
+            ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+        ], $discovery->pending_answers);
+        Queue::assertPushed(AdvanceCardDiscovery::class, 1);
+        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log): bool {
+            $encoded = json_encode($log->context);
+
+            return $log->message === 'card_discovery.requested'
+                && ($log->context['answers_count'] ?? null) === 1
+                && is_string($encoded)
+                && ! str_contains($encoded, 'Duas semanas');
+        });
+    }
+
+    public function test_empty_answers_do_not_dispatch_a_regeneration(): void
+    {
+        Queue::fake();
+        Storage::fake('discoveries');
+        [$user, $card] = $this->approvedCard();
+        $existing = $this->storePreviousDiscovery($card, "# Antigo\n\nTexto.");
+        $service = app(CardDiscoveryService::class);
+
+        foreach ([[], [['question' => 'Qual o prazo?', 'answer' => '  ']]] as $answers) {
+            try {
+                $service->requestWithAnswers($card->fresh(), $user, $answers);
+                $this->fail('Resposta vazia não pode disparar.');
+            } catch (CardDiscoveryNotAllowed $exception) {
+                $this->assertSame('Informe ao menos uma resposta para regenerar o Discovery.', $exception->getMessage());
+            }
+        }
+
+        Queue::assertNothingPushed();
+        $fresh = $existing->fresh();
+        $this->assertSame(CardDiscovery::STATUS_COMPLETED, $fresh->status);
+        $this->assertNull($fresh->pending_answers);
+
+        $withoutDocument = $this->createCard($user, Project::factory()->create([
+            'repository' => 'acme/other-app',
+            'branch' => 'develop',
+        ]));
+        try {
+            $service->requestWithAnswers($withoutDocument, $user, [
+                ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+            ]);
+            $this->fail('Sem Discovery anterior não pode disparar.');
+        } catch (CardDiscoveryNotAllowed $exception) {
+            $this->assertSame('A regeneração com respostas exige o Discovery anterior.', $exception->getMessage());
+        }
+
+        Queue::assertNothingPushed();
+        $this->assertNull($withoutDocument->fresh()->discovery);
+    }
+
+    public function test_another_user_cannot_regenerate_with_answers(): void
+    {
+        Queue::fake();
+        Event::fake([MessageLogged::class]);
+        Storage::fake('discoveries');
+        [$owner, $card] = $this->approvedCard();
+        $this->storePreviousDiscovery($card, "# Antigo\n\nTexto.");
+        $other = User::factory()->create();
+
+        try {
+            app(CardDiscoveryService::class)->requestWithAnswers($card, $other, [
+                ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+            ]);
+            $this->fail('Outro usuário deveria receber 403.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+
+        Queue::assertNothingPushed();
+        $this->assertNull($card->fresh()->discovery->pending_answers);
+        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($card, $other): bool {
+            return $log->level === 'warning'
+                && $log->message === 'card_discovery.forbidden'
+                && $log->context['card_id'] === $card->id
+                && $log->context['user_id'] === $other->id;
+        });
+    }
+
+    public function test_regeneration_with_answers_is_rejected_while_one_is_in_progress(): void
+    {
+        Queue::fake();
+        Storage::fake('discoveries');
+        [$user, $card] = $this->approvedCard();
+        $this->storePreviousDiscovery($card, "# Antigo\n\nTexto.");
+        $service = app(CardDiscoveryService::class);
+        $service->requestWithAnswers($card, $user, [
+            ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+        ]);
+
+        try {
+            $service->requestWithAnswers($card->fresh(), $user, [
+                ['question' => 'Qual o prazo?', 'answer' => 'Três semanas'],
+            ]);
+            $this->fail('Não pode disparar de novo enquanto está em andamento.');
+        } catch (CardDiscoveryNotAllowed $exception) {
+            $this->assertSame('Já existe um Discovery em andamento para este card.', $exception->getMessage());
+        }
+
+        Queue::assertPushed(AdvanceCardDiscovery::class, 1);
+        $this->assertSame('Duas semanas', $card->fresh()->discovery->pending_answers[0]['answer']);
+    }
+
+    public function test_successful_regeneration_replaces_the_document_and_clears_the_answers(): void
+    {
+        Storage::fake('discoveries');
+        $gateway = $this->fakeAgents();
+        $gateway->snapshots = [DiscoveryAgentSnapshot::finished("# Novo\n\nPremissa: duas semanas.")];
+        [$user, $card] = $this->approvedCard();
+        $previous = "# Antigo\n\n## 6. Dúvidas\n\n- Qual o prazo? — importa";
+        $this->storePreviousDiscovery($card, $previous);
+        $path = 'cards/'.$card->id.'/discovery.md';
+
+        $discovery = app(CardDiscoveryService::class)->requestWithAnswers($card, $user, [
+            ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+        ]);
+
+        $prompt = (string) $gateway->lastRequest?->prompt;
+        $answerAt = mb_strpos($prompt, 'Duas semanas');
+        $this->assertNotFalse($answerAt);
+        $this->assertLessThan($answerAt, mb_strpos($prompt, 'OVERRIDE OBRIGATÓRIO'));
+        $this->assertStringContainsString('Avisar card parecido', $prompt);
+        $this->assertStringContainsString($previous, $prompt);
+        $this->assertStringContainsString('Qual o prazo?', $prompt);
+        $this->assertStringContainsString('Somente leitura', $prompt);
+        $this->assertStringContainsString('NÃO faça commit', $prompt);
+        $this->assertSame(CardDiscovery::STATUS_COMPLETED, $discovery->status);
+        $this->assertNull($discovery->pending_answers);
+        $this->assertSame($path, $discovery->document_path);
+        $this->assertSame("# Novo\n\nPremissa: duas semanas.", Storage::disk('discoveries')->get($path));
+    }
+
+    public function test_failed_regeneration_keeps_the_answers_and_the_previous_document(): void
+    {
+        Storage::fake('discoveries');
+        $gateway = $this->fakeAgents();
+        [$user, $card] = $this->approvedCard();
+        $previous = "# Antigo\n\nVersao boa.";
+        $this->storePreviousDiscovery($card, $previous);
+        $path = 'cards/'.$card->id.'/discovery.md';
+        $service = app(CardDiscoveryService::class);
+        $answers = [['question' => 'Qual o prazo?', 'answer' => 'Duas semanas']];
+
+        $gateway->snapshots = [DiscoveryAgentSnapshot::failed('ERROR')];
+        $failed = $service->requestWithAnswers($card, $user, $answers);
+        $this->assertSame(CardDiscovery::STATUS_FAILED, $failed->status);
+        $this->assertSame($answers, $failed->pending_answers);
+        $this->assertSame($previous, Storage::disk('discoveries')->get($path));
+
+        $gateway->snapshots = [DiscoveryAgentSnapshot::finished('   ')];
+        $empty = $service->requestWithAnswers($card->fresh(), $user, $answers);
+        $this->assertSame(CardDiscoveryService::MESSAGE_EMPTY, $empty->error_message);
+        $this->assertSame($answers, $empty->pending_answers);
+        $this->assertSame($previous, Storage::disk('discoveries')->get($path));
+
+        $running = CardDiscovery::query()->where('card_id', $card->id)->firstOrFail();
+        $running->forceFill([
+            'status' => CardDiscovery::STATUS_RUNNING,
+            'external_agent_id' => 'agent-1',
+            'external_run_id' => 'run-1',
+            'deadline_at' => now()->subMinute(),
+            'error_message' => null,
+            'pending_answers' => $answers,
+        ])->save();
+
+        $this->assertFalse($service->advance($running->fresh()));
+        $timedOut = $running->fresh();
+        $this->assertSame(CardDiscovery::STATUS_FAILED, $timedOut->status);
+        $this->assertSame(CardDiscoveryService::MESSAGE_TIMEOUT, $timedOut->error_message);
+        $this->assertSame($answers, $timedOut->pending_answers);
+        $this->assertSame($previous, Storage::disk('discoveries')->get($path));
+    }
+
+    public function test_request_without_answers_does_not_send_pending_answers(): void
+    {
+        Storage::fake('discoveries');
+        $gateway = $this->fakeAgents();
+        $gateway->snapshots = [DiscoveryAgentSnapshot::finished("# Novo\n\nSem respostas.")];
+        [$user, $card] = $this->approvedCard();
+        $discovery = $this->storePreviousDiscovery($card, "# Antigo\n\nTexto.");
+        $discovery->forceFill([
+            'pending_answers' => [
+                ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+            ],
+        ])->save();
+
+        $fresh = app(CardDiscoveryService::class)->request($card, $user);
+
+        $prompt = (string) $gateway->lastRequest?->prompt;
+        $this->assertStringNotContainsString('Duas semanas', $prompt);
+        $this->assertStringNotContainsString('Contexto da regeneração', $prompt);
+        $this->assertStringContainsString('Somente leitura', $prompt);
+        $this->assertNull($fresh->pending_answers);
+    }
+
     public function test_worker_give_up_marks_timeout_and_keeps_the_file(): void
     {
         Storage::fake('discoveries');
@@ -332,6 +544,21 @@ class CardDiscoveryServiceTest extends TestCase
         ])->save();
         (new AdvanceCardDiscovery($discovery->id))->failed(new \RuntimeException('expired'));
         $this->assertSame(CardDiscovery::STATUS_COMPLETED, $discovery->fresh()->status);
+    }
+
+    private function storePreviousDiscovery(Card $card, string $markdown): CardDiscovery
+    {
+        $path = 'cards/'.$card->id.'/discovery.md';
+        Storage::disk('discoveries')->put($path, $markdown);
+
+        return CardDiscovery::query()->create([
+            'card_id' => $card->id,
+            'provider' => 'cursor',
+            'status' => CardDiscovery::STATUS_COMPLETED,
+            'document_disk' => 'discoveries',
+            'document_path' => $path,
+            'finished_at' => now(),
+        ]);
     }
 
     /**
