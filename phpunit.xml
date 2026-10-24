@@ -35,5 +35,7 @@
         <env name="GITHUB_APP_ID" value="" force="true"/>
         <env name="GITHUB_APP_PRIVATE_KEY" value="" force="true"/>
         <env name="GITHUB_APP_INSTALLATION_ID" value="" force="true"/>
+        <env name="CURSOR_API_KEY" value="" force="true"/>
+        <env name="CURSOR_MODEL" value="" force="true"/>
     </php>
 </phpunit>

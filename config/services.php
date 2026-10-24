@@ -13,7 +13,7 @@ return [
     ],
 
     'ses' => [
-        'key'    => env('AWS_ACCESS_KEY_ID'),
+        'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
@@ -25,7 +25,7 @@ return [
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
-            'channel'              => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
+            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
 
@@ -36,7 +36,7 @@ return [
     */
     'openrouter' => [
         'api_key' => env('OPENROUTER_API_KEY'),
-        'model'   => env('OPENROUTER_MODEL', 'nvidia/nemotron-3-ultra-550b-a55b:free'),
+        'model' => env('OPENROUTER_MODEL', 'nvidia/nemotron-3-ultra-550b-a55b:free'),
         'fallback_models' => array_values(array_filter(array_map(
             'trim',
             explode(',', (string) env(
@@ -53,7 +53,7 @@ return [
     */
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
-        'model'   => env('OPENAI_MODEL', 'gpt-4o-mini'),
+        'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
     ],
 
     /*
@@ -69,6 +69,23 @@ return [
         'app_id' => env('GITHUB_APP_ID', ''),
         'private_key' => env('GITHUB_APP_PRIVATE_KEY', ''),
         'installation_id' => env('GITHUB_APP_INSTALLATION_ID', ''),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cursor Cloud Agent
+    |--------------------------------------------------------------------------
+    |
+    | Chave única do sistema para disparar o Discovery a partir do card.
+    | Fica só no ambiente — nunca no banco nem na tela.
+    |
+    */
+    'cursor' => [
+        'api_key' => env('CURSOR_API_KEY'),
+        'base_url' => env('CURSOR_API_BASE', 'https://api.cursor.com/v1'),
+        'model' => env('CURSOR_MODEL'),
+        'poll_seconds' => max(3, (int) env('CURSOR_POLL_SECONDS', 10)),
+        'timeout_minutes' => max(1, (int) env('CURSOR_TIMEOUT_MINUTES', 20)),
     ],
 
 ];

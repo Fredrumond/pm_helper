@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Contracts\AgentGateway;
 use App\Contracts\LlmGateway;
 use App\Contracts\ProjectDocsGateway;
 use App\Models\LlmModel;
 use App\Models\User;
+use App\Services\Adapters\CursorAgentAdapter;
 use App\Services\Adapters\GitHubMcpProjectDocsGateway;
 use App\Services\Adapters\OpenAiAdapter;
 use App\Services\Adapters\OpenRouterAdapter;
@@ -35,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->bind(ProjectDocsGateway::class, GitHubMcpProjectDocsGateway::class);
+        $this->app->bind(AgentGateway::class, CursorAgentAdapter::class);
     }
 
     /**
