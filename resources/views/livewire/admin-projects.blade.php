@@ -151,10 +151,23 @@
         </div>
         <div class="space-y-3">
             @foreach ($projects as $project)
-                <div wire:key="project-{{ $project->id }}" class="bg-white border border-gray-200 rounded-xl px-5 py-4">
+                <div wire:key="project-{{ $project->id }}" @class([
+                    'border rounded-xl px-5 py-4',
+                    'bg-white border-gray-200' => ! $project->trashed(),
+                    'bg-gray-50 border-gray-200' => $project->trashed(),
+                ])>
                     <div class="flex items-start justify-between gap-4">
                         <div class="min-w-0">
-                            <p class="font-medium text-gray-900 truncate">{{ $project->name }}</p>
+                            <div class="flex items-center gap-2 min-w-0">
+                                <p @class(['font-medium truncate', 'text-gray-900' => ! $project->trashed(), 'text-gray-600' => $project->trashed()])>
+                                    {{ $project->name }}
+                                </p>
+                                @if ($project->trashed())
+                                    <span class="shrink-0 inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700">
+                                        Desativado
+                                    </span>
+                                @endif
+                            </div>
                             <p class="text-xs font-mono text-gray-500 mt-1 truncate">{{ $project->repository }} @ {{ $project->branch }}</p>
                             @if ($project->documents_count === 0)
                                 <span class="mt-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
@@ -163,29 +176,37 @@
                             @endif
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            <button type="button"
-                                    wire:click="syncDocuments({{ $project->id }})"
-                                    wire:loading.attr="disabled"
-                                    wire:target="syncDocuments, save"
-                                    class="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <span wire:loading.remove wire:target="syncDocuments({{ $project->id }})">Sincronizar</span>
-                                <span wire:loading wire:target="syncDocuments({{ $project->id }})">Sincronizando…</span>
-                            </button>
-                            <button type="button"
-                                    wire:click="startEdit({{ $project->id }})"
-                                    wire:loading.attr="disabled"
-                                    wire:target="syncDocuments, save"
-                                    class="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                                Editar
-                            </button>
-                            <button type="button"
-                                    wire:click="deactivate({{ $project->id }})"
-                                    wire:confirm="Desativar o projeto {{ $project->name }}?"
-                                    wire:loading.attr="disabled"
-                                    wire:target="syncDocuments, save"
-                                    class="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                                Desativar
-                            </button>
+                            @if ($project->trashed())
+                                <button type="button"
+                                        wire:click="reactivate({{ $project->id }})"
+                                        class="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                                    Reativar
+                                </button>
+                            @else
+                                <button type="button"
+                                        wire:click="syncDocuments({{ $project->id }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="syncDocuments, save"
+                                        class="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <span wire:loading.remove wire:target="syncDocuments({{ $project->id }})">Sincronizar</span>
+                                    <span wire:loading wire:target="syncDocuments({{ $project->id }})">Sincronizando…</span>
+                                </button>
+                                <button type="button"
+                                        wire:click="startEdit({{ $project->id }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="syncDocuments, save"
+                                        class="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Editar
+                                </button>
+                                <button type="button"
+                                        wire:click="deactivate({{ $project->id }})"
+                                        wire:confirm="Desativar o projeto {{ $project->name }}?"
+                                        wire:loading.attr="disabled"
+                                        wire:target="syncDocuments, save"
+                                        class="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Desativar
+                                </button>
+                            @endif
                         </div>
                     </div>
                 </div>

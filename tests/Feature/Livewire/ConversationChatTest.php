@@ -1523,6 +1523,10 @@ TXT;
             'title' => 'Conversa anterior',
             'project_id' => $project->id,
         ]);
+        $existing->messages()->create([
+            'role' => 'user',
+            'content' => 'Já comecei esta conversa',
+        ]);
 
         $this->actingAs($user)
             ->withSession(['current_project_id' => $project->id])

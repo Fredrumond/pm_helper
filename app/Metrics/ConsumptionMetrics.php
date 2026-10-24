@@ -27,6 +27,7 @@ class ConsumptionMetrics
         $usages = $this->usagesFor($user)->get();
 
         $conversations = $user->conversations()
+            ->withTrashed()
             ->selectRaw('COUNT(*) as total')
             ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
             ->first();
@@ -77,7 +78,7 @@ class ConsumptionMetrics
     public function recent(User $user, int $limit = 20): Collection
     {
         return $this->usagesFor($user)
-            ->with('conversation:id,title,user_id')
+            ->with('conversation:id,title,user_id,deleted_at')
             ->latest()
             ->limit($limit)
             ->get();
@@ -89,7 +90,7 @@ class ConsumptionMetrics
     private function usagesFor(User $user): Builder
     {
         return LlmUsage::query()->where(function (Builder $query) use ($user): void {
-            $query->whereIn('conversation_id', $user->conversations()->select('id'))
+            $query->whereIn('conversation_id', $user->conversations()->withTrashed()->select('id'))
                 ->orWhere('user_id', $user->id);
         });
     }

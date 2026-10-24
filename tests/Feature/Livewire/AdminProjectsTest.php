@@ -202,7 +202,7 @@ class AdminProjectsTest extends TestCase
         });
     }
 
-    public function test_admin_deactivates_project_it_leaves_the_list_and_keeps_deleted_at(): void
+    public function test_admin_deactivates_project_it_stays_in_the_list_as_inactive(): void
     {
         Event::fake([MessageLogged::class]);
 
@@ -218,10 +218,14 @@ class AdminProjectsTest extends TestCase
             ->test(AdminProjects::class)
             ->assertSee('App mobile')
             ->assertSee('octocat/hello-world')
+            ->assertSee('Desativar')
             ->call('deactivate', $project->id)
-            ->assertDontSee('App mobile')
-            ->assertDontSee('octocat/hello-world')
-            ->assertSee('Nenhum projeto ativo.');
+            ->assertSee('App mobile')
+            ->assertSee('octocat/hello-world')
+            ->assertSee('Desativado')
+            ->assertSee('Reativar')
+            ->assertDontSee('Desativar')
+            ->assertDontSee('Nenhum projeto ativo.');
 
         $this->assertSoftDeleted('projects', [
             'id' => $project->id,
@@ -234,6 +238,44 @@ class AdminProjectsTest extends TestCase
         $this->assertProjectAudit('deleted', $admin->id, $project->id);
         Event::assertNotDispatched(MessageLogged::class, function (MessageLogged $log): bool {
             return $log->message === 'Projeto desativado.';
+        });
+    }
+
+    public function test_admin_reactivates_a_deactivated_project(): void
+    {
+        Event::fake([MessageLogged::class]);
+
+        $admin = User::factory()->admin()->create();
+        $project = Project::factory()->create([
+            'name' => 'App mobile',
+            'repository' => 'octocat/hello-world',
+        ]);
+        $project->delete();
+
+        config(['audit.console' => true]);
+
+        Livewire::actingAs($admin)
+            ->test(AdminProjects::class)
+            ->assertSee('App mobile')
+            ->assertSee('Desativado')
+            ->assertSee('Reativar')
+            ->call('reactivate', $project->id)
+            ->assertSee('Projeto reativado.')
+            ->assertSee('App mobile')
+            ->assertSee('Desativar')
+            ->assertDontSee('Desativado')
+            ->assertDontSee('Reativar');
+
+        $this->assertNotSoftDeleted('projects', [
+            'id' => $project->id,
+            'repository' => 'octocat/hello-world',
+        ]);
+        $this->assertNull($project->fresh()->deleted_at);
+        $this->assertSame(1, Project::query()->count());
+
+        $this->assertProjectAudit('restored', $admin->id, $project->id);
+        Event::assertNotDispatched(MessageLogged::class, function (MessageLogged $log): bool {
+            return $log->message === 'Projeto reativado.';
         });
     }
 

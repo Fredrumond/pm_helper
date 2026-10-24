@@ -204,9 +204,13 @@
                                 <p class="text-sm font-medium text-gray-800 truncate">{{ $usage->model }}</p>
                                 <p class="text-[11px] text-gray-400 mt-0.5">
                                     @if ($usage->conversation)
-                                        <a href="{{ route('conversations.show', $usage->conversation) }}" class="hover:text-indigo-600">
+                                        @if ($usage->conversation->trashed())
                                             {{ $usage->conversation->title }}
-                                        </a>
+                                        @else
+                                            <a href="{{ route('conversations.show', $usage->conversation) }}" class="hover:text-indigo-600">
+                                                {{ $usage->conversation->title }}
+                                            </a>
+                                        @endif
                                         ·
                                     @endif
                                     @if ($usage->step)

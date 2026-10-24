@@ -157,4 +157,35 @@ class ConsumptionMetricsTest extends TestCase
         $this->assertSame(1, $byModel['text-embedding-3-small']['calls']);
         $this->assertSame('$0.00002', $byModel['text-embedding-3-small']['formatted_cost']);
     }
+
+    public function test_includes_usage_from_soft_deleted_conversations(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'status' => 'completed',
+        ]);
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'model' => 'test/a',
+            'prompt_tokens' => 10,
+            'completion_tokens' => 5,
+            'total_tokens' => 15,
+            'cost' => 0.20,
+        ]);
+
+        $conversation->delete();
+
+        $metrics = new ConsumptionMetrics;
+        $summary = $metrics->summary($user);
+        $recent = $metrics->recent($user);
+
+        $this->assertSame(1, $summary['calls']);
+        $this->assertEqualsWithDelta(0.20, $summary['cost'], 0.0000001);
+        $this->assertSame(1, $summary['conversations']);
+        $this->assertSame(1, $summary['completed']);
+        $this->assertTrue($recent->first()?->conversation?->trashed());
+        $this->assertSame('Checkout', $recent->first()?->conversation?->title);
+    }
 }

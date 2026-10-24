@@ -39,7 +39,7 @@ class LlmUsage extends Model
 
     public function conversation(): BelongsTo
     {
-        return $this->belongsTo(Conversation::class);
+        return $this->belongsTo(Conversation::class)->withTrashed();
     }
 
     public function user(): BelongsTo

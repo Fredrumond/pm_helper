@@ -45,7 +45,7 @@ class ExploreController extends Controller
         abort_if($conversation->user_id !== Auth::id(), 403);
         abort_unless($conversation->isExplore(), 404);
 
-        $conversation->delete();
+        $conversation->forceDelete();
 
         return redirect()->route('explorar.index')
             ->with('message', 'Exploração excluída.');

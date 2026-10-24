@@ -127,12 +127,23 @@ class AdminProjects extends Component
         }
     }
 
+    public function reactivate(int $projectId): void
+    {
+        $this->ensureAdmin();
+
+        $project = Project::withTrashed()->findOrFail($projectId);
+        $project->restore();
+
+        $this->statusMessage = 'Projeto reativado.';
+        $this->errorMessage = null;
+    }
+
     public function render(): View
     {
         $this->ensureAdmin();
 
         return view('livewire.admin-projects', [
-            'projects' => Project::query()->withCount('documents')->orderBy('name')->get(),
+            'projects' => Project::withTrashed()->withCount('documents')->orderBy('name')->orderBy('id')->get(),
         ]);
     }
 
@@ -169,7 +180,7 @@ class AdminProjects extends Component
 
     private function repositoryConflictMessage(): string
     {
-        return 'Já existe um projeto com este repositório, inclusive desativado. Edite o registro existente; não é possível cadastrar o mesmo owner/repo de novo.';
+        return 'Já existe um projeto com este repositório, inclusive desativado. Edite ou reative o registro existente; não é possível cadastrar o mesmo owner/repo de novo.';
     }
 
     private function applySyncResult(ProjectDocumentsSyncResult $result): bool
