@@ -163,6 +163,47 @@ return [
     'releases' => [
 
         [
+            'versao' => '0.12.0',
+            'data' => '2026-10-26',
+            'estado' => 'development',
+            'titulo' => 'PM vê só Conversas e Cards',
+            'resumo' => 'O PM deixa de ver Explorar, Documentos e o consumo da sessão. Menu e URL dessas superfícies ficam com o admin; o card do PM abre sem o bloco de tokens e custo.',
+            'commits' => [],
+            'modulos' => [
+                [
+                    'nome' => 'Navegação',
+                    'itens' => [
+                        ['titulo' => 'Menu do PM mostra só Conversas e Cards', 'estado' => 'development', 'nota' => 'Explorar e Documentos saem do menu desktop e do menu responsivo'],
+                    ],
+                ],
+                [
+                    'nome' => 'Explorar e Documentos',
+                    'itens' => [
+                        ['titulo' => 'Rotas de Explorar e Documentos exigem admin', 'estado' => 'development', 'nota' => 'Middleware admin; Livewire também recusa quem não é admin'],
+                    ],
+                ],
+                [
+                    'nome' => 'Cards',
+                    'itens' => [
+                        ['titulo' => 'Consumo da sessão no card só para o admin', 'estado' => 'development', 'nota' => 'O PM vê o card sem tokens e custo'],
+                    ],
+                ],
+                [
+                    'nome' => 'Documentação',
+                    'itens' => [
+                        ['titulo' => 'Discovery 0019 — PM vê só conversas e cards', 'estado' => 'development', 'nota' => 'docs/discovery/0019-pm-ve-so-conversas-e-cards.md'],
+                    ],
+                ],
+                [
+                    'nome' => 'Testes',
+                    'itens' => [
+                        ['titulo' => 'Explore, Documentos e consumo da sessão cobrem o papel do PM', 'estado' => 'test'],
+                    ],
+                ],
+            ],
+        ],
+
+        [
             'versao' => '0.11.0',
             'data' => '2026-10-24',
             'estado' => 'development',

@@ -6,7 +6,7 @@
     $summary = $conversation->usageSummary();
 @endphp
 
-@if ($usages->isNotEmpty())
+@if ($usages->isNotEmpty() && Auth::user()?->can('admin'))
     <section {{ $attributes->merge(['class' => 'rounded-xl border border-indigo-100 bg-indigo-50/60 p-4']) }}>
         <h3 class="text-xs font-semibold text-indigo-500 uppercase tracking-wide mb-3">Consumo da sessão</h3>
 
