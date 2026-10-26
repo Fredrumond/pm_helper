@@ -124,7 +124,7 @@
     <x-session-usage :conversation="$card->conversation" class="mb-5" />
 
     {{-- Ações --}}
-    @if (! $card->isApproved())
+    @if (! $card->isApproved() && Auth::id() === $card->user_id)
         <button wire:click="approve"
                 class="w-full py-2.5 bg-green-600 text-white text-sm font-semibold rounded-xl hover:bg-green-700 transition-colors">
             ✓ Aprovar Card

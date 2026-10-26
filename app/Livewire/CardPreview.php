@@ -12,7 +12,10 @@ class CardPreview extends Component
 
     public function mount(Card $card): void
     {
-        abort_if($card->user_id !== Auth::id(), 403);
+        abort_unless(
+            $card->user_id === Auth::id() || Auth::user()?->can('admin'),
+            403,
+        );
         abort_if($card->conversation()->doesntExist(), 404);
         $this->card = $card;
     }

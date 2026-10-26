@@ -28,7 +28,7 @@ class CardDiscoveryPanel extends Component
     public function mount(Card $card): void
     {
         $this->card = $card;
-        $this->authorizeOwner();
+        $this->authorizeReader();
     }
 
     public function generate(CardDiscoveryService $service): void
@@ -85,7 +85,7 @@ class CardDiscoveryPanel extends Component
 
     public function toggleDocument(): void
     {
-        $this->authorizeOwner();
+        $this->authorizeReader();
         $this->documentOpen = ! $this->documentOpen;
     }
 
@@ -97,20 +97,21 @@ class CardDiscoveryPanel extends Component
         $questions = $markdown !== null ? DiscoveryQuestions::fromMarkdown($markdown) : [];
         $this->syncAnswers($questions, $discovery);
         $inProgress = $discovery?->isInProgress() ?? false;
+        $owner = $this->isOwner();
 
         return view('livewire.card-discovery-panel', [
             'discovery' => $discovery,
             'visible' => $this->eligible() || $discovery !== null,
-            'canGenerate' => $this->eligible() && ($discovery === null || ! $inProgress),
+            'canGenerate' => $owner && $this->eligible() && ($discovery === null || ! $inProgress),
             'buttonLabel' => ($discovery !== null && ($discovery->isTerminal() || $markdown !== null))
                 ? 'Gerar de novo'
                 : 'Gerar Discovery',
             'attachmentTitle' => $markdown !== null ? DiscoveryMarkdown::title($markdown) : null,
             'documentHtml' => ($markdown !== null && $this->documentOpen) ? DiscoveryMarkdown::toHtml($markdown) : null,
             'hasDocument' => $markdown !== null,
-            'questions' => $questions,
+            'questions' => $owner ? $questions : [],
             'answersLocked' => $inProgress,
-            'canRegenerateWithAnswers' => $markdown !== null && $questions !== [] && ! $inProgress && $this->hasFilledAnswer(),
+            'canRegenerateWithAnswers' => $owner && $markdown !== null && $questions !== [] && ! $inProgress && $this->hasFilledAnswer(),
         ]);
     }
 
@@ -189,12 +190,31 @@ class CardDiscoveryPanel extends Component
         return is_string($markdown) && trim($markdown) !== '' ? $markdown : null;
     }
 
-    private function authorizeOwner(): void
+    private function isOwner(): bool
     {
-        if ($this->card->user_id === Auth::id()) {
+        return $this->card->user_id === Auth::id();
+    }
+
+    private function authorizeReader(): void
+    {
+        if ($this->isOwner() || Auth::user()?->can('admin')) {
             return;
         }
 
+        $this->forbid();
+    }
+
+    private function authorizeOwner(): void
+    {
+        if ($this->isOwner()) {
+            return;
+        }
+
+        $this->forbid();
+    }
+
+    private function forbid(): void
+    {
         Log::warning('card_discovery.forbidden', [
             'card_id' => $this->card->id,
             'user_id' => Auth::id(),

@@ -39,6 +39,9 @@
                                 <p class="font-medium text-gray-900 truncate group-hover:text-indigo-600">
                                     {{ $conversation->title }}
                                 </p>
+                                @if (Auth::user()->isAdmin())
+                                    <p class="text-xs text-gray-500 mt-0.5">{{ $conversation->user?->name }}</p>
+                                @endif
                                 <p class="text-xs text-gray-400 mt-1">
                                     {{ $conversation->created_at->diffForHumans() }}
                                     &middot;

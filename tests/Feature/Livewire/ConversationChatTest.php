@@ -1818,6 +1818,69 @@ TXT;
         $this->assertSame($project->id, $conversation->fresh()->project_id);
     }
 
+    public function test_admin_reads_another_users_interview_without_changing_it(): void
+    {
+        Http::preventStrayRequests();
+
+        $owner = User::factory()->create();
+        $admin = User::factory()->admin()->create();
+        $project = Project::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $owner->id,
+            'title' => 'Entrevista da Marina',
+            'interview_summary' => 'Resumo pronto para o card.',
+            'current_step' => 'card_generation',
+        ]);
+        $conversation->messages()->create([
+            'role' => 'user',
+            'content' => 'Quero avisar quando a tarefa for parecida.',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->assertOk()
+            ->assertSee('Quero avisar quando a tarefa for parecida.')
+            ->assertDontSee('Gerar Card')
+            ->assertDontSee('wire:submit="sendMessage"', false)
+            ->assertDontSee('aria-label="Projeto"', false)
+            ->assertDontSee('Tentar revisão novamente');
+
+        Livewire::actingAs($admin)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->set('input', 'mensagem indevida')
+            ->call('sendMessage')
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('messages', [
+            'conversation_id' => $conversation->id,
+            'content' => 'mensagem indevida',
+        ]);
+        $this->assertSame('Entrevista da Marina', $conversation->fresh()->title);
+        $this->assertNull($conversation->fresh()->project_id);
+
+        Livewire::actingAs($admin)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('selectProject', $project->id)
+            ->assertForbidden();
+
+        $this->assertNull($conversation->fresh()->project_id);
+
+        Livewire::actingAs($admin)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('generateCard')
+            ->assertForbidden();
+
+        Livewire::actingAs($admin)
+            ->test(ConversationChat::class, ['conversation' => $conversation])
+            ->call('retryProjectDocsReview')
+            ->assertForbidden();
+
+        $this->assertSame(1, $conversation->messages()->count());
+        $this->assertDatabaseMissing('cards', [
+            'conversation_id' => $conversation->id,
+        ]);
+    }
+
     private function assertReviewThenBriefing(
         Conversation $conversation,
         ProjectDocsResult $review,

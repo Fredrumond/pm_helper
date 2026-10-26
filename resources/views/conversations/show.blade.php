@@ -44,13 +44,15 @@
                         </span>
                     @endif
                 </div>
-                <form method="POST" action="{{ route('conversations.destroy', $conversation) }}"
-                      onsubmit="return confirm('Excluir esta conversa?')">
-                    @csrf @method('DELETE')
-                    <button type="submit" class="text-xs text-gray-400 hover:text-red-500 transition-colors">
-                        Excluir
-                    </button>
-                </form>
+                @if ($conversation->user_id === Auth::id())
+                    <form method="POST" action="{{ route('conversations.destroy', $conversation) }}"
+                          onsubmit="return confirm('Excluir esta conversa?')">
+                        @csrf @method('DELETE')
+                        <button type="submit" class="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                            Excluir
+                        </button>
+                    </form>
+                @endif
             </div>
 
             {{-- Componente Livewire do chat --}}

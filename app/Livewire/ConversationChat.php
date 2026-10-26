@@ -33,7 +33,7 @@ class ConversationChat extends Component
 
     public function mount(Conversation $conversation): void
     {
-        abort_if($conversation->user_id !== Auth::id(), 403);
+        $this->abortUnlessCanRead($conversation);
         $this->conversation = $conversation;
         $this->forgetInactiveProjectIfNotStarted();
         session()->forget('chat.selected_model');
@@ -41,7 +41,7 @@ class ConversationChat extends Component
 
     public function selectProject(mixed $projectId): void
     {
-        abort_if($this->conversation->user_id !== Auth::id(), 403);
+        $this->abortUnlessOwner();
 
         if ($this->conversationHasStarted()) {
             $this->hydrateSelectedProject();
@@ -64,6 +64,8 @@ class ConversationChat extends Component
 
     public function sendMessage(LlmGateway $llm, CardParserService $parser): void
     {
+        $this->abortUnlessOwner();
+
         $this->forgetInactiveProjectIfNotStarted();
 
         if (trim($this->input) === '' || $this->conversation->isCompleted()) {
@@ -148,6 +150,8 @@ class ConversationChat extends Component
 
     public function retryProjectDocsReview(DocsRetrievalService $retrieval): void
     {
+        $this->abortUnlessOwner();
+
         if ($this->conversation->isCompleted() || ! ProjectDocsReview::canRetry($this->conversation->id)) {
             return;
         }
@@ -160,6 +164,8 @@ class ConversationChat extends Component
 
     public function generateCard(LlmGateway $llm, CardParserService $parser): void
     {
+        $this->abortUnlessOwner();
+
         if ($this->generatingCard) {
             return;
         }
@@ -460,6 +466,19 @@ class ConversationChat extends Component
             'showRetryProjectDocsReview' => ProjectDocsReview::canRetry($this->conversation->id)
                 && ! $this->conversation->isCompleted(),
         ]);
+    }
+
+    private function abortUnlessCanRead(Conversation $conversation): void
+    {
+        abort_unless(
+            $conversation->user_id === Auth::id() || Auth::user()?->can('admin'),
+            403,
+        );
+    }
+
+    private function abortUnlessOwner(): void
+    {
+        abort_if($this->conversation->user_id !== Auth::id(), 403);
     }
 
     private function activeModel(string $prompt): string

@@ -36,7 +36,7 @@
                 <p class="text-sm text-red-600">{{ $message }}</p>
             @enderror
 
-            @if ($canGenerate)
+            @if ($canGenerate && Auth::id() === $card->user_id)
                 <button type="button"
                         wire:click="generate"
                         wire:loading.attr="disabled"
@@ -59,7 +59,7 @@
                     </div>
                     @if ($documentHtml)
                         <div class="discovery-markdown mt-3 text-sm text-gray-800">{!! $documentHtml !!}</div>
-                        @if (count($questions) > 0)
+                        @if (count($questions) > 0 && Auth::id() === $card->user_id)
                             <div class="mt-4 space-y-3 border-t border-gray-200 pt-3">
                                 <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Dúvidas</p>
                                 @foreach ($questions as $index => $question)

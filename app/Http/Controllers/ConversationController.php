@@ -11,12 +11,18 @@ class ConversationController extends Controller
 {
     public function index(): View
     {
-        $conversations = Auth::user()
-            ->conversations()
-            ->interview()
-            ->with('card')
-            ->latest()
-            ->paginate(20);
+        $conversations = Auth::user()?->can('admin')
+            ? Conversation::query()
+                ->interview()
+                ->with(['user', 'card'])
+                ->latest()
+                ->paginate(20)
+            : Auth::user()
+                ->conversations()
+                ->interview()
+                ->with('card')
+                ->latest()
+                ->paginate(20);
 
         return view('conversations.index', compact('conversations'));
     }
@@ -44,7 +50,10 @@ class ConversationController extends Controller
 
     public function show(Conversation $conversation): View
     {
-        abort_if($conversation->user_id !== Auth::id(), 403);
+        abort_unless(
+            $conversation->user_id === Auth::id() || Auth::user()?->can('admin'),
+            403,
+        );
         abort_if($conversation->isExplore(), 404);
 
         $conversation->load(['messages', 'card', 'llmUsages']);
