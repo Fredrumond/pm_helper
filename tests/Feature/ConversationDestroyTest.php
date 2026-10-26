@@ -135,6 +135,104 @@ class ConversationDestroyTest extends TestCase
         ]);
     }
 
+    public function test_admin_lists_and_reads_another_users_interview_without_deleting_it(): void
+    {
+        $owner = User::factory()->create(['name' => 'Marina PM']);
+        $admin = User::factory()->admin()->create(['name' => 'Admin Auditor']);
+        $pm = User::factory()->create(['name' => 'Paulo PM']);
+
+        $interview = Conversation::query()->create([
+            'user_id' => $owner->id,
+            'title' => 'Entrevista da Marina',
+            'interview_summary' => 'Resumo pronto para o card.',
+            'current_step' => 'card_generation',
+        ]);
+        $interview->messages()->create([
+            'role' => 'user',
+            'content' => 'Quero avisar quando a tarefa for parecida.',
+        ]);
+
+        $explore = Conversation::createExploreFor($owner);
+
+        Conversation::query()->create([
+            'user_id' => $pm->id,
+            'title' => 'Entrevista do Paulo',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('conversations.index'))
+            ->assertOk()
+            ->assertSee('Entrevista da Marina')
+            ->assertSee('Marina PM')
+            ->assertSee('Entrevista do Paulo')
+            ->assertDontSee('href="'.route('conversations.show', $explore).'"', false);
+
+        $this->actingAs($pm)
+            ->get(route('conversations.index'))
+            ->assertOk()
+            ->assertSee('Entrevista do Paulo')
+            ->assertDontSee('Entrevista da Marina')
+            ->assertDontSee('Marina PM');
+
+        $this->actingAs($admin)
+            ->get(route('conversations.show', $interview))
+            ->assertOk()
+            ->assertSee('Quero avisar quando a tarefa for parecida.')
+            ->assertDontSee('Excluir')
+            ->assertDontSee('Gerar Card')
+            ->assertDontSee('wire:submit="sendMessage"', false)
+            ->assertDontSee('aria-label="Projeto"', false);
+
+        $this->actingAs($pm)
+            ->get(route('conversations.show', $interview))
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->delete(route('conversations.destroy', $interview))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('conversations', [
+            'id' => $interview->id,
+            'deleted_at' => null,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('conversations.show', $explore))
+            ->assertNotFound();
+    }
+
+    public function test_admin_reads_another_users_draft_preview_without_approving_it(): void
+    {
+        $owner = User::factory()->create();
+        $admin = User::factory()->admin()->create();
+        [$conversation, $card] = $this->interviewWithCardAndUsage($owner, title: 'Card da Marina');
+
+        $this->actingAs($admin)
+            ->get(route('conversations.show', $conversation))
+            ->assertOk()
+            ->assertSee('Card da Marina')
+            ->assertSee('Permitir que o comprador pague no checkout.')
+            ->assertDontSee('Aprovar Card');
+
+        $this->actingAs($admin)
+            ->get(route('cards.show', $card))
+            ->assertForbidden();
+
+        Livewire::actingAs($admin)
+            ->test(CardPreview::class, ['card' => $card])
+            ->assertDontSee('Aprovar Card')
+            ->call('approve')
+            ->assertForbidden();
+
+        $this->assertSame('draft', $card->fresh()->status);
+
+        [, $ownCard] = $this->interviewWithCardAndUsage($admin, title: 'Card do admin');
+
+        Livewire::actingAs($admin)
+            ->test(CardPreview::class, ['card' => $ownCard])
+            ->assertSee('Aprovar Card');
+    }
+
     /**
      * @return array{0: Conversation, 1: Card}
      */

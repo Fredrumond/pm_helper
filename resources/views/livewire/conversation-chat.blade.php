@@ -74,6 +74,7 @@
         </div>
     </div>
 
+    @if (Auth::id() === $conversation->user_id)
     {{-- Composer --}}
     <div class="bg-white border-t border-gray-200 px-4 py-3 shrink-0">
         @if ($conversation->isCompleted())
@@ -279,4 +280,5 @@
             @endif
         @endif
     </div>
+    @endif
 </div>
