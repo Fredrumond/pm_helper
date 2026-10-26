@@ -43,6 +43,9 @@
                                     </span>
                                 </div>
                                 <p class="font-semibold text-gray-900 group-hover:text-indigo-600 truncate">{{ $card->title }}</p>
+                                @if (Auth::user()->isAdmin())
+                                    <p class="text-xs text-gray-500 mt-0.5">{{ $card->user?->name }}</p>
+                                @endif
                                 @if ($card->objetivo)
                                     <p class="text-xs text-gray-400 mt-1 truncate">{{ $card->objetivo }}</p>
                                 @endif

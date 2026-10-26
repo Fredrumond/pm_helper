@@ -7,6 +7,7 @@ use App\Jobs\AdvanceCardDiscovery;
 use App\Livewire\CardDiscoveryPanel;
 use App\Models\Card;
 use App\Models\CardDiscovery;
+use App\Models\LlmUsage;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Agents\DiscoveryAgentSnapshot;
@@ -62,11 +63,22 @@ class CardDiscoveryPanelTest extends TestCase
     public function test_stranger_and_admin_cannot_open_the_card_or_the_panel(): void
     {
         Event::fake([MessageLogged::class]);
+        Queue::fake();
         Storage::fake('discoveries');
-        $user = User::factory()->create();
-        $card = $this->createCard($user, Project::factory()->create());
+        $owner = User::factory()->create(['name' => 'Marina PM']);
+        $card = $this->createCard($owner, Project::factory()->create(), 'approved', [
+            'title' => 'Card da Marina',
+        ]);
         $path = 'cards/'.$card->id.'/discovery.md';
-        Storage::disk('discoveries')->put($path, "# Segredo do discovery\n\nNao vazar.");
+        Storage::disk('discoveries')->put($path, <<<'MD'
+# Segredo do discovery
+
+Nao vazar para outro PM.
+
+## 6. Dúvidas
+
+- Onde mostrar o aviso? — Confirmar a tela
+MD);
         CardDiscovery::query()->create([
             'card_id' => $card->id,
             'provider' => 'cursor',
@@ -74,19 +86,35 @@ class CardDiscoveryPanelTest extends TestCase
             'document_disk' => 'discoveries',
             'document_path' => $path,
         ]);
+        LlmUsage::query()->create([
+            'conversation_id' => $card->conversation_id,
+            'model' => 'test/model',
+            'prompt_tokens' => 10,
+            'completion_tokens' => 5,
+            'total_tokens' => 15,
+            'cost' => 0.25,
+        ]);
 
-        $stranger = User::factory()->create();
-        $admin = User::factory()->admin()->create();
+        $stranger = User::factory()->create(['name' => 'Paulo PM']);
+        $admin = User::factory()->admin()->create(['name' => 'Admin Auditor']);
+
+        $this->actingAs($stranger)
+            ->get(route('cards.index'))
+            ->assertOk()
+            ->assertDontSee('Card da Marina')
+            ->assertDontSee('Marina PM');
+
+        $this->actingAs($admin)
+            ->get(route('cards.index'))
+            ->assertOk()
+            ->assertSee('Card da Marina')
+            ->assertSee('Marina PM');
 
         $this->actingAs($stranger)
             ->get(route('cards.show', $card))
             ->assertForbidden()
-            ->assertDontSee('Segredo do discovery');
-
-        $this->actingAs($admin)
-            ->get(route('cards.show', $card))
-            ->assertForbidden()
-            ->assertDontSee('Nao vazar.');
+            ->assertDontSee('Segredo do discovery')
+            ->assertDontSee('Nao vazar para outro PM.');
 
         Livewire::actingAs($stranger)
             ->test(CardDiscoveryPanel::class, ['card' => $card])
@@ -96,6 +124,55 @@ class CardDiscoveryPanelTest extends TestCase
             return $log->message === 'card_discovery.forbidden'
                 && $log->context['card_id'] === $card->id
                 && $log->context['user_id'] === $stranger->id;
+        });
+
+        $this->actingAs($admin)
+            ->get(route('cards.show', $card))
+            ->assertOk()
+            ->assertSee('Card da Marina')
+            ->assertSee('Consumo da sessão')
+            ->assertDontSee('Gerar Discovery')
+            ->assertDontSee('Gerar de novo com respostas')
+            ->assertDontSee('data-discovery-answer', false)
+            ->assertDontSee('Nao vazar para outro PM.');
+
+        Event::assertNotDispatched(MessageLogged::class, function (MessageLogged $log) use ($admin): bool {
+            return $log->message === 'card_discovery.forbidden'
+                && $log->context['user_id'] === $admin->id;
+        });
+
+        Livewire::actingAs($admin)
+            ->test(CardDiscoveryPanel::class, ['card' => $card])
+            ->assertOk()
+            ->assertDontSee('Gerar Discovery')
+            ->assertDontSee('data-discovery-answer', false)
+            ->assertDontSee('Gerar de novo com respostas')
+            ->call('toggleDocument')
+            ->assertSee('Segredo do discovery')
+            ->assertSee('Nao vazar para outro PM.')
+            ->assertSee('Onde mostrar o aviso?')
+            ->assertDontSee('data-discovery-answer', false)
+            ->assertDontSee('Gerar de novo com respostas')
+            ->set('answers.0', 'Na tela de criar')
+            ->call('generate')
+            ->assertForbidden();
+
+        Queue::assertNothingPushed();
+        $this->assertNull($card->fresh()->discovery->pending_answers);
+
+        Livewire::actingAs($admin)
+            ->test(CardDiscoveryPanel::class, ['card' => $card])
+            ->set('answers.0', 'Na tela de criar')
+            ->call('regenerateWithAnswers')
+            ->assertForbidden();
+
+        Queue::assertNothingPushed();
+        $this->assertNull($card->fresh()->discovery->pending_answers);
+        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($card, $admin): bool {
+            return $log->level === 'warning'
+                && $log->message === 'card_discovery.forbidden'
+                && $log->context['card_id'] === $card->id
+                && $log->context['user_id'] === $admin->id;
         });
     }
 

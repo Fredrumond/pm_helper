@@ -83,6 +83,17 @@ class ConversationDestroyTest extends TestCase
         Livewire::actingAs($user)
             ->test(CardPreview::class, ['card' => $card])
             ->assertNotFound();
+
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('cards.index'))
+            ->assertOk()
+            ->assertDontSee('Card oculto');
+
+        $this->actingAs($admin)
+            ->get(route('cards.show', $card))
+            ->assertNotFound();
     }
 
     public function test_metrics_still_include_cost_of_soft_deleted_conversation(): void
@@ -216,7 +227,9 @@ class ConversationDestroyTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('cards.show', $card))
-            ->assertForbidden();
+            ->assertOk()
+            ->assertSee('Card da Marina')
+            ->assertSee('Consumo da sessão');
 
         Livewire::actingAs($admin)
             ->test(CardPreview::class, ['card' => $card])

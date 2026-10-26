@@ -400,6 +400,44 @@ class CardDiscoveryServiceTest extends TestCase
         });
     }
 
+    public function test_admin_cannot_request_or_regenerate_another_users_discovery(): void
+    {
+        Queue::fake();
+        Event::fake([MessageLogged::class]);
+        Storage::fake('discoveries');
+        [, $card] = $this->approvedCard();
+        $discovery = $this->storePreviousDiscovery($card, "# Antigo\n\nTexto.");
+        $admin = User::factory()->admin()->create();
+        $service = app(CardDiscoveryService::class);
+
+        try {
+            $service->request($card, $admin);
+            $this->fail('Admin em card alheio deveria receber 403.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+
+        try {
+            $service->requestWithAnswers($card, $admin, [
+                ['question' => 'Qual o prazo?', 'answer' => 'Duas semanas'],
+            ]);
+            $this->fail('Admin em card alheio deveria receber 403.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+
+        Queue::assertNothingPushed();
+        $fresh = $discovery->fresh();
+        $this->assertSame(CardDiscovery::STATUS_COMPLETED, $fresh->status);
+        $this->assertNull($fresh->pending_answers);
+        Event::assertDispatched(MessageLogged::class, function (MessageLogged $log) use ($card, $admin): bool {
+            return $log->level === 'warning'
+                && $log->message === 'card_discovery.forbidden'
+                && $log->context['card_id'] === $card->id
+                && $log->context['user_id'] === $admin->id;
+        });
+    }
+
     public function test_regeneration_with_answers_is_rejected_while_one_is_in_progress(): void
     {
         Queue::fake();
