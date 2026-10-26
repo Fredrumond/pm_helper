@@ -32,6 +32,7 @@ config/
 
 docs/
   adr/             # Decisões de arquitetura (0001–0007; catálogo no banco é o 0007)
+  plan-slice/      # Planos de execução locais — não commitar
   MVP_LAUNCH_GUIDE.md
   POS_MVP_ROADMAP.md
 
@@ -90,6 +91,10 @@ Use o bom senso — **não rode a suite completa em toda mudança**. O objetivo 
 | Antes de criar um commit com entrega significativa | Rodar a suite completa |
 
 > **Regra geral:** se a mudança não toca PHP com lógica (services, models, livewire, adapters) e não altera schema, não rode os testes. Se tocar lógica, prefira `--filter` no escopo afetado antes de decidir rodar tudo.
+
+### Planos (`docs/plan-slice/`)
+- Planos em `docs/plan-slice/` ficam só na máquina local.
+- **Não os inclua em commits**, nem o arquivo do plano nem a atualização de status das fatias.
 
 ### Docker
 - O ambiente de desenvolvimento roda via `docker-compose up`.
