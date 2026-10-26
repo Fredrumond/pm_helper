@@ -7,6 +7,7 @@ use App\Models\DocumentChunk;
 use App\Services\DocumentChunker;
 use App\Services\DocumentSearch;
 use App\Services\MarkdownFrontmatterParser;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -42,8 +43,14 @@ class Documents extends Component
 
     public bool $searchComparedEmbeddings = false;
 
+    public function mount(): void
+    {
+        $this->ensureAdmin();
+    }
+
     public function startCreate(): void
     {
+        $this->ensureAdmin();
         $this->resetForm();
         $this->statusMessage = null;
         $this->showForm = true;
@@ -51,6 +58,8 @@ class Documents extends Component
 
     public function startEdit(int $documentId): void
     {
+        $this->ensureAdmin();
+
         $document = Document::query()->findOrFail($documentId);
 
         $this->editingId = $document->id;
@@ -64,11 +73,14 @@ class Documents extends Component
 
     public function cancelForm(): void
     {
+        $this->ensureAdmin();
         $this->resetForm();
     }
 
     public function save(): void
     {
+        $this->ensureAdmin();
+
         $this->name = trim($this->name);
 
         if ($this->editingId === null) {
@@ -106,6 +118,8 @@ class Documents extends Component
 
     public function search(): void
     {
+        $this->ensureAdmin();
+
         $this->question = trim($this->question);
         $this->validate([
             'question' => ['required', 'string'],
@@ -120,6 +134,8 @@ class Documents extends Component
 
     public function destroy(int $documentId): void
     {
+        $this->ensureAdmin();
+
         $document = Document::query()->findOrFail($documentId);
         $document->delete();
 
@@ -193,5 +209,10 @@ class Documents extends Component
     {
         $this->reset('name', 'content', 'file', 'editingId', 'showForm');
         $this->resetValidation();
+    }
+
+    private function ensureAdmin(): void
+    {
+        abort_unless(Auth::user()?->can('admin'), 403);
     }
 }

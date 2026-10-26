@@ -16,7 +16,7 @@ class SessionUsageTest extends TestCase
 
     public function test_shows_session_usage_on_conversation_and_card_after_card_is_generated(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Checkout',
@@ -82,9 +82,58 @@ class SessionUsageTest extends TestCase
             ->assertSee('#2 nvidia/nemotron-3-ultra-550b-a55b:free');
     }
 
-    public function test_hides_usage_block_when_session_has_no_records(): void
+    public function test_product_manager_sees_the_card_without_session_usage(): void
     {
         $user = User::factory()->create();
+        $conversation = Conversation::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Checkout',
+            'status' => 'completed',
+        ]);
+
+        $card = Card::query()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $user->id,
+            'title' => 'Checkout MVP',
+            'objetivo' => 'Permitir que o comprador pague no checkout.',
+            'como_funciona_hoje' => 'Fluxo atual sem pagamento',
+            'regras' => ['Exibir meios de pagamento disponíveis.'],
+            'onde' => ['Checkout'],
+            'aceite' => ['Comprador com carrinho: ao pagar, confirma o pedido.'],
+            'priority' => 'high',
+            'status' => 'draft',
+        ]);
+
+        LlmUsage::query()->create([
+            'conversation_id' => $conversation->id,
+            'generation_id' => 'gen-1',
+            'model' => 'nvidia/nemotron-3-ultra-550b-a55b:free',
+            'prompt_version' => 'v1',
+            'provider' => 'GMICloud',
+            'prompt_tokens' => 850,
+            'completion_tokens' => 131,
+            'total_tokens' => 981,
+            'cached_tokens' => 128,
+            'cost' => 0,
+            'finish_reason' => 'stop',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('conversations.show', $conversation))
+            ->assertOk()
+            ->assertSee('Checkout MVP')
+            ->assertDontSee('Consumo da sessão');
+
+        $this->actingAs($user)
+            ->get(route('cards.show', $card))
+            ->assertOk()
+            ->assertSee('Checkout MVP')
+            ->assertDontSee('Consumo da sessão');
+    }
+
+    public function test_hides_usage_block_when_session_has_no_records(): void
+    {
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::query()->create([
             'user_id' => $user->id,
             'title' => 'Checkout',

@@ -31,6 +31,7 @@ class ExploreChat extends Component
 
     public function mount(Conversation $conversation): void
     {
+        $this->ensureAdmin();
         abort_if($conversation->user_id !== Auth::id(), 403);
         abort_unless($conversation->isExplore(), 404);
 
@@ -40,6 +41,7 @@ class ExploreChat extends Component
 
     public function selectProject(mixed $projectId): void
     {
+        $this->ensureAdmin();
         abort_if($this->conversation->user_id !== Auth::id(), 403);
 
         if ($this->conversationHasStarted()) {
@@ -63,6 +65,7 @@ class ExploreChat extends Component
 
     public function sendMessage(LlmGateway $llm, SystemPromptCatalog $prompts): void
     {
+        $this->ensureAdmin();
         abort_if($this->conversation->user_id !== Auth::id(), 403);
         $this->forgetInactiveProjectIfNotStarted();
 
@@ -237,6 +240,11 @@ class ExploreChat extends Component
         }
 
         $this->hydrateSelectedProject();
+    }
+
+    private function ensureAdmin(): void
+    {
+        abort_unless(Auth::user()?->can('admin'), 403);
     }
 
     private function activeProjectId(mixed $projectId): ?int

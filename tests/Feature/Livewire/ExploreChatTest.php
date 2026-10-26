@@ -27,7 +27,7 @@ class ExploreChatTest extends TestCase
 
     public function test_sends_history_through_complete_prompt_with_fixed_openai_model(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $prompt = (new SystemPromptCatalog)->current('explore');
         $llm = $this->bindFakeLlmGateway()->queueComplete('Resposta livre do modelo.');
@@ -90,7 +90,7 @@ class ExploreChatTest extends TestCase
             ], 200),
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $prompt = (new SystemPromptCatalog)->current('explore');
 
@@ -119,7 +119,7 @@ class ExploreChatTest extends TestCase
 
     public function test_ignores_blank_input(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $llm = $this->bindFakeLlmGateway();
 
@@ -134,7 +134,7 @@ class ExploreChatTest extends TestCase
 
     public function test_shows_llm_error_in_the_thread(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $this->bindFakeLlmGateway()->queueComplete(new \RuntimeException('HTTP 401: chave inválida'));
 
@@ -148,7 +148,7 @@ class ExploreChatTest extends TestCase
 
     public function test_shows_soft_unavailable_message(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $this->bindFakeLlmGateway()->queueComplete(
             new LlmTemporarilyUnavailableException('Não consegui continuar agora. Envie a mensagem novamente em alguns instantes.')
@@ -172,7 +172,7 @@ class ExploreChatTest extends TestCase
             ], 200),
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $document = Document::factory()->create(['name' => 'missao.md']);
         DocumentChunk::factory()->create([
@@ -219,7 +219,7 @@ class ExploreChatTest extends TestCase
             ], 200),
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $mission = Document::factory()->create(['name' => 'missao.md']);
         $rules = Document::factory()->create(['name' => 'docs/regras/pagamento.md']);
@@ -270,7 +270,7 @@ class ExploreChatTest extends TestCase
 
     public function test_explore_answer_without_documents_has_no_source_tooltip(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
 
         $this->bindFakeLlmGateway()->queueComplete('Resposta livre.');
@@ -288,7 +288,7 @@ class ExploreChatTest extends TestCase
 
     public function test_selecting_a_project_before_the_first_message_persists(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $project = Project::factory()->create(['name' => 'Checkout']);
         $conversation = Conversation::createExploreFor($user);
 
@@ -305,7 +305,7 @@ class ExploreChatTest extends TestCase
 
     public function test_project_cannot_change_after_the_first_message(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $first = Project::factory()->create(['name' => 'Checkout']);
         $second = Project::factory()->create(['name' => 'Mobile']);
         $conversation = Conversation::createExploreFor($user);
@@ -336,7 +336,7 @@ class ExploreChatTest extends TestCase
             ], 200),
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $project = Project::factory()->create();
         $manual = Document::factory()->create(['name' => 'manual.md', 'project_id' => null]);
@@ -378,7 +378,7 @@ class ExploreChatTest extends TestCase
             ], 200),
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $project = Project::factory()->create(['name' => 'Checkout']);
         $conversation = Conversation::createExploreFor($user);
         $conversation->update(['project_id' => $project->id]);
@@ -413,8 +413,8 @@ class ExploreChatTest extends TestCase
 
     public function test_rejects_another_users_explore_conversation(): void
     {
-        $owner = User::factory()->create();
-        $other = User::factory()->create();
+        $owner = User::factory()->admin()->create();
+        $other = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($owner);
 
         Livewire::actingAs($other)
@@ -422,9 +422,19 @@ class ExploreChatTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_product_manager_cannot_use_explore_chat(): void
+    {
+        $productManager = User::factory()->create();
+        $conversation = Conversation::createExploreFor($productManager);
+
+        Livewire::actingAs($productManager)
+            ->test(ExploreChat::class, ['conversation' => $conversation])
+            ->assertForbidden();
+    }
+
     public function test_rejects_interview_conversation(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = $user->conversations()->create([
             'title' => 'Nova conversa',
             'prompt_name' => 'interview',
@@ -437,7 +447,7 @@ class ExploreChatTest extends TestCase
 
     public function test_explore_conversations_do_not_appear_in_the_interview_list(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $interview = $user->conversations()->create([
             'title' => 'Checkout digital',
         ]);
@@ -461,7 +471,7 @@ class ExploreChatTest extends TestCase
             ['id' => 'gpt-4o', 'name' => 'GPT-4o'],
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $llm = $this->bindFakeLlmGateway()
             ->queueComplete('Resposta com o padrão.')
@@ -501,7 +511,7 @@ class ExploreChatTest extends TestCase
             ['id' => 'gpt-4o', 'name' => 'GPT-4o'],
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $document = Document::factory()->create(['name' => 'missao.md']);
         DocumentChunk::factory()->create([
@@ -543,7 +553,7 @@ class ExploreChatTest extends TestCase
             0.30,
         ));
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
         $document = Document::factory()->create(['name' => 'missao.md']);
         DocumentChunk::factory()->create([

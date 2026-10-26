@@ -19,7 +19,7 @@ class ExplorePageTest extends TestCase
 
     public function test_index_lists_explorations_without_creating_one(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $exploration = Conversation::createExploreFor($user);
         $exploration->update(['title' => 'Checkout do produto']);
 
@@ -37,7 +37,7 @@ class ExplorePageTest extends TestCase
 
     public function test_index_shows_empty_state_when_there_are_no_explorations(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $this->actingAs($user)
             ->get(route('explorar.index'))
@@ -53,7 +53,7 @@ class ExplorePageTest extends TestCase
 
     public function test_store_creates_a_new_exploration_each_time(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $first = $this->actingAs($user)->post(route('explorar.store'));
         $second = $this->actingAs($user)->post(route('explorar.store'));
@@ -67,7 +67,7 @@ class ExplorePageTest extends TestCase
 
     public function test_show_opens_the_explore_chat(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
 
         $this->actingAs($user)
@@ -79,8 +79,8 @@ class ExplorePageTest extends TestCase
 
     public function test_show_rejects_another_users_exploration(): void
     {
-        $owner = User::factory()->create();
-        $other = User::factory()->create();
+        $owner = User::factory()->admin()->create();
+        $other = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($owner);
 
         $this->actingAs($other)
@@ -90,7 +90,7 @@ class ExplorePageTest extends TestCase
 
     public function test_interview_show_rejects_explore_conversation(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = Conversation::createExploreFor($user);
 
         $this->actingAs($user)
@@ -100,7 +100,7 @@ class ExplorePageTest extends TestCase
 
     public function test_show_rejects_interview_conversation(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $conversation = $user->conversations()->create([
             'title' => 'Nova conversa',
             'prompt_name' => 'interview',
@@ -113,7 +113,7 @@ class ExplorePageTest extends TestCase
 
     public function test_destroy_deletes_only_the_selected_exploration(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $keep = Conversation::createExploreFor($user);
         $remove = Conversation::createExploreFor($user);
 
@@ -125,14 +125,46 @@ class ExplorePageTest extends TestCase
         $this->assertDatabaseMissing('conversations', ['id' => $remove->id]);
     }
 
-    public function test_product_manager_sees_explorar_in_the_main_menu(): void
+    public function test_product_manager_cannot_access_explorar_or_see_the_nav_links(): void
     {
-        $user = User::factory()->create();
+        $productManager = User::factory()->create();
+        $conversation = Conversation::createExploreFor($productManager);
 
-        $this->actingAs($user)
+        $this->actingAs($productManager)
+            ->get(route('explorar.index'))
+            ->assertForbidden();
+
+        $this->actingAs($productManager)
+            ->post(route('explorar.store'))
+            ->assertForbidden();
+
+        $this->actingAs($productManager)
+            ->get(route('explorar.show', $conversation))
+            ->assertForbidden();
+
+        $this->actingAs($productManager)
+            ->delete(route('explorar.destroy', $conversation))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('conversations', ['id' => $conversation->id]);
+
+        $this->actingAs($productManager)
+            ->get(route('conversations.index'))
+            ->assertOk()
+            ->assertDontSee('href="'.route('explorar.index').'"', false)
+            ->assertDontSee('href="'.route('documents.index').'"', false);
+    }
+
+    public function test_admin_sees_explorar_and_documents_in_the_menu(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
             ->get(route('conversations.index'))
             ->assertOk()
             ->assertSee('href="'.route('explorar.index').'"', false)
-            ->assertSee('Explorar');
+            ->assertSee('href="'.route('documents.index').'"', false)
+            ->assertSee('Explorar')
+            ->assertSee('Documentos');
     }
 }

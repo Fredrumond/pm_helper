@@ -39,11 +39,44 @@ class DocumentsTest extends TestCase
             ->assertRedirect(route('login'));
     }
 
+    public function test_product_manager_is_forbidden_and_does_not_see_the_documents_link(): void
+    {
+        $productManager = User::factory()->create();
+
+        $this->actingAs($productManager)
+            ->get(route('documents.index'))
+            ->assertForbidden();
+
+        Livewire::actingAs($productManager)
+            ->test(Documents::class)
+            ->assertForbidden();
+
+        $this->actingAs($productManager)
+            ->get(route('conversations.index'))
+            ->assertOk()
+            ->assertDontSee('href="'.route('documents.index').'"', false);
+    }
+
+    public function test_admin_accesses_documents_and_sees_the_nav_link(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('conversations.index'))
+            ->assertOk()
+            ->assertSee('href="'.route('documents.index').'"', false)
+            ->assertSee('Documentos');
+
+        $this->actingAs($admin)
+            ->get(route('documents.index'))
+            ->assertOk();
+    }
+
     public function test_authenticated_user_uploads_md_file_and_sees_it_in_the_list(): void
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $file = UploadedFile::fake()->createWithContent('guia.md', "# Guia\n\nConteúdo de teste.");
 
@@ -77,7 +110,7 @@ class DocumentsTest extends TestCase
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $content = str_repeat('a', 500).str_repeat('b', 20);
         $file = UploadedFile::fake()->createWithContent('longo.md', $content);
 
@@ -108,7 +141,7 @@ class DocumentsTest extends TestCase
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $file = UploadedFile::fake()->createWithContent('notas.txt', 'texto');
 
@@ -124,7 +157,7 @@ class DocumentsTest extends TestCase
 
     public function test_user_can_edit_and_delete_document(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $document = Document::factory()->create([
             'name' => 'antigo.md',
             'content' => 'Antigo',
@@ -162,7 +195,7 @@ class DocumentsTest extends TestCase
 
     public function test_search_ranks_chunks_by_cosine_and_shows_top_three(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $this->seedRankedChunks();
 
         $component = Livewire::actingAs($user)
@@ -186,7 +219,7 @@ class DocumentsTest extends TestCase
 
     public function test_search_does_not_call_llm(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $this->seedRankedChunks();
 
         // Sem nenhum fake de LLM — se chamar a LLM a chamada Http real falharia;
@@ -210,7 +243,7 @@ class DocumentsTest extends TestCase
 
     public function test_search_requires_a_question(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         Livewire::actingAs($user)
             ->test(Documents::class)
@@ -221,7 +254,7 @@ class DocumentsTest extends TestCase
 
     public function test_search_without_embeddings_keeps_the_empty_index_message(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         Livewire::actingAs($user)
             ->test(Documents::class)
@@ -242,7 +275,7 @@ class DocumentsTest extends TestCase
             0.30,
         ));
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $document = Document::factory()->create(['name' => 'missao.md']);
         DocumentChunk::factory()->create([
             'document_id' => $document->id,
